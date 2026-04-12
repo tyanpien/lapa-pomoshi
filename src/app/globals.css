@@ -5,8 +5,37 @@
   --foreground: #111111;
 }
 
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Montserrat", sans-serif;
+}
+
+body.no-scroll {
+  overflow: hidden;
+}
+
+header, .header, nav, .nav {
+  will-change: auto;
+}
+
+.nav a,
+.nav span,
+.dropdown,
+.dropdownMenu {
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }

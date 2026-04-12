@@ -1,56 +1,92 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import Sidebar from "../sidebar/Sidebar";
+import { useState } from "react";
+import { useUser } from "@/shared/lib/hooks/useUser";
+import Sidebar from "@/widgets/sidebar/Sidebar";
+import styles from "./Header.module.css";
 
 export default function Header() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const { isAuth } = useUser();
+  const [open, setOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const burgerIcon = (open || isHovered) ? "/burger_hover.svg" : "/burger.svg";
+
+  const toggleMenu = () => setOpen(!open);
+  const closeMenu = () => setOpen(false);
 
   return (
-    <>
-      <header className="w-full h-16 bg-white border-b flex items-center justify-between px-6 relative">
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className="flex flex-col gap-1"
-        >
-          <span className="w-6 h-[2px] bg-black"></span>
-          <span className="w-6 h-[2px] bg-black"></span>
-          <span className="w-6 h-[2px] bg-black"></span>
-        </button>
+    <header className={styles.header}>
+      <div className={styles.container}>
+        <Link href="/" className={styles.logo}>
+          <img src="/logo.svg" alt="logo" />
+        </Link>
 
-        <nav className="flex gap-6 items-center">
-          <Link href="/help">Помочь</Link>
-          <Link href="/urgent">Срочно</Link>
+      <nav className={styles.nav}>
 
-          <div
-            className="relative"
-            onMouseEnter={() => setIsCatalogOpen(true)}
-            onMouseLeave={() => setIsCatalogOpen(false)}
-          >
-            <span className="cursor-pointer">Каталог</span>
+        <div className={styles.navItem}>
+          <div className={styles.dropdown}>
+            <div className={styles.dropdownWrapper}>
+              <div className={styles.dropdownTrigger}>
+                Каталог
+              </div>
 
-            {isCatalogOpen && (
-              <div className="absolute top-6 left-0 bg-white border shadow-md p-4 flex flex-col gap-2 z-50">
+              <div className={styles.dropdownMenu}>
                 <Link href="/catalog/animals">Животные</Link>
                 <Link href="/catalog/organizations">Организации</Link>
                 <Link href="/catalog/volunteers">Волонтеры</Link>
               </div>
-            )}
+            </div>
           </div>
+        </div>
 
-          <Link href="/knowledge">База знаний</Link>
-          <Link href="/events">Мероприятия</Link>
-        </nav>
+        <div className={styles.navItem}>
+          <Link href="/help">Помочь</Link>
+        </div>
 
-        <Link href="/login">Вход</Link>
-      </header>
+        <div className={styles.navItem}>
+          <div className={styles.dropdown}>
+            <div className={styles.dropdownWrapper}>
+              <div className={styles.dropdownTrigger}>
+                Узнать
+              </div>
 
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
-    </>
+              <div className={styles.dropdownMenu}>
+                <Link href="/knowledge">База знаний</Link>
+                <Link href="/events">Мероприятия</Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.navItem}>
+          <Link href="/urgent" className={styles.urgent}>
+            Срочно
+          </Link>
+        </div>
+
+      </nav>
+
+        <div className={styles.right}>
+          {!isAuth ? (
+            <Link href="/login" className={styles.login}>
+              <img src="/user.svg" alt="user" />
+              Войти
+            </Link>
+          ) : (
+            <button
+              onClick={toggleMenu}
+              className={styles.burger}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+            >
+              <img src={burgerIcon} alt="menu" />
+            </button>
+          )}
+        </div>
+      </div>
+      <Sidebar isOpen={open} onClose={closeMenu} />
+    </header>
   );
 }

@@ -1,0 +1,146 @@
+.header {
+  background: #3D4F3A;
+  width: 100%;
+  position: relative;
+  z-index: 100;
+}
+
+.container {
+  max-width: 1140px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px;
+  box-sizing: border-box;
+}
+
+.logo img {
+  width: 53px;
+  cursor: pointer;
+}
+
+.nav {
+  display: flex;
+  gap: 101px;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: #FFDC99;
+  align-items: center;
+  position: relative;
+}
+
+.navItem {
+  width: 120px;
+  display: flex;
+  justify-content: center;
+}
+
+.nav a,
+.nav span {
+  cursor: pointer;
+  display: inline-block;
+}
+
+.urgent {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdownWrapper {
+  width: 150px;
+}
+
+.dropdownTrigger {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #FFDC99;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.dropdownMenu {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 80%;
+  width: 150px;
+  flex-direction: column;
+  gap: 16px;
+  background: #C49A4A;
+  border-radius: 0 0 8px 8px;
+  padding: 16px 20px;
+  box-sizing: border-box;
+  z-index: 200;
+}
+
+.dropdown:hover .dropdownTrigger {
+  background: #C49A4A;
+  color: #FFFFFF;
+}
+
+.dropdown:hover .dropdownMenu {
+  display: flex;
+}
+
+.dropdownMenu a {
+  color: #FFFFFF;
+  font-size: 16px;
+  text-decoration: none;
+  font-weight: 400;
+  transition: 0.2s;
+}
+
+.dropdownMenu a:hover {
+  opacity: 0.8;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.login {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 600;
+  font-size: 20px;
+  color: #FFDC99;
+  text-decoration: none;
+  padding: 12px 0px;
+}
+
+.login img {
+  width: 20px;
+}
+
+.burger {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.burger img {
+  width: 28px;
+}
+
+.nav, .right {
+  align-items: center;
+}

@@ -1,8 +1,6 @@
-import Card from "@/shared/ui/card/card";
-
 export default function UrgentPage() {
   return (
-    <div>
+    <div className="flex justify-center items-center min-h-screen">
       <h1 className="text-2xl font-bold mb-4 text-red-600">
         Срочные случаи
       </h1>

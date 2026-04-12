@@ -1,0 +1,160 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.sidebar {
+  background: #3D4F3A;
+  color: #ffffff;
+  width: 100%;
+  height: 100%;
+  padding: 40px 60px;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.logo {
+  position: fixed;
+  top: 24px;
+  left: 213px;
+  transform: translateX(-50%);
+  z-index: 1001;
+}
+
+.logo img {
+  width: 53px;
+  cursor: pointer;
+}
+
+.closeButton {
+  position: fixed;
+  top: 33px;
+  right: calc(50% - 550px);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s;
+  z-index: 1001;
+}
+
+.closeButton:hover {
+  opacity: 0.8;
+}
+
+.closeButton img {
+  width: 28px;
+  height: 28px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 50px;
+  margin-top: 100px;
+  gap: 120px;
+  position: relative;
+  z-index: 1;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  font-size: 28px;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 600;
+}
+
+.column > a,
+.column > div {
+  cursor: pointer;
+  text-decoration: none;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.urgentLink {
+  color: #FFD57E !important;
+}
+
+.dropdownBlock {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  transition: 0.3s;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.dropdownBlock.active {
+  background: #51674E;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-left: -20px;
+  width: calc(100% + 20px);
+}
+
+.dropdownBlock:not(.active) {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
+.dropdownHeader {
+  cursor: pointer;
+  display: inline-block;
+}
+
+.dropdownTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 28px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.arrow {
+  display: inline-flex;
+  transition: transform 0.3s ease;
+}
+
+.arrow img {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.open {
+  transform: rotate(180deg);
+}
+
+.dropdownContent {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-left: 0;
+}
+
+.dropdownContent a {
+  font-size: 20px;
+  font-weight: 500;
+  opacity: 0.9;
+  color: #ffffff;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.dropdownContent a:hover {
+  opacity: 1;
+}
