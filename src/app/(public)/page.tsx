@@ -221,7 +221,7 @@ export default function HomePage() {
                   Временно приютите питомца, пока он ищет
                   постоянного дома
                 </p>
-                <a href="/catalog/volunteers" className={styles.helpLink}>
+                <a href="/help" className={styles.helpLink}>
                   Предложить дом →
                 </a>
               </div>

@@ -1,0 +1,307 @@
+.page {
+  background: #F5F0E8;
+  padding: 40px 0;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.breadcrumbs {
+  margin-bottom: 30px;
+  font-size: 14px;
+  color: #8C8176;
+}
+
+.breadcrumbs a {
+  color: #8B5A3C;
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumbs span {
+  margin: 0 8px;
+}
+
+.profileHeader {
+  display: flex;
+  gap: 30px;
+  width: 930px;
+  margin-bottom: 40px;
+  border-radius: 16px;
+  padding: 24px 30px;
+  margin-left: 200px;
+}
+
+.avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #E0D6CC;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profileInfo {
+  flex: 1;
+}
+
+.nameRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.nameRow h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #8B5A3C;
+  margin-top: 10px;
+}
+
+.writeBtn {
+  background: #8B5A3C;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.writeBtn:hover {
+  background: #794e34;
+}
+
+.infoRow {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.infoItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #666;
+}
+
+.infoIcon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+}
+
+.infoIconR {
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+}
+
+.threeColumns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 55px;
+  margin-bottom: 40px;
+}
+
+.column {
+  padding: 0px;
+}
+
+.column h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #000000;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+}
+
+/* компетенции */
+.column:first-child {
+  background: #7A8C6E;
+  border-radius: 8px;
+  padding: 20px;
+  width: 230px;
+}
+
+.column:first-child h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+}
+
+.column:first-child .skillsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.column:first-child .skillTag {
+  background: transparent;
+  padding: 6px 0;
+  font-size: 15px;
+  color: white;
+  font-weight: 400;
+  display: block;
+}
+
+/* о себе */
+.aboutText {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #000000;
+  margin: 0 0 30px 0;
+}
+
+.withWhomLink a {
+  color: #333333;
+  background-color: #EFE4D2;
+  text-decoration: none;
+  font-weight: 400;
+  padding: 10px 10px;
+  border-radius: 8px;
+  margin-left: 2PX;
+  font-size: 14px;
+}
+
+.withWhomLink a:hover {
+  text-decoration: underline;
+}
+
+/* доступность */
+.availability {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.availabilityItem {
+  display: flex;
+  gap: 4px;
+  font-size: 15px;
+  color: #000000;
+}
+
+.availabilityDay {
+  font-weight: 400;
+  color: #000000;
+  min-width: 55px;
+}
+
+/* кол-во выполненных задач */
+.tasksBlock {
+  justify-content: end;
+  width: 1130px;
+  display: flex;
+  gap: 16px;
+  padding: 30px;
+  margin-top: -100px;
+  margin-bottom: 40px;
+}
+
+.tasksNumber {
+  font-size: 48px;
+  font-weight: 800;
+  color: #3D4F3A;
+  line-height: 0.8;
+}
+
+.tasksLabel {
+  font-size: 15px;
+  color: #000000;
+  margin-top: 8px;
+}
+
+/* отзывы */
+.reviewsSection h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #8B5A3C;
+}
+
+.reviewCard {
+  padding: 20px;
+  margin-top: 20px;
+  width: 500px;
+  background: white;
+}
+
+.reviewCard:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.reviewHeader {
+  margin-bottom: 12px;
+}
+
+.reviewAuthorBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reviewAvatar {
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.reviewAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reviewAuthorInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reviewAuthor {
+  font-weight: 400;
+  color: #000000;
+  font-size: 14px;
+}
+
+.reviewDate {
+  font-size: 12px;
+  color: #8C8176;
+}
+
+.reviewRating {
+  font-size: 14px;
+  color: #F5A623;
+  margin-bottom: 12px;
+  letter-spacing: 2px;
+}
+
+.reviewText {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #444;
+  margin: 0;
+}

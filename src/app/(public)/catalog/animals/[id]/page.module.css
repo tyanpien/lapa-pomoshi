@@ -1,0 +1,283 @@
+.page {
+  background: #F5F0E8;
+  padding: 40px 0;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.breadcrumbs {
+  margin-bottom: 30px;
+  font-size: 14px;
+  color: #8C8176;
+}
+
+.breadcrumbs a {
+  color: #8B5A3C;
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumbs span {
+  margin: 0 8px;
+}
+
+.topBlock {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 48px;
+}
+
+.photoBlock {
+  flex: 1;
+}
+
+.mainPhoto {
+  width: 100%;
+  height: 400px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #E0D6CC;
+  margin-bottom: 16px;
+}
+
+.mainPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnails {
+  display: flex;
+  gap: 12px;
+}
+
+.thumbnail {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail:hover {
+  border-color: #C49A4A;
+}
+
+.activeThumb {
+  border-color: #8B5A3C;
+}
+
+.infoBlock {
+  flex: 1;
+}
+
+.infoBlock h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #8B5A3C;
+  margin: 0 0 16px 0;
+}
+
+.tags {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.tags span {
+  background: #EFE4D2;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333333;
+  font-weight: 500;
+}
+
+.description {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #444;
+  margin-bottom: 24px;
+}
+
+.orgBlock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.orgIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.orgBlock span {
+  font-size: 14px;
+  color: #8C8176;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 16px;
+}
+
+.helpBtn {
+  background: #8B5A3C;
+  color: white;
+  padding: 12px 28px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.helpBtn:hover {
+  background: #794e34;
+}
+
+.adoptBtn {
+  background: #8B5A3C;
+  color: white;
+  padding: 12px 28px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.adoptBtn:hover {
+  background: #794e34;
+}
+
+/* секции */
+.section {
+  padding: 0px 0px;
+  margin-bottom: 24px;
+}
+
+.section h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #8B5A3C;
+  margin: 0 0 20px 0;
+}
+
+/* здоровье и уход */
+.healthGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.healthItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.healthItem img {
+  width: 16px;
+  height: 16px;
+}
+
+.healthItem span {
+  font-size: 14px;
+  color: #333;
+}
+
+/* две колонки */
+.twoColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 60px;
+}
+
+.column {
+  margin-top: 20px;
+  width: 450px;
+}
+
+.column h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333333;
+  margin: 0 0 12px 0;
+}
+
+.healthText {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #000000;
+  margin: 0;
+}
+
+/* особенности характера */
+.characterTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.section h2 {
+  margin-bottom: 20px;
+}
+.characterTag {
+  background: #7A8C6E;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: white;
+  font-weight: 500;
+}
+
+.notFound {
+  text-align: center;
+  padding: 60px 20px;
+  margin-top: 100px;
+  margin-bottom: 100px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #C49A4A;
+}
+
+.notFound h1 {
+  font-size: 28px;
+  color: #8B5A3C;
+  margin-bottom: 20px;
+}
+
+.notFound a {
+  display: inline-block;
+  background: #8B5A3C;
+  color: white;
+  padding: 10px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.urgentTag {
+  color:#ffffff !important;
+  background: #9E1010 !important;
+}
