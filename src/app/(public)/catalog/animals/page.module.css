@@ -161,6 +161,44 @@
   background: #F5F0E8;
 }
 
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #49413a;
+}
+
+.checkboxLabel input {
+  display: none;
+}
+
+.customCheckbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #8B5A3C;
+  position: relative;
+  background: #f8f4ee;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.checkboxLabel input:checked + .customCheckbox {
+  background: #8B5A3C;
+  border-color: #8B5A3C;
+}
+
+.checkboxLabel input:checked + .customCheckbox::after {
+  content: "✓";
+  color: white;
+  font-size: 12px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .loading {
   text-align: center;
   margin-top: 250px;

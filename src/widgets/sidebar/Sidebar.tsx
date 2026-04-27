@@ -42,7 +42,6 @@ export default function Sidebar({ isOpen, onClose }: any) {
             {role === "user" && (
               <>
                 <Link href="/profile" onClick={onClose}>Мой профиль</Link>
-                <Link href="/requests" onClick={onClose}>Мои заявки</Link>
                 <Link href="/forms" onClick={onClose}>Мои анкеты</Link>
                 <Link href="/messages" onClick={onClose}>Мои сообщения</Link>
               </>
@@ -54,7 +53,6 @@ export default function Sidebar({ isOpen, onClose }: any) {
                   Лента задач
                 </Link>
                 <Link href="/profile" onClick={onClose}>Мой профиль</Link>
-                <Link href="/requests" onClick={onClose}>Мои заявки</Link>
                 <Link href="/forms" onClick={onClose}>Мои анкеты</Link>
                 <Link href="/responses" onClick={onClose}>Мои отклики</Link>
                 <Link href="/messages" onClick={onClose}>Мои сообщения</Link>

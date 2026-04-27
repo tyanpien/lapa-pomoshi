@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import styles from "./page.module.css";
 import { organizationsApi, Organization, OrganizationCatalogs, NeedOption } from "@/shared/api/endpoints/organizations";
 import { getImageUrl } from "@/shared/api/client";
@@ -167,12 +168,13 @@ export default function OrganizationsPage() {
             {openNeeds && (
               <div className={styles.column}>
                 {catalogs?.needs_options?.map((need: NeedOption) => (
-                  <label key={need.id}>
+                  <label key={need.id} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"
                       checked={needs.includes(need.id)}
                       onChange={() => toggleNeed(need.id)}
                     />
+                    <span className={styles.customCheckbox}></span>
                     {need.label}
                   </label>
                 ))}
@@ -271,7 +273,9 @@ export default function OrganizationsPage() {
                     </div>
                     <div className={styles.orgButtons}>
                       <button className={styles.helpBtn}>Помочь</button>
-                      <button className={styles.detailsBtn}>Подробнее</button>
+                      <Link href={`/catalog/organizations/${org.id}`} className={styles.detailsBtn}>
+                        Подробнее
+                      </Link>
                     </div>
                   </div>
                 )}

@@ -1,0 +1,353 @@
+.page {
+  min-height: 100vh;
+  background: #f3eee7;
+}
+
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 40px 0;
+}
+
+.pageHeader {
+  margin-bottom: 26px;
+}
+
+.title {
+  font-size: 32px;
+  margin-bottom: 30px;
+  color: #8B5A3C;
+  font-weight: 700;
+  margin-left: 344px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.filters {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-left: 20px;
+  margin-top: 10px;
+}
+
+.search {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #8B5A3C;
+  font-size: 14px;
+}
+
+.search:focus {
+  outline: none;
+  border-color: #8B5A3C;
+  box-shadow: 0 0 0 2px rgba(139, 90, 60, 0.1);
+}
+
+.dropdownFilter {
+  position: relative;
+  width: 100%;
+}
+
+.dropdownHeader {
+  border: 1px solid #8B5A3C;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #333333;
+}
+
+.dropdownList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #f3eee7;
+  border: 1px solid #8B5A3C;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  overflow: hidden;
+}
+
+.dropdownItem {
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 14px;
+}
+
+.dropdownItem:hover {
+  background: #f1e7d6;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  color: #000000;
+  margin-top: 6px;
+}
+
+.checkboxLabel input {
+  display: none;
+}
+
+.customCheckbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #8B5A3C;
+  position: relative;
+  background: #f8f4ee;
+  transition: all 0.2s ease;
+}
+
+.checkboxLabel input:checked + .customCheckbox {
+  background: #8B5A3C;
+  border-color: #8B5A3C;
+}
+
+.checkboxLabel input:checked + .customCheckbox::after {
+  content: "✓";
+  color: white;
+  font-size: 12px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.filterBlock {
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+
+.filterTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #8B5A3C;
+  margin-top: 10px;
+}
+
+.buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.pill {
+  border: 1px solid #8B5A3C;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 15px;
+}
+
+.buttons button:hover {
+  background-color: #8B5A3C;
+  color: white;
+  font-weight: 600;
+}
+
+.activeBtn {
+  background-color: #8B5A3C !important;
+  color: white;
+  font-weight: 600;
+}
+
+
+.checkGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.primaryBtn {
+  background: #8B5A3C;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+
+.primaryBtn:hover {
+  background: #794e34;
+}
+
+.resetBtn {
+  background: none;
+  border: none;
+  color: #8B5A3C;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px;
+  margin-top: -10px;
+  transition: color 0.2s;
+}
+
+.resetBtn:hover {
+  color: #916a51;
+}
+
+.cardsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 10px;
+  margin-left: 54px;
+}
+
+.card {
+  display: flex;
+  width: 100%;
+  max-width: 776px;
+  height: 340px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #FFFFFF;
+}
+
+.cardImageWrap {
+  position: relative;
+  width: 456px;
+  flex-shrink: 0;
+}
+
+.cardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tags {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.tag {
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8f5f1;
+  background: #C49A4A;
+}
+
+.tag:nth-child(2) {
+  background: #3D4F3A;
+}
+
+.statusBadge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f5f5f5;
+}
+
+.progressBadge {
+  background: #3D4F3A;
+}
+
+.deadlineBadge {
+  background: #952525;
+}
+
+.cardBody {
+  flex: 1;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.org {
+  margin: 0;
+  color: #9a9288;
+  font-size: 13px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: #1f1b18;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.description {
+  margin: 0;
+  color: #4c453f;
+  font-size: 15px;
+  line-height: 1.45;
+  flex: 1;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.cardBtn {
+  border: none;
+  border-radius: 8px;
+  background: #8a5a3b;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.cardBtn:hover {
+  background: #74482d;
+}
+
+.detailsLink {
+  color: #7b5a45;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.detailsLink:hover {
+  text-decoration: underline;
+}

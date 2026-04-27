@@ -218,12 +218,14 @@ export default function Page() {
             <div>
               <p>Пол</p>
               <div className={styles.column}>
-                <label>
+                <label className={styles.checkboxLabel}>
                   <input onChange={() => toggle("male", gender, setGender)} type="checkbox" />
+                  <span className={styles.customCheckbox}></span>
                   Мальчик
                 </label>
-                <label>
+                <label className={styles.checkboxLabel}>
                   <input onChange={() => toggle("female", gender, setGender)} type="checkbox" />
+                  <span className={styles.customCheckbox}></span>
                   Девочка
                 </label>
               </div>
@@ -233,8 +235,9 @@ export default function Page() {
               <p>Возраст</p>
               <div className={styles.column}>
                 {catalogs?.age_groups?.map(g => (
-                  <label key={g.id}>
+                  <label key={g.id} className={styles.checkboxLabel}>
                     <input onChange={() => toggle(g.id, age, setAge)} type="checkbox" />
+                    <span className={styles.customCheckbox}></span>
                     {g.label}
                   </label>
                 ))}
@@ -253,11 +256,12 @@ export default function Page() {
             {openFeatures && (
               <div className={styles.column}>
                 {catalogs?.features?.map(f => (
-                  <label key={f.id}>
+                  <label key={f.id} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"
                       onChange={() => toggle(f.label, features, setFeatures)}
                     />
+                    <span className={styles.customCheckbox}></span>
                     {f.label}
                   </label>
                 ))}
@@ -275,25 +279,28 @@ export default function Page() {
             </p>
             {openStatus && (
               <div className={styles.column}>
-                <label>
+                <label className={styles.checkboxLabel}>
                   <input
                     type="checkbox"
                     onChange={() => toggle("home", status, setStatus)}
                   />
+                  <span className={styles.customCheckbox}></span>
                   Ищет дом
                 </label>
-                <label>
+                <label className={styles.checkboxLabel}>
                   <input
                     type="checkbox"
                     onChange={() => toggle("treatment", status, setStatus)}
                   />
+                  <span className={styles.customCheckbox}></span>
                   На лечении
                 </label>
-                <label>
+                <label className={styles.checkboxLabel}>
                   <input
                     type="checkbox"
                     onChange={() => toggle("temporary", status, setStatus)}
                   />
+                  <span className={styles.customCheckbox}></span>
                   Передержка
                 </label>
               </div>

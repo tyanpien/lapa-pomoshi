@@ -15,7 +15,6 @@ export default function Footer() {
 
             <div className={styles.footerCol}>
               <h4>Навигация</h4>
-              <a href="/">Главная</a>
               <a href="/catalog/animals">Животные</a>
               <a href="/catalog/organizations">Организации</a>
               <a href="/catalog/volunteers">Волонтеры</a>
@@ -28,7 +27,6 @@ export default function Footer() {
               <a href="/urgent">Срочные сборы</a>
               <a href="/knowledge">База знаний</a>
               <a href="/volunteer">Стать волонтером</a>
-              <a href="/foster">Передержка</a>
             </div>
 
             <div className={styles.footerCol}>

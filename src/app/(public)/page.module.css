@@ -1,767 +1,771 @@
-.page {
-  font-family: "Montserrat", sans-serif;
-  overflow-x: hidden;
-}
-
-/* главная */
-.hero {
-  background: #3D4F3A;
-  width: 100vw;
-  height: 800px;
-  margin-left: calc(-50vw + 50%);
-  padding: 80px 0;
-}
-
-.container {
-  max-width: 1140px;
-  margin: 0 auto;
-}
-
-.hero .container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.heroLeft {
-  max-width: 586px;
-}
-
-.heroLeft h1 {
-  font-size: 36px;
-  font-weight: 600;
-  color: #FFFFFF;
-  line-height: 1.2;
-  margin-bottom: 70px;
-}
-
-.heroLeft p {
-  font-size: 16px;
-  color: #FFFFFF;
-  margin-bottom: 70px;
-  line-height: 1.5;
-}
-
-.heroButtons {
-  display: flex;
-  gap: 16px;
-}
-
-.primary {
-  background: #8B5A3C;
-  color: white;
-  padding: 16px 36px;
-  border-radius: 10px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.primary:hover {
-  background: #865a3e;
-}
-
-.secondary {
-  border: 3px solid #8B5A3C;
-  color: white;
-  padding: 14px 26px;
-  font-weight: 600;
-  border-radius: 10px;
-  text-decoration: none;
-}
-
-.secondary:hover {
-  border: 3px solid #a66c48;
-}
-
-.heroRight img {
-  width: 454px;
-}
-
-
-/* срочно нужна помощь */
-.urgent {
-  background: #F5F0E8;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  padding: 120px 0;
-}
-
-.container {
-  max-width: 1140px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 40px;
-}
-
-.urgent h2 {
-  font-size: 28px;
-  color: #8B5A3C;
-  font-weight: 600;
-  margin: 0;
-}
-
-.viewAllBtn {
-  color: #333333;
-  font-size: 16px;
-  font-weight: 500;
-  text-decoration: none;
-  display: inline-block;
-  margin-top: 20px;
-  margin-left: 1090px;
-  transition: opacity 0.2s;
-}
-
-.viewAllBtn:hover {
-  opacity: 0.7;
-}
-
-.urgentGrid {
-  display: flex;
-  gap: 32px;
-}
-
-.bigCard {
-  display: flex;
-  background: white;
-  border-radius: 16px;
-  overflow: hidden;
-  width: 740px;
-  height: 390px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-.bigImageWrapper {
-  position: relative;
-  width: 80%;
-  height: 100%;
-}
-
-.bigImage {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.bigImage img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.progressOnImage {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 20px 16px 12px;
-}
-
-.progressBarWrapper {
-  position: relative;
-  background: #F5F0E8;
-  border-radius: 8px;
-  height: 28px;
-  overflow: hidden;
-}
-
-.progressBarFill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  background: #3D4F3A;
-  border-radius: 8px;
-  z-index: 1;
-}
-
-.progressText {
-  position: relative;
-  display: block;
-  text-align: left;
-  margin-left: 14px;
-  margin-top: 2px;
-  line-height: 24px;
-  font-size: 14px;
-  color: white;
-  font-weight: 600;
-  z-index: 2;
-}
-
-.bigInfo {
-  padding: 32px;
-  width: 50%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.orgName {
-  font-size: 14px;
-  color: #000000;
-  margin-bottom: 4px;
-  font-weight: 400;
-}
-
-.bigInfo h3 {
-  font-size: 32px;
-  margin: 0 0 20px 0;
-  font-weight: 700;
-  color: #333333;
-}
-
-.bigInfo p {
-  font-size: 16px;
-  margin: 0 0 97px 0;
-  font-weight: 400;
-  height: 89px;
-  color: #333333;
-}
-
-.bigActions {
-  display: flex;
-  gap: 26px;
-  align-items: center;
-}
-
-.helpBtn {
-  background: #8B5A3C;
-  color: white;
-  padding: 12px 32px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  text-decoration: none;
-  transition: background 0.3s ease;
-  display: inline-block;
-}
-
-.helpBtn:hover {
-  background: #6B4428;
-}
-
-.moreBtn {
-  color: #8B5A3C;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.moreBtn:hover {
-  text-decoration: underline;
-}
-
-.smallGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 32px;
-}
-
-.smallGrid img {
-  width: 163px;
-  height: 176px;
-  border-radius: 8px;
-  object-fit: cover;
-  cursor: pointer;
-}
-
-.smallCard {
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.smallImage {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.smallImage img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.smallFilter {
-  position: absolute;
-  top: 141px;
-  left: 10px;
-  background: #3D4F3A;
-  backdrop-filter: blur(4px);
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 5px;
-  z-index: 1;
-}
-
-.smallFilter1 {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: #C49A4A;
-  backdrop-filter: blur(4px);
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 5px;
-  z-index: 1;
-}
-
-
-/* как вы можете помочь */
-.helpSection {
-  background: #F5F0E8;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  padding: 80px 0;
-}
-
-.container {
-  max-width: 1140px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-.sectionTitle {
-  font-size: 28px;
-  color: #8B5A3C;
-  font-weight: 600;
-  margin-bottom: 40px;
-}
-
-.helpGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 32px;
-}
-
-.helpCard {
-  background: transparent;
-  border: 1px solid #C49A4A;
-  border-radius: 12px;
-  padding: 28px 24px;
-  text-align: center;
-  transition: all 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.helpCardContent {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.helpPhoto {
-  width: 100px;
-  height: 100px;
-  margin: 0 auto 20px auto;
-  display: block;
-}
-
-.helpVolunteer {
-  width: 130px;
-  height: 104px;
-  margin: 0 auto 16px auto;
-  display: block;
-}
-
-.helpThings {
-  width: 100px;
-  height: 100px;
-  margin: 0 auto 20px auto;
-  display: block;
-}
-
-.helpCard h3 {
-  font-size: 20px;
-  font-weight: 600;
-  color: #8B5A3C;
-  margin: 0 0 24px 0;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #C49A4A;
-}
-
-.helpCard p {
-  font-size: 16px;
-  color: #333333;
-  line-height: 1.5;
-  margin: 0 0 24px 0;
-  flex: 1;
-  text-align: center;
-}
-
-.helpLink {
-  font-size: 16px;
-  font-weight: 600;
-  color: #8B5A3C;
-  text-decoration: none;
-  display: inline-block;
-  margin-top: auto;
-  align-self: center;
-  padding: 8px 0;
-  transition: opacity 0.2s;
-}
-
-.helpLink:hover {
-  opacity: 0.7;
-}
-
-.helpCard:hover {
-  border-color: #8B5A3C;
-  transform: translateY(-2px);
-}
-
-
-/* ищут дом*/
-.homeSection {
-  background: #F5F0E8;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  padding: 80px 0;
-}
-
-.homeHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-.homeHeader h2 {
-  font-size: 28px;
-  color: #8B5A3C;
-  font-weight: 600;
-}
-
-.filters {
-  display: flex;
-  gap: 14px;
-}
-
-.filters button {
-  border: 1px solid #C49A4A;
-  background: transparent;
-  padding: 8px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: #333333;
-}
-
-.filters .active {
-  background: #8B5A3C;
-  color: white;
-  border: none;
-}
-
-.homeGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 30px;
-}
-
-.animalCard {
-  overflow: hidden;
-}
-
-.imageWrapper {
-  position: relative;
-}
-
-.imageWrapper img {
-  width: 100%;
-  height: 240px;
-  object-fit: cover;
-  border-radius: 8px;
-}
-
-.badge {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  background: #3D4F3A;
-  color: white;
-  font-size: 14px;
-  padding: 6px 10px;
-  border-radius: 8px;
-}
-
-.cardBody {
-  padding: 32px;
-  margin-top: 12px;
-  border-radius: 8px;
-  border: 1px solid #C49A4A;
-}
-
-.cardBody h3 {
-  font-size: 26px;
-  font-weight: 600;
-  color: #8B5A3C;
-  margin-bottom: 10px;
-}
-
-.tags {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.tags span {
-  background: #7A8C6E;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  color: white;
-}
-
-.org {
-  font-size: 14px;
-  color: #00000094;
-  margin-bottom: 32px;
-}
-
-.orgIcon {
-  width: 18px;
-  height: 18px;
-  display: inline-block;
-  margin-right: 4px;
-}
-
-.link {
-  color: #8B5A3C;
-  font-weight: 600;
-  font-size: 16px;
-  text-decoration: none;
-}
-
-.center {
-  display: flex;
-  justify-content: center;
-  margin-top: 32px;
-}
-
-.showAll {
-  border: 1px solid #8B5A3C;
-  padding: 12px 28px;
-  border-radius: 8px;
-  font-weight: 600;
-  text-decoration: none;
-  color: #333333;
-}
-
-
-/* организации на платформе */
-.orgSection {
-  background: #F5F0E8;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  padding: 80px 0;
-}
-
-.orgHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-.orgHeader h2 {
-  font-size: 28px;
-  color: #8B5A3C;
-  font-weight: 600;
-}
-
-.showAllRight {
-  color: #8B5A3C;
-  text-decoration: none;
-  font-weight: 600;
-  margin-left: 1159px;
-  margin-top: 32px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.orgGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 30px;
-}
-
-.orgCard {
-  border: 1px solid #8B5A3C;
-  border-radius: 8px;
-  padding: 20px;
-  height: 200px;
-  transition: 0.3s;
-}
-
-.orgTop {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.orgLogo {
-  width: 50px;
-  height: 50px;
-  background: #3D4F3A;
-  border-radius: 50%;
-  margin-bottom: 16px;
-}
-
-.orgTop h3 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #333333;
-  margin-top: -16px;
-}
-
-.orgCard p {
-  font-size: 16px;
-  color: #000000;
-  margin-bottom: 34px;
-}
-
-.orgLink {
-  font-size: 16px;
-  font-weight: 600;
-  color: #8B5A3C;
-  text-decoration: none;
-}
-
-
-/* ближайшие мероприятия */
-.eventsSection {
-  background: #F5F0E8;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  padding: 80px 0;
-}
-
-.eventsHeader {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 32px;
-}
-
-.eventsHeader h2 {
-  font-size: 28px;
-  color: #8B5A3C;
-  font-weight: 600;
-  white-space:nowrap;
-}
-
-.eventsGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}
-
-.eventCard {
-  border: 1px solid #8B5A3C;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.eventCard img {
-  width: 100%;
-  height: 180px;
-  object-fit: cover;
-}
-
-.eventBody {
-  padding: 16px;
-}
-
-.eventBody h3 {
-  font-size: 18px;
-  color: #8B5A3C;
-  margin-bottom: 8px;
-}
-
-.eventMeta {
-  font-size: 13px;
-  color: #8C8176;
-  margin-bottom: 10px;
-}
-
-.eventLink {
-  color: #8B5A3C;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-
-/* регистрация */
-.ctaSection {
-  background: #F5F0E8;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  padding: 20px 0;
-  padding-bottom: 60px;
-}
-
-.ctaBox {
-  background: #f1e8da;
-  border-radius: 8px;
-  padding: 60px;
-  text-align: center;
-}
-
-.ctaBox h2 {
-  font-size: 28px;
-  color: #8B5A3C;
-  margin-bottom: 16px;
-  font-weight: 600;
-}
-
-.ctaBox p {
-  color: #6B5E52;
-  margin-bottom: 34px;
-}
-
-.ctaButtons {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  font-size: 14px;
-}
-
-.primaryReg {
-  background: #8B5A3C;
-  color: white;
-  border-radius: 8px;
-  font-weight: 600;
-  padding: 16px 10px;
-  text-decoration: none;
-}
-
-.primaryReg:hover {
-  background: #865a3e;
-}
-
-.secondaryHelp {
-  border: 3px solid #8B5A3C;
-  color: #8B5A3C;
-  padding: 14px 26px;
-  font-weight: 600;
-  border-radius: 8px;
-  text-decoration: none;
-}
-
-.secondaryHelp:hover {
-  border: 3px solid #a66c48;
-}
+  .page {
+    font-family: "Montserrat", sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* главная */
+  .hero {
+    background: #3D4F3A;
+    width: 100vw;
+    height: 800px;
+    margin-left: calc(-50vw + 50%);
+    padding: 80px 0;
+  }
+
+  .container {
+    max-width: 1140px;
+    margin: 0 auto;
+  }
+
+  .hero .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .heroLeft {
+    max-width: 586px;
+  }
+
+  .heroLeft h1 {
+    font-size: 36px;
+    font-weight: 600;
+    color: #FFFFFF;
+    line-height: 1.2;
+    margin-bottom: 70px;
+  }
+
+  .heroLeft p {
+    font-size: 16px;
+    color: #FFFFFF;
+    margin-bottom: 70px;
+    line-height: 1.5;
+  }
+
+  .heroButtons {
+    display: flex;
+    gap: 16px;
+  }
+
+  .primary {
+    background: #8B5A3C;
+    color: white;
+    padding: 16px 36px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .primary:hover {
+    background: #865a3e;
+  }
+
+  .secondary {
+    border: 3px solid #8B5A3C;
+    color: white;
+    padding: 14px 26px;
+    font-weight: 600;
+    border-radius: 10px;
+    text-decoration: none;
+  }
+
+  .secondary:hover {
+    border: 3px solid #a66c48;
+  }
+
+  .heroRight img {
+    width: 454px;
+  }
+
+
+  /* срочно нужна помощь */
+  .urgent {
+    background: #F5F0E8;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding: 120px 0;
+  }
+
+  .container {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+  }
+
+  .urgent h2 {
+    font-size: 28px;
+    color: #8B5A3C;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .viewAllBtn {
+    color: #333333;
+    font-size: 16px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 20px;
+    margin-left: 1090px;
+    transition: opacity 0.2s;
+  }
+
+  .viewAllBtn:hover {
+    opacity: 0.7;
+  }
+
+  .urgentGrid {
+    display: flex;
+    gap: 32px;
+  }
+
+  .bigCard {
+    display: flex;
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    width: 2240px;
+    height: 390px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+
+  .bigImageWrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .bigImage {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .bigImage img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .progressOnImage {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px 16px 12px;
+  }
+
+  .progressBarWrapper {
+    position: relative;
+    background: #F5F0E8;
+    border-radius: 8px;
+    height: 28px;
+    overflow: hidden;
+  }
+
+  .progressBarFill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: #3D4F3A;
+    border-radius: 8px;
+    z-index: 1;
+  }
+
+  .progressText {
+    position: relative;
+    display: block;
+    text-align: left;
+    margin-left: 14px;
+    margin-top: 2px;
+    line-height: 24px;
+    font-size: 14px;
+    color: white;
+    font-weight: 600;
+    z-index: 2;
+  }
+
+  .bigInfo {
+    padding: 32px;
+    padding-top: 50px;
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .orgName {
+    font-size: 14px;
+    color: #000000;
+    margin-bottom: 4px;
+    font-weight: 400;
+  }
+
+  .bigInfo h3 {
+    font-size: 32px;
+    margin: 0 0 20px 0;
+    font-weight: 700;
+    color: #333333;
+  }
+
+  .bigInfo p {
+    font-size: 16px;
+    margin: 0 0 97px 0;
+    font-weight: 400;
+    height: 89px;
+    color: #333333;
+  }
+
+  .bigActions {
+    display: flex;
+    gap: 26px;
+    align-items: center;
+  }
+
+  .helpBtn {
+    background: #8B5A3C;
+    color: white;
+    padding: 12px 32px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    transition: background 0.3s ease;
+    display: inline-block;
+  }
+
+  .helpBtn:hover {
+    background: #6B4428;
+  }
+
+  .moreBtn {
+    color: #8B5A3C;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .moreBtn:hover {
+    text-decoration: underline;
+  }
+
+  .smallGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+  }
+
+  .smallGrid img {
+    width: 163px;
+    height: 176px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: pointer;
+  }
+
+  .smallCard {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+        width: 163px;
+    height: 176px;
+  }
+
+  .smallImage {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .smallImage img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .smallFilter {
+    position: absolute;
+    top: 141px;
+    left: 10px;
+    background: #3D4F3A;
+    backdrop-filter: blur(4px);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 5px;
+    z-index: 1;
+  }
+
+  .smallFilter1 {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #C49A4A;
+    backdrop-filter: blur(4px);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 5px;
+    z-index: 1;
+  }
+
+
+  /* как вы можете помочь */
+  .helpSection {
+    background: #F5F0E8;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding: 80px 0;
+  }
+
+  .container {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  .sectionTitle {
+    font-size: 28px;
+    color: #8B5A3C;
+    font-weight: 600;
+    margin-bottom: 40px;
+  }
+
+  .helpGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+  }
+
+  .helpCard {
+    background: transparent;
+    border: 1px solid #C49A4A;
+    border-radius: 12px;
+    padding: 28px 24px;
+    text-align: center;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .helpCardContent {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  .helpPhoto {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 20px auto;
+    display: block;
+  }
+
+  .helpVolunteer {
+    width: 130px;
+    height: 104px;
+    margin: 0 auto 16px auto;
+    display: block;
+  }
+
+  .helpThings {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 20px auto;
+    display: block;
+  }
+
+  .helpCard h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #8B5A3C;
+    margin: 0 0 24px 0;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #C49A4A;
+  }
+
+  .helpCard p {
+    font-size: 16px;
+    color: #333333;
+    line-height: 1.5;
+    margin: 0 0 24px 0;
+    flex: 1;
+    text-align: center;
+  }
+
+  .helpLink {
+    font-size: 16px;
+    font-weight: 600;
+    color: #8B5A3C;
+    text-decoration: none;
+    display: inline-block;
+    margin-top: auto;
+    align-self: center;
+    padding: 8px 0;
+    transition: opacity 0.2s;
+  }
+
+  .helpLink:hover {
+    opacity: 0.7;
+  }
+
+  .helpCard:hover {
+    border-color: #8B5A3C;
+    transform: translateY(-2px);
+  }
+
+
+  /* ищут дом*/
+  .homeSection {
+    background: #F5F0E8;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding: 80px 0;
+  }
+
+  .homeHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+  }
+
+  .homeHeader h2 {
+    font-size: 28px;
+    color: #8B5A3C;
+    font-weight: 600;
+  }
+
+  .filters {
+    display: flex;
+    gap: 14px;
+  }
+
+  .filters button {
+    border: 1px solid #C49A4A;
+    background: transparent;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #333333;
+  }
+
+  .filters .active {
+    background: #8B5A3C;
+    color: white;
+    border: none;
+  }
+
+  .homeGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+  }
+
+  .animalCard {
+    overflow: hidden;
+  }
+
+  .imageWrapper {
+    position: relative;
+  }
+
+  .imageWrapper img {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+
+  .badge {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: #3D4F3A;
+    color: white;
+    font-size: 14px;
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+
+  .cardBody {
+    padding: 32px;
+    margin-top: 12px;
+    border-radius: 8px;
+    height: 250px;
+    border: 1px solid #C49A4A;
+  }
+
+  .cardBody h3 {
+    font-size: 26px;
+    font-weight: 600;
+    color: #8B5A3C;
+    margin-bottom: 10px;
+  }
+
+  .tags {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .tags span {
+    background: #7A8C6E;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: white;
+  }
+
+  .org {
+    font-size: 14px;
+    color: #00000094;
+    margin-bottom: 32px;
+  }
+
+  .orgIcon {
+    width: 18px;
+    height: 18px;
+    display: inline-block;
+    margin-right: 4px;
+  }
+
+  .link {
+    color: #8B5A3C;
+    font-weight: 600;
+    font-size: 16px;
+    text-decoration: none;
+  }
+
+  .center {
+    display: flex;
+    justify-content: center;
+    margin-top: 32px;
+  }
+
+  .showAll {
+    border: 1px solid #8B5A3C;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    color: #333333;
+  }
+
+
+  /* организации на платформе */
+  .orgSection {
+    background: #F5F0E8;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding: 80px 0;
+  }
+
+  .orgHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+  }
+
+  .orgHeader h2 {
+    font-size: 28px;
+    color: #8B5A3C;
+    font-weight: 600;
+  }
+
+  .showAllRight {
+    color: #8B5A3C;
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 1159px;
+    margin-top: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .orgGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+  }
+
+  .orgCard {
+    border: 1px solid #8B5A3C;
+    border-radius: 8px;
+    padding: 20px;
+    height: 200px;
+    transition: 0.3s;
+  }
+
+  .orgTop {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .orgLogo {
+    width: 50px;
+    height: 50px;
+    background: #3D4F3A;
+    border-radius: 50%;
+    margin-bottom: 16px;
+  }
+
+  .orgTop h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333333;
+    margin-top: -16px;
+  }
+
+  .orgCard p {
+    font-size: 16px;
+    color: #000000;
+    margin-bottom: 34px;
+  }
+
+  .orgLink {
+    font-size: 16px;
+    font-weight: 600;
+    color: #8B5A3C;
+    text-decoration: none;
+  }
+
+
+  /* ближайшие мероприятия */
+  .eventsSection {
+    background: #F5F0E8;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding: 80px 0;
+  }
+
+  .eventsHeader {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .eventsHeader h2 {
+    font-size: 28px;
+    color: #8B5A3C;
+    font-weight: 600;
+    white-space:nowrap;
+  }
+
+  .eventsGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  .eventCard {
+    border: 1px solid #8B5A3C;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .eventCard img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+  }
+
+  .eventBody {
+    padding: 16px;
+  }
+
+  .eventBody h3 {
+    font-size: 18px;
+    color: #8B5A3C;
+    margin-bottom: 8px;
+  }
+
+  .eventMeta {
+    font-size: 13px;
+    color: #8C8176;
+    margin-bottom: 10px;
+  }
+
+  .eventLink {
+    color: #8B5A3C;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+
+  /* регистрация */
+  .ctaSection {
+    background: #F5F0E8;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding: 20px 0;
+    padding-bottom: 60px;
+  }
+
+  .ctaBox {
+    background: #f1e8da;
+    border-radius: 8px;
+    padding: 60px;
+    text-align: center;
+  }
+
+  .ctaBox h2 {
+    font-size: 28px;
+    color: #8B5A3C;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  .ctaBox p {
+    color: #6B5E52;
+    margin-bottom: 34px;
+  }
+
+  .ctaButtons {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: 14px;
+  }
+
+  .primaryReg {
+    background: #8B5A3C;
+    color: white;
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 16px 10px;
+    text-decoration: none;
+  }
+
+  .primaryReg:hover {
+    background: #865a3e;
+  }
+
+  .secondaryHelp {
+    border: 3px solid #8B5A3C;
+    color: #8B5A3C;
+    padding: 14px 26px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+  }
+
+  .secondaryHelp:hover {
+    border: 3px solid #a66c48;
+  }

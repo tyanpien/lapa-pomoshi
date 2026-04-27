@@ -1,51 +1,86 @@
 .page {
-  background: #F5F0E8;
-  padding: 40px 0;
   min-height: 100vh;
+  background: #f5f2ec;
+  color: #37312d;
+  padding: 34px 0 84px;
 }
 
 .container {
-  max-width: 1140px;
+  width: 100%;
+  max-width: 1158px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 28px;
+}
+
+.notFound {
+  max-width: 1158px;
+  margin: 0 auto;
+  padding: 84px 28px;
+  color: #5e5148;
+}
+
+.notFound a {
+  color: #8b5a3c;
 }
 
 .breadcrumbs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 30px;
   font-size: 14px;
-  color: #8C8176;
+  color: #867e76;
 }
 
 .breadcrumbs a {
-  color: #8B5A3C;
+  color: #8b5a3c;
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 
 .breadcrumbs a:hover {
-  text-decoration: underline;
+  color: #754a31;
 }
 
-.breadcrumbs span {
-  margin: 0 8px;
+.breadcrumbs a:active {
+  color: #663f2a;
+}
+
+.breadcrumbs a:focus-visible {
+  outline: 2px solid #8b5a3c;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .profileHeader {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
   gap: 30px;
-  width: 930px;
-  margin-bottom: 40px;
-  border-radius: 16px;
-  padding: 24px 30px;
-  margin-left: 200px;
+  align-items: start;
+  margin-left: 180px;
+  margin-bottom: 44px;
+  margin-top: 40px;
+}
+
+.headerMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.avatarWrap {
+  position: relative;
+  width: 124px;
+  height: 124px;
+  flex: 0 0 124px;
 }
 
 .avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: #E0D6CC;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
   overflow: hidden;
-  flex-shrink: 0;
+  background: #D9D9D9;
 }
 
 .avatar img {
@@ -54,205 +89,277 @@
   object-fit: cover;
 }
 
+.statusDot {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #f5f2ec;
+}
+
+.statusDotAvailable {
+  background: #4f7f45;
+}
+
+.statusDotBusy {
+  background: #c2554b;
+}
+
 .profileInfo {
-  flex: 1;
-}
-
-.nameRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.nameRow h1 {
-  font-size: 32px;
-  font-weight: 700;
-  color: #8B5A3C;
-  margin-top: 10px;
-}
-
-.writeBtn {
-  background: #8B5A3C;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  border: none;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.writeBtn:hover {
-  background: #794e34;
-}
-
-.infoRow {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.infoItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: #666;
-}
-
-.infoIcon {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-}
-
-.infoIconR {
-  width: 20px;
-  height: 20px;
-  display: inline-block;
-}
-
-.threeColumns {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 55px;
-  margin-bottom: 40px;
-}
-
-.column {
-  padding: 0px;
-}
-
-.column h2 {
-  font-size: 16px;
-  font-weight: 700;
-  color: #000000;
-  margin: 0 0 16px 0;
-  padding-bottom: 8px;
-}
-
-/* компетенции */
-.column:first-child {
-  background: #7A8C6E;
-  border-radius: 8px;
-  padding: 20px;
-  width: 230px;
-}
-
-.column:first-child h2 {
-  font-size: 20px;
-  font-weight: 700;
-  color: white;
-  margin: 0 0 16px 0;
-  padding-bottom: 8px;
-}
-
-.column:first-child .skillsList {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.column:first-child .skillTag {
-  background: transparent;
-  padding: 6px 0;
-  font-size: 15px;
-  color: white;
-  font-weight: 400;
-  display: block;
+.title {
+  margin: 2px 0 10px;
+  font-size: 28px;
+  line-height: 1.04;
+  color: #8b5a3c;
+  font-weight: 700;
 }
 
-/* о себе */
-.aboutText {
-  font-size: 15px;
-  line-height: 1.5;
-  color: #000000;
-  margin: 0 0 30px 0;
-}
-
-.withWhomLink a {
-  color: #333333;
-  background-color: #EFE4D2;
-  text-decoration: none;
-  font-weight: 400;
-  padding: 10px 10px;
-  border-radius: 8px;
-  margin-left: 2PX;
+.location {
+  margin: 0 0 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
+  color: #7d736a;
 }
 
-.withWhomLink a:hover {
-  text-decoration: underline;
+.locationIcon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.75;
 }
 
-/* доступность */
-.availability {
+.tagsRow {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.availabilityItem {
+.stateTag,
+.experienceTag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  padding: 10px 10px;
+  font-size: 12px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.stateTag {
+  background: #738b6a;
+  color: #f8f5ef;
+}
+
+.experienceTag {
+  background: #EFE4D2;
+  color: #544a42;
+}
+
+.actionsRow {
   display: flex;
-  gap: 4px;
-  font-size: 15px;
-  color: #000000;
+  gap: 10px;
+  margin-top: 4px;
 }
 
-.availabilityDay {
-  font-weight: 400;
-  color: #000000;
-  min-width: 55px;
+.writeBtn,
+.offerBtn {
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid #8b5a3c;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-/* кол-во выполненных задач */
+.writeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #8b5a3c;
+  color: #f8f5ef;
+  text-decoration: none;
+}
+
+.writeBtn:hover {
+  background: #784d34;
+  border-color: #784d34;
+}
+
+.writeBtn:active {
+  transform: translateY(1px);
+}
+
+.writeBtn:focus-visible {
+  outline: 2px solid #8b5a3c;
+  outline-offset: 2px;
+}
+
+.offerBtn {
+  background: #f5f2ec;
+  color: #5d4d43;
+}
+
+.offerBtn:hover {
+  background: #ede7dc;
+}
+
+.offerBtn:active {
+  transform: translateY(1px);
+}
+
+.offerBtn:focus-visible {
+  outline: 2px solid #8b5a3c;
+  outline-offset: 2px;
+}
+
 .tasksBlock {
-  justify-content: end;
-  width: 1130px;
-  display: flex;
-  gap: 16px;
-  padding: 30px;
-  margin-top: -100px;
-  margin-bottom: 40px;
+  padding-top: 0px;
+  text-align: left;
 }
 
 .tasksNumber {
-  font-size: 48px;
+  margin: 0;
+  font-size: 64px;
+  line-height: 0.92;
+  color: #3d4f3a;
   font-weight: 800;
-  color: #3D4F3A;
-  line-height: 0.8;
 }
 
 .tasksLabel {
-  font-size: 15px;
-  color: #000000;
-  margin-top: 8px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #7d736a;
 }
 
-/* отзывы */
-.reviewsSection h2 {
-  font-size: 20px;
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 36px;
+  margin-bottom: 46px;
+}
+
+.mainColumn {
+  display: grid;
+  gap: 34px;
+}
+
+.infoSection {
+  max-width: 720px;
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: #2d2824;
   font-weight: 700;
-  color: #8B5A3C;
+}
+
+.aboutText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.9;
+  color: #3d3732;
+  white-space: pre-line;
+}
+
+.skillsList {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.skillTag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 8px;
+  background: #EFE4D2;
+  color: #5f544b;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.availabilityCard {
+  border: 1px solid #8B5A3C;
+  border-radius: 10px;
+  background: #f5f2ec;
+  box-shadow: 0 6px 12px rgb(61 43 26 / 7%);
+  padding: 32px 16px 14px 32px;
+  height: fit-content;
+  width: 358px;
+  height: 200px;
+  margin-left: 744px;
+  margin-top: -70px;
+}
+
+.availabilityTitle {
+  margin: 0 0 14px;
+  color: #4a3e35;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.availabilityList {
+  display: grid;
+  gap: 8px;
+}
+
+.availabilityChip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  border-radius: 8px;
+  background: #738b6a;
+  color: #f5f2ec;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.availabilityCaption {
+  margin: 14px 0 0;
+  font-size: 14px;
+  color: #44403b;
+}
+
+.reviewsSection {
+  max-width: 1030px;
+}
+
+.reviewsTitle {
+  margin: 0 0 18px;
+  font-size: 24px;
+  color: #2d2824;
+  font-weight: 700;
 }
 
 .reviewCard {
-  padding: 20px;
-  margin-top: 20px;
-  width: 500px;
-  background: white;
+  border: 1px solid #d8cfc2;
+  border-radius: 10px;
+  background: #f7f4ef;
+  padding: 16px;
 }
 
-.reviewCard:first-child {
-  border-top: none;
-  padding-top: 0;
-  margin-top: 0;
+.reviewCard + .reviewCard {
+  margin-top: 14px;
 }
 
 .reviewHeader {
-  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
 .reviewAuthorBlock {
@@ -262,11 +369,11 @@
 }
 
 .reviewAvatar {
-  width: 55px;
-  height: 55px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   overflow: hidden;
-  flex-shrink: 0;
+  background: #ccc4b8;
 }
 
 .reviewAvatar img {
@@ -276,32 +383,35 @@
 }
 
 .reviewAuthorInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  gap: 3px;
 }
 
 .reviewAuthor {
-  font-weight: 400;
-  color: #000000;
-  font-size: 14px;
+  font-size: 15px;
+  color: #433b35;
 }
 
 .reviewDate {
   font-size: 12px;
-  color: #8C8176;
+  color: #8c8176;
 }
 
 .reviewRating {
   font-size: 14px;
-  color: #F5A623;
-  margin-bottom: 12px;
-  letter-spacing: 2px;
+  color: #dd9f30;
+  letter-spacing: 1px;
 }
 
 .reviewText {
+  margin: 12px 0 0;
   font-size: 14px;
-  line-height: 1.5;
-  color: #444;
+  line-height: 1.6;
+  color: #4f473f;
+}
+
+.noReviews {
   margin: 0;
+  font-size: 15px;
+  color: #7f756d;
 }

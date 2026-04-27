@@ -246,15 +246,6 @@ export default function VolunteersPage() {
               )}
             </div>
 
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={showNearby}
-                onChange={(e) => setShowNearby(e.target.checked)}
-              />
-              <span>Показать волонтеров рядом</span>
-            </label>
-
             <div>
               <p>С кем готов работать</p>
               <div className={styles.buttons}>
@@ -283,12 +274,13 @@ export default function VolunteersPage() {
               <p>Компетенции</p>
               <div className={styles.column}>
                 {catalogs?.competencies?.map((comp: CatalogOption) => (
-                  <label key={comp.id}>
+                  <label key={comp.id} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"
                       checked={competenciesSelected.includes(comp.label)}
                       onChange={() => toggleCompetency(comp.label)}
                     />
+                    <span className={styles.customCheckbox}></span>
                     {comp.label}
                   </label>
                 ))}
@@ -299,12 +291,13 @@ export default function VolunteersPage() {
               <p>Опыт</p>
               <div className={styles.column}>
                 {catalogs?.experience_levels?.map((exp: CatalogOption) => (
-                  <label key={exp.id}>
+                  <label key={exp.id} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"
                       checked={experience.includes(exp.label)}
                       onChange={() => toggleExperience(exp.label)}
                     />
+                    <span className={styles.customCheckbox}></span>
                     {exp.label}
                   </label>
                 ))}

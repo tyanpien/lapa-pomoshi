@@ -98,7 +98,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  margin-top: 18px;
 }
 
 .column label {
@@ -141,7 +140,7 @@
   left: 0;
   right: 0;
   margin-top: 4px;
-  background: white;
+  background: #F7F3ED;
   border: 1px solid #8B5A3C;
   border-radius: 8px;
   display: flex;
@@ -165,20 +164,38 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  color: #333;
   cursor: pointer;
-  margin: 4px 0;
+  font-size: 14px;
+  color: #49413a;
 }
 
 .checkboxLabel input {
-  width: 16px;
-  height: 16px;
-  accent-color: #8B5A3C;
+  display: none;
 }
 
-.checkboxLabel span {
-  margin-left: 5px;
+.customCheckbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #8B5A3C;
+  position: relative;
+  background: #f8f4ee;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.checkboxLabel input:checked + .customCheckbox {
+  background: #8B5A3C;
+  border-color: #8B5A3C;
+}
+
+.checkboxLabel input:checked + .customCheckbox::after {
+  content: "✓";
+  color: white;
+  font-size: 12px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .showBtn {
@@ -389,6 +406,10 @@
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .detailsBtn:hover {
