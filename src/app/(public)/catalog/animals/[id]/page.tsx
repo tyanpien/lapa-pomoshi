@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import styles from "./page.module.css";
 import { animalsApi, Animal } from "@/shared/api/endpoints/animals";
 import { getImageUrl } from "@/shared/api/client";
+import { getOrganizationAnimalById } from "@/shared/lib/organizationAnimals";
 
 export default function AnimalPage() {
   const params = useParams();
@@ -16,8 +17,28 @@ export default function AnimalPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    animalsApi.getById(id)
+    let cancelled = false;
+    const localAnimal = getOrganizationAnimalById(id);
+    if (localAnimal) {
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setAnimal(localAnimal);
+        if (localAnimal.photo_urls?.length) {
+          setMainImage(getImageUrl(localAnimal.photo_urls[0]));
+        } else if (localAnimal.primary_photo_url) {
+          setMainImage(getImageUrl(localAnimal.primary_photo_url));
+        }
+        setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    animalsApi
+      .getById(id)
       .then((data) => {
+        if (cancelled) return;
         setAnimal(data);
 
         if (data.photo_urls?.length) {
@@ -28,9 +49,13 @@ export default function AnimalPage() {
         setLoading(false);
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error(err);
         setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {

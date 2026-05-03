@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import Sidebar from "@/widgets/sidebar/Sidebar";
 import styles from "./Header.module.css";
@@ -10,40 +10,16 @@ export default function Header() {
   const { isAuth, userAvatar, userName, role } = useUser();
   const [open, setOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [devRole, setDevRole] = useState("guest");
-
-  useEffect(() => {
-    const currentRole = localStorage.getItem("userRole") || "guest";
-    setDevRole(currentRole);
-  }, []);
 
   const burgerIcon = (open || isHovered) ? "/burger_hover.svg" : "/burger.svg";
 
   const toggleMenu = () => setOpen(!open);
   const closeMenu = () => setOpen(false);
 
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newRole = e.target.value;
-    setDevRole(newRole);
-    localStorage.setItem("userRole", newRole);
-    localStorage.setItem("token", "mock-token");
-
-    if (newRole === "user") {
-      localStorage.setItem("userAvatar", "/event.png");
-      localStorage.setItem("userName", "Анна Смирнова");
-    } else if (newRole === "volunteer") {
-      localStorage.setItem("userAvatar", "/event.png");
-      localStorage.setItem("userName", "Анна Смирнова");
-    } else if (newRole === "organization") {
-      localStorage.setItem("userAvatar", "/event.png");
-      localStorage.setItem("userName", "Благотворительный фонд");
-    } else {
-      localStorage.removeItem("userAvatar");
-      localStorage.removeItem("userName");
-      localStorage.removeItem("token");
-    }
-
-    window.location.reload();
+  const getProfileHref = () => {
+    if (role === "volunteer") return "/volunteer/profile";
+    if (role === "organization") return "/organization/profile";
+    return "/profile";
   };
 
   return (
@@ -102,7 +78,7 @@ export default function Header() {
             </Link>
           ) : (
             <>
-              <Link href="/profile" className={styles.avatarLink}>
+              <Link href={getProfileHref()} className={styles.avatarLink}>
                 <img
                   src={userAvatar || "/event.png"}
                   alt={userName || "Аватар"}
@@ -123,18 +99,6 @@ export default function Header() {
         </div>
       </div>
       <Sidebar isOpen={open} onClose={closeMenu} />
-
-      {/* переключатель ролей */}
-      {process.env.NODE_ENV === "development" && (
-        <div className={styles.devTools}>
-          <select value={devRole} onChange={handleRoleChange}>
-            <option value="guest">Гость</option>
-            <option value="user">Пользователь</option>
-            <option value="volunteer">Волонтер</option>
-            <option value="organization">Организация</option>
-          </select>
-        </div>
-      )}
     </header>
   );
 }

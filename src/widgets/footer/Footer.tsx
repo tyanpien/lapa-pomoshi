@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import styles from "./Footer.module.css";
 
 export default function Footer() {
@@ -15,18 +16,18 @@ export default function Footer() {
 
             <div className={styles.footerCol}>
               <h4>Навигация</h4>
-              <a href="/catalog/animals">Животные</a>
-              <a href="/catalog/organizations">Организации</a>
-              <a href="/catalog/volunteers">Волонтеры</a>
-              <a href="/events">Мероприятия</a>
+              <Link href="/catalog/animals">Животные</Link>
+              <Link href="/catalog/organizations">Организации</Link>
+              <Link href="/catalog/volunteers">Волонтеры</Link>
+              <Link href="/events">Мероприятия</Link>
             </div>
 
             <div className={styles.footerCol}>
               <h4>Помощь</h4>
-              <a href="/help">Как помочь</a>
-              <a href="/urgent">Срочные сборы</a>
-              <a href="/knowledge">База знаний</a>
-              <a href="/volunteer">Стать волонтером</a>
+              <Link href="/help">Как помочь</Link>
+              <Link href="/urgent">Срочные сборы</Link>
+              <Link href="/knowledge">База знаний</Link>
+              <Link href="/volunteer">Стать волонтером</Link>
             </div>
 
             <div className={styles.footerCol}>

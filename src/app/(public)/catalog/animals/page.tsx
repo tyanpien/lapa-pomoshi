@@ -5,6 +5,10 @@ import styles from "./page.module.css";
 import Link from "next/link";
 import { animalsApi, Animal } from "@/shared/api/endpoints/animals";
 import { getImageUrl } from "@/shared/api/client";
+import {
+  getAllOrganizationAnimals,
+  getOrganizationAnimalsEventName,
+} from "@/shared/lib/organizationAnimals";
 
 interface AgeGroup {
   id: string;
@@ -56,7 +60,9 @@ export default function Page() {
       animalsApi.getCatalogs()
     ])
       .then(([animalsData, catalogsData]) => {
-        setAnimals(animalsData.items || []);
+        const apiAnimals = animalsData.items || [];
+        const organizationAnimals = getAllOrganizationAnimals();
+        setAnimals([...organizationAnimals, ...apiAnimals]);
         setCatalogs(catalogsData);
         setLoading(false);
       })
@@ -64,6 +70,19 @@ export default function Page() {
         console.error("Ошибка загрузки:", error);
         setLoading(false);
       });
+  }, []);
+
+  useEffect(() => {
+    const eventName = getOrganizationAnimalsEventName();
+    const handleUpdate = () => {
+      setAnimals((previous) => {
+        const externalAnimals = previous.filter((animal) => animal.id < 1_000_000_000_000);
+        const organizationAnimals = getAllOrganizationAnimals();
+        return [...organizationAnimals, ...externalAnimals];
+      });
+    };
+    window.addEventListener(eventName, handleUpdate);
+    return () => window.removeEventListener(eventName, handleUpdate);
   }, []);
 
   useEffect(() => {
@@ -109,9 +128,19 @@ export default function Page() {
 
   const normalizeSpecies = (s: string): "cat" | "dog" | "other" => {
     if (!s) return "other";
-    const val = s.toLowerCase();
-    if (val.includes("кот") || val.includes("кош")) return "cat";
-    if (val.includes("соб")) return "dog";
+    const val = s.toLowerCase().trim();
+    
+    const catKeywords = ["кот", "кош", "котёнок", "котенок", "котяра", "котик"];
+    const dogKeywords = ["соб", "пёс", "пес", "щен", "собач", "дог", "dog", "псина", "собака"];
+    
+    if (catKeywords.some(keyword => val.includes(keyword))) {
+      return "cat";
+    }
+    
+    if (dogKeywords.some(keyword => val.includes(keyword))) {
+      return "dog";
+    }
+    
     return "other";
   };
 

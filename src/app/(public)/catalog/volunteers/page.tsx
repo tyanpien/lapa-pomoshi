@@ -1,12 +1,24 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import styles from "./page.module.css";
 import Link from "next/link";
 import { volunteersApi, Volunteer, VolunteersCatalogs, CatalogOption } from "@/shared/api/endpoints/volunteers";
 import { getImageUrl } from "@/shared/api/client";
+import { useUser } from "@/shared/lib/hooks/useUser";
+import {
+  VOLUNTEER_PROFILE_UPDATED_EVENT,
+  readLinkedVolunteerCatalogUserId,
+  readVolunteerDetailsFromStorage,
+  resolveVolunteerCatalogIsAvailable,
+} from "@/shared/lib/volunteerProfileStorage";
+import {
+  buildVolunteerCatalogCardChips,
+  mergeVolunteerAnimalTypes,
+  mergeVolunteerFilterCompetencyTags,
+} from "@/shared/lib/volunteerCatalogEnrichment";
 
-const sortOptions = ["сначала свободные", "по рейтингу", "по опыту", "по задачам"];
+const sortOptions = ["сначала свободные", "по опыту", "все"];
 
 const competencyMapping: Record<string, string[]> = {
   "Выгул / Уход": ["Выгул", "Уход"],
@@ -19,6 +31,7 @@ const competencyMapping: Record<string, string[]> = {
 };
 
 export default function VolunteersPage() {
+  const { userName } = useUser();
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [catalogs, setCatalogs] = useState<VolunteersCatalogs | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,10 +45,26 @@ export default function VolunteersPage() {
   const [experience, setExperience] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("сначала свободные");
   const [openSort, setOpenSort] = useState(false);
-  const [showCount, setShowCount] = useState(6);
+  const [catalogLocalTick, setCatalogLocalTick] = useState(0);
 
   const cityRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
+
+  const linkedCatalogSnapshot = useMemo(() => {
+    void catalogLocalTick;
+    const linkedId = readLinkedVolunteerCatalogUserId();
+    const overlay =
+      linkedId != null && userName?.trim()
+        ? readVolunteerDetailsFromStorage(userName)
+        : null;
+    return { linkedId, overlay };
+  }, [catalogLocalTick, userName]);
+
+  useEffect(() => {
+    const onProfilePersisted = () => setCatalogLocalTick((value) => value + 1);
+    window.addEventListener(VOLUNTEER_PROFILE_UPDATED_EVENT, onProfilePersisted);
+    return () => window.removeEventListener(VOLUNTEER_PROFILE_UPDATED_EVENT, onProfilePersisted);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -93,7 +122,6 @@ export default function VolunteersPage() {
     setCompetenciesSelected([]);
     setExperience([]);
     setSortBy("сначала свободные");
-    setShowCount(6);
   };
 
   const matchesCompetency = (volunteerCompentencies: string[], selectedCompetencyLabel: string): boolean => {
@@ -103,7 +131,17 @@ export default function VolunteersPage() {
     );
   };
 
+  const volunteerEnrichmentFor = (v: Volunteer) =>
+    linkedCatalogSnapshot.linkedId === v.user_id ? linkedCatalogSnapshot.overlay : null;
+
+  const animalPoolHas = (pool: string[], label: string) =>
+    pool.some((item) => item.toLowerCase() === label.toLowerCase());
+
   let filteredVolunteers = volunteers.filter((v) => {
+    const enrichment = volunteerEnrichmentFor(v);
+    const competencyPool = mergeVolunteerFilterCompetencyTags(v, enrichment);
+    const animalPool = mergeVolunteerAnimalTypes(v, enrichment);
+
     const matchesSearch = search === "" ||
       v.full_name.toLowerCase().includes(search.toLowerCase());
 
@@ -113,12 +151,12 @@ export default function VolunteersPage() {
 
     const matchesWithWhom =
       withWhom === "all" ||
-      (withWhom === "cat" && v.animal_types?.includes("Кошки")) ||
-      (withWhom === "dog" && v.animal_types?.includes("Собаки"));
+      (withWhom === "cat" && animalPoolHas(animalPool, "Кошки")) ||
+      (withWhom === "dog" && animalPoolHas(animalPool, "Собаки"));
 
     const matchesCompetencies =
       competenciesSelected.length === 0 ||
-      competenciesSelected.every((comp) => matchesCompetency(v.competency_tags || [], comp));
+      competenciesSelected.every((comp) => matchesCompetency(competencyPool, comp));
 
     const matchesExperience =
       experience.length === 0 || experience.includes(v.experience_level_label);
@@ -135,10 +173,9 @@ export default function VolunteersPage() {
 
   filteredVolunteers = [...filteredVolunteers].sort((a, b) => {
     if (sortBy === "сначала свободные") {
-      return (b.is_available ? 1 : 0) - (a.is_available ? 1 : 0);
-    }
-    if (sortBy === "по рейтингу") {
-      return b.rating - a.rating;
+      const eff = (v: Volunteer) =>
+        resolveVolunteerCatalogIsAvailable(v.is_available, volunteerEnrichmentFor(v));
+      return (eff(b) ? 1 : 0) - (eff(a) ? 1 : 0);
     }
     if (sortBy === "по опыту") {
       const expOrder: Record<string, number> = {
@@ -148,13 +185,10 @@ export default function VolunteersPage() {
       };
       return (expOrder[b.experience_level_label] || 0) - (expOrder[a.experience_level_label] || 0);
     }
-    if (sortBy === "по задачам") {
-      return b.completed_tasks_count - a.completed_tasks_count;
-    }
     return 0;
   });
 
-  const displayedVolunteers = filteredVolunteers.slice(0, showCount);
+  const displayedVolunteers = filteredVolunteers;
 
   if (loading) {
     return (
@@ -306,7 +340,7 @@ export default function VolunteersPage() {
 
             <button
               className={styles.showBtn}
-              onClick={() => setShowCount(showCount + 6)}
+              
             >
               Показать {filteredVolunteers.length} волонтеров
             </button>
@@ -317,21 +351,28 @@ export default function VolunteersPage() {
           </aside>
 
           <div className={styles.grid}>
-            {displayedVolunteers.map((v) => (
+            {displayedVolunteers.map((v) => {
+              const enrichment = volunteerEnrichmentFor(v);
+              const isAvailOnCard = resolveVolunteerCatalogIsAvailable(v.is_available, enrichment);
+              const previewChips = buildVolunteerCatalogCardChips(v, enrichment, 6);
+              return (
               <div key={v.user_id} className={styles.volunteerCard}>
                 <div className={styles.volunteerHeader}>
-                  <div className={styles.avatar}>
-                    <img
-                      src={getImageUrl(v.avatar_url) || "/event.png"}
-                      alt={v.full_name}
+                  <div className={styles.avatarWrap}>
+                    <div className={styles.avatar}>
+                      <img
+                        src={getImageUrl(v.avatar_url) || "/event.png"}
+                        alt={v.full_name}
+                      />
+                    </div>
+                    <span
+                      className={`${styles.statusDot} ${isAvailOnCard ? styles.statusDotAvailable : styles.statusDotBusy}`}
+                      role="img"
+                      aria-label={isAvailOnCard ? "На связи" : "Занят"}
                     />
                   </div>
                   <div className={styles.volunteerInfo}>
                     <h3>{v.full_name}</h3>
-                    <div className={styles.rating}>
-                      <img src="/star.svg" alt="рейтинг" className={styles.infoIconR} />
-                      {v.rating}
-                    </div>
                     <div className={styles.city}>
                       <img src="/org.svg" alt="город" className={styles.infoIcon} />
                       {v.location_city}
@@ -349,18 +390,28 @@ export default function VolunteersPage() {
                 </div>
 
                 <div className={styles.skills}>
-                  {v.competency_tags?.slice(0, 4).map((skill, idx) => (
-                    <span key={idx} className={styles.skillTag}>
-                      {skill}
+                  {previewChips.map((chip) => (
+                    <span
+                      key={`${chip.variant}-${chip.label}`}
+                      className={[
+                        styles.skillTag,
+                        chip.variant === "format" ? styles.skillTagAccent : "",
+                        chip.variant === "pet" ? styles.skillTagPetKind : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {chip.label}
                     </span>
                   ))}
                 </div>
 
                 <Link href={`/catalog/volunteers/${v.user_id}`} className={styles.messageBtn}>
-                  Написать
+                  Подробнее
                 </Link>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

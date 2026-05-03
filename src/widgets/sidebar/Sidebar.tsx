@@ -4,9 +4,16 @@ import { useUser } from "@/shared/lib/hooks/useUser";
 import { useState, useEffect } from "react";
 import styles from "./Sidebar.module.css";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-export default function Sidebar({ isOpen, onClose }: any) {
-  const { role } = useUser();
+type SidebarProps = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { role, logout } = useUser();
+  const router = useRouter();
 
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [animalsOpen, setAnimalsOpen] = useState(false);
@@ -22,6 +29,13 @@ export default function Sidebar({ isOpen, onClose }: any) {
       document.body.classList.remove('no-scroll');
     };
   }, [isOpen]);
+
+  const handleLogout = () => {
+    logout();
+    onClose();
+    router.push("/");
+    router.refresh();
+  };
 
   if (!isOpen) return null;
 
@@ -42,26 +56,26 @@ export default function Sidebar({ isOpen, onClose }: any) {
             {role === "user" && (
               <>
                 <Link href="/profile" onClick={onClose}>Мой профиль</Link>
-                <Link href="/forms" onClick={onClose}>Мои анкеты</Link>
+                <Link href="/profile/applications" onClick={onClose}>Мои анкеты</Link>
                 <Link href="/messages" onClick={onClose}>Мои сообщения</Link>
               </>
             )}
 
             {role === "volunteer" && (
               <>
-                <Link href="/tasks" onClick={onClose} className={styles.urgentLink}>
+                <Link href="/volunteer/tasks" onClick={onClose} className={styles.urgentLink}>
                   Лента задач
                 </Link>
-                <Link href="/profile" onClick={onClose}>Мой профиль</Link>
-                <Link href="/forms" onClick={onClose}>Мои анкеты</Link>
-                <Link href="/responses" onClick={onClose}>Мои отклики</Link>
+                <Link href="/volunteer/profile" onClick={onClose}>Мой профиль</Link>
+                <Link href="/profile/applications" onClick={onClose}>Мои анкеты</Link>
+                <Link href="/volunteer/responses" onClick={onClose}>Мои отклики</Link>
                 <Link href="/messages" onClick={onClose}>Мои сообщения</Link>
               </>
             )}
 
             {role === "organization" && (
               <>
-                <Link href="/org/profile" onClick={onClose}>Профиль</Link>
+                <Link href="/organization/profile" onClick={onClose}>Профиль</Link>
 
                 <div className={`${styles.dropdownBlock} ${animalsOpen ? styles.active : ""}`}>
                   <div
@@ -78,21 +92,20 @@ export default function Sidebar({ isOpen, onClose }: any) {
 
                   {animalsOpen && (
                     <div className={styles.dropdownContent}>
-                      <Link href="/org/home-hello" onClick={onClose}>
-                        Привет из дома
-                      </Link>
-                      <Link href="/org/animals" onClick={onClose}>
+                      <Link href="/organization/animals" onClick={onClose}>
                         Животные
+                      </Link>
+                      <Link href="/organization/home" onClick={onClose}>
+                        Привет из дома
                       </Link>
                     </div>
                   )}
                 </div>
-
-                <Link href="/org/requests" onClick={onClose}>Заявки</Link>
+                <Link href="/organization/requests" onClick={onClose}>Заявки</Link>
                 <Link href="/messages" onClick={onClose}>Сообщения</Link>
-                <Link href="/org/reports" onClick={onClose}>Отчеты</Link>
-                <Link href="/org/articles" onClick={onClose}>Статьи</Link>
-                <Link href="/org/events" onClick={onClose}>Мои мероприятия</Link>
+                <Link href="/organization/reports" onClick={onClose}>Отчеты</Link>
+                <Link href="/organization/articles" onClick={onClose}>Статьи</Link>
+                <Link href="/organization/events" onClick={onClose}>Мои мероприятия</Link>
               </>
             )}
           </div>
@@ -133,6 +146,11 @@ export default function Sidebar({ isOpen, onClose }: any) {
             <Link href="/help" onClick={onClose}>Помочь</Link>
             <Link href="/knowledge" onClick={onClose}>База знаний</Link>
             <Link href="/events" onClick={onClose}>Мероприятия</Link>
+            {role !== "guest" && (
+              <button type="button" className={styles.logoutButton} onClick={handleLogout}>
+                Выйти из аккаунта
+              </button>
+            )}
           </div>
         </div>
       </div>

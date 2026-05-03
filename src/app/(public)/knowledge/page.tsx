@@ -79,7 +79,7 @@ export default function KnowledgePage() {
 
                 <div className={styles.meta}>
                   <span className={styles.time}>
-                    <img src="/clock.svg" className={styles.clockIcon} />
+                    <img src="/clock.svg" className={styles.clockIcon} alt="" />
                     {a.read_minutes} мин
                   </span>
 

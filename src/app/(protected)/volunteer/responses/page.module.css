@@ -1,0 +1,227 @@
+.page {
+  min-height: calc(100vh - 120px);
+  background: #f3f1ec;
+  padding: 56px 20px 72px;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.top h1 {
+  color: #8b5a3c;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filterBtn {
+  border: 1px solid #8B5A3C;
+  color: #333333;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.filterBtnActive {
+  background: #8b5a3c;
+  color: #fffaf2;
+  font-weight: 600;
+  border-color: #8b5a3c;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.card {
+  border-radius: 10px;
+  background: #FFFFFF;
+  padding: 24px 28px 20px;
+  min-height: 340px;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardCancelled {
+  background: #F3F3F3;
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.metaLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.typeTag {
+  border-radius: 8px;
+  background: #efe4d2;
+  color: #4f4237;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 5px 10px;
+}
+
+.organization {
+  color: #333333;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.urgent {
+  flex-shrink: 0;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: #F5F0E8;
+  font-weight: 600;
+  background: #C49A4A;
+  text-transform: lowercase;
+}
+
+.title {
+  color: #333333;
+  font-size: 30px;
+  line-height: 0.95;
+  margin-bottom: 18px;
+  font-weight: 700;
+}
+
+.description {
+  color: #333333;
+  font-size: 16px;
+  line-height: 1.8;
+  margin-bottom: 26px;
+  max-width: 100%;
+}
+
+.timeRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #333333;
+  font-size: 16px;
+  margin-bottom: 18px;
+}
+
+.timeRow img {
+  width: 16px;
+  height: 16px;
+}
+
+.bottom {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.chatBtn {
+  border: none;
+  background: #8b5a3c;
+  color: #fff4e6;
+  border-radius: 8px;
+  height: 40px;
+  min-width: 70px;
+  padding: 0 20px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondaryBtn {
+  border: none;
+  background: transparent;
+  color: #8b5a3c;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.status {
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 6px 14px;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.statusPending {
+  color: #f1f8ec;
+  background: #7A8C6E;
+}
+
+.statusActive {
+  color: #f0f7eb;
+  background: #3D4F3A;
+}
+
+.statusDone {
+  color: #4c4c4c;
+  background: #F5F0E8;
+}
+
+.statusCancelled {
+  color: #fff1ef;
+  background: #952525;
+}
+
+.statusArchive {
+  color: #4c4c4c;
+  background: #ebe8e1;
+}
+
+@media (max-width: 980px) {
+  .top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

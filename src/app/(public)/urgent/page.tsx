@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import styles from "./page.module.css";
 import Link from "next/link";
 
-import { urgentApi, UrgentItem } from "@/shared/api/endpoints/urgent";
+import { urgentApi, UrgentCatalogs, UrgentItem } from "@/shared/api/endpoints/urgent";
 import { getImageUrl } from "@/shared/api/client";
 
 interface UrgentCard {
@@ -25,7 +25,7 @@ interface UrgentCard {
 
 export default function UrgentPage() {
   const [cards, setCards] = useState<UrgentItem[]>([]);
-  const [catalogs, setCatalogs] = useState<any>(null);
+  const [catalogs, setCatalogs] = useState<UrgentCatalogs | null>(null);
 
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
@@ -34,13 +34,12 @@ export default function UrgentPage() {
   const [helpTypes, setHelpTypes] = useState<string[]>([]);
   const [showCount, setShowCount] = useState(10);
 
-  const [filteredCards, setFilteredCards] = useState<UrgentCard[]>([]);
-
   const cityRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     urgentApi.getList().then((data) => {
       setCards(data.items.filter((i: UrgentItem) => i.is_urgent));
+      setShowCount(10);
     });
 
     urgentApi.getCatalogs().then(setCatalogs);
@@ -56,44 +55,47 @@ export default function UrgentPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const mappedCards: UrgentCard[] = cards.map((item) => {
-    const isProgress = item.target_amount;
+  const mappedCards = useMemo<UrgentCard[]>(() => {
+    return cards.map((item) => {
+      const isProgress = item.target_amount;
 
-    return {
-      id: item.id,
-      animalId: item.animal_id ?? item.id,
+      return {
+        id: item.id,
+        animalId: item.animal_id ?? item.id,
 
-      title: item.animal_name || item.title,
-      org: item.organization_name,
-      description: item.description,
+        title: item.animal_name || item.title,
+        org: item.organization_name,
+        description: item.description,
 
-      tags: item.badges || [],
-      helpType: item.help_type,
+        tags: item.badges || [],
+        helpType: item.help_type,
 
-      status: isProgress
-        ? `${item.collected_amount} из ${item.target_amount}`
-        : item.deadline_label || "",
+        status: isProgress
+          ? `${item.collected_amount} из ${item.target_amount}`
+          : item.deadline_label || "",
 
-      amount: isProgress ? "progress" : "deadline",
+        amount: isProgress ? "progress" : "deadline",
 
-      action: item.volunteer_needed ? "Помочь" : "Связаться",
+        action: item.volunteer_needed ? "Помочь" : "Связаться",
 
-      image: item.primary_photo_url
-        ? getImageUrl(item.primary_photo_url)
-        : "/cat-placeholder.jpg",
+        image: item.primary_photo_url
+          ? getImageUrl(item.primary_photo_url)
+          : "/cat-placeholder.jpg",
 
-      animalSpecies: item.animal_species || "cat",
-      city: item.city,
-    };
-  });
+        animalSpecies: item.animal_species || "cat",
+        city: item.city,
+      };
+    });
+  }, [cards]);
 
-  useEffect(() => {
+  const filteredCards = useMemo(() => {
     let filtered = mappedCards;
 
     if (search) {
-      filtered = filtered.filter((card) =>
-        card.title.toLowerCase().includes(search.toLowerCase()) ||
-        card.org.toLowerCase().includes(search.toLowerCase())
+      const q = search.toLowerCase();
+      filtered = filtered.filter(
+        (card) =>
+          card.title.toLowerCase().includes(q) || card.org.toLowerCase().includes(q)
       );
     }
 
@@ -102,26 +104,20 @@ export default function UrgentPage() {
     }
 
     if (animalType !== "all") {
-      filtered = filtered.filter(
-        (card) => card.animalSpecies === animalType
-      );
+      filtered = filtered.filter((card) => card.animalSpecies === animalType);
     }
 
     if (helpTypes.length > 0) {
-      filtered = filtered.filter((card) =>
-        helpTypes.includes(card.helpType)
-      );
+      filtered = filtered.filter((card) => helpTypes.includes(card.helpType));
     }
 
-    setFilteredCards(filtered);
-    setShowCount(10);
-  }, [search, city, animalType, helpTypes, cards]);
+    return filtered;
+  }, [mappedCards, search, city, animalType, helpTypes]);
 
   const toggleHelpType = (value: string) => {
+    setShowCount(10);
     setHelpTypes((prev) =>
-      prev.includes(value)
-        ? prev.filter((i) => i !== value)
-        : [...prev, value]
+      prev.includes(value) ? prev.filter((i) => i !== value) : [...prev, value]
     );
   };
 
@@ -149,7 +145,10 @@ export default function UrgentPage() {
               className={styles.search}
               placeholder="Найти"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setShowCount(10);
+                setSearch(e.target.value);
+              }}
             />
 
             <div className={styles.dropdownFilter} ref={cityRef}>
@@ -166,6 +165,7 @@ export default function UrgentPage() {
                   <div
                     className={styles.dropdownItem}
                     onClick={() => {
+                      setShowCount(10);
                       setCity("");
                       setOpenCity(false);
                     }}
@@ -178,6 +178,7 @@ export default function UrgentPage() {
                       key={c}
                       className={styles.dropdownItem}
                       onClick={() => {
+                        setShowCount(10);
                         setCity(c);
                         setOpenCity(false);
                       }}
@@ -197,7 +198,10 @@ export default function UrgentPage() {
                   className={`${styles.pill} ${
                     animalType === "cat" ? styles.activeBtn : ""
                   }`}
-                  onClick={() => setAnimalType("cat")}
+                  onClick={() => {
+                    setShowCount(10);
+                    setAnimalType("cat");
+                  }}
                 >
                   Кошки
                 </button>
@@ -206,7 +210,10 @@ export default function UrgentPage() {
                   className={`${styles.pill} ${
                     animalType === "dog" ? styles.activeBtn : ""
                   }`}
-                  onClick={() => setAnimalType("dog")}
+                  onClick={() => {
+                    setShowCount(10);
+                    setAnimalType("dog");
+                  }}
                 >
                   Собаки
                 </button>
@@ -215,7 +222,10 @@ export default function UrgentPage() {
                   className={`${styles.pill} ${
                     animalType === "all" ? styles.activeBtn : ""
                   }`}
-                  onClick={() => setAnimalType("all")}
+                  onClick={() => {
+                    setShowCount(10);
+                    setAnimalType("all");
+                  }}
                 >
                   Все
                 </button>
@@ -226,7 +236,7 @@ export default function UrgentPage() {
               <h2 className={styles.filterTitle}>Как помочь</h2>
 
               <div className={styles.column}>
-                {catalogs?.help_types?.map((t: any) => (
+                {catalogs?.help_types?.map((t) => (
                   <label key={t.id} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"

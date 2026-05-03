@@ -1,0 +1,89 @@
+.emptyState {
+  margin: 0;
+  font-size: 15px;
+  color: #6d6d6d;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 38, 31, 0.55);
+  z-index: 100;
+  overflow-y: auto;
+  padding: 48px 16px;
+}
+
+.modal {
+  width: min(900px, 100%);
+  background: #fff;
+  border-radius: 8px;
+  padding: 28px;
+  margin: 0 auto;
+}
+
+.modalTitle {
+  margin: 0 0 18px;
+  color: #8b5a3c;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+  color: #4b4b4b;
+  font-size: 16px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  border: 1px solid #33333399;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.primaryButton,
+.secondaryButton {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton {
+  background: #8b5a3c;
+  color: #fff;
+}
+
+.secondaryButton {
+  background: #ece7e0;
+  color: #353535;
+}
+
+.savedLabel {
+  color: #3d4f3a;
+  font-size: 14px;
+}

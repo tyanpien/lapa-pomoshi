@@ -1,13 +1,13 @@
 .page {
   min-height: 100vh;
-  background: #f5f2ec;
+  background: #F5F0E8;
   color: #37312d;
   padding: 34px 0 84px;
 }
 
 .container {
   width: 100%;
-  max-width: 1158px;
+  max-width: 1140px;
   margin: 0 auto;
   padding: 0 28px;
 }
@@ -27,7 +27,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 30px;
+  margin-bottom: 24px;
   font-size: 14px;
   color: #867e76;
 }
@@ -35,15 +35,10 @@
 .breadcrumbs a {
   color: #8b5a3c;
   text-decoration: none;
-  transition: color 0.2s ease;
 }
 
 .breadcrumbs a:hover {
   color: #754a31;
-}
-
-.breadcrumbs a:active {
-  color: #663f2a;
 }
 
 .breadcrumbs a:focus-visible {
@@ -54,8 +49,8 @@
 
 .profileHeader {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 350px;
-  gap: 30px;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 200px);
+  gap: clamp(16px, 4vw, 40px);
   align-items: start;
   margin-left: 180px;
   margin-bottom: 44px;
@@ -66,6 +61,8 @@
   display: flex;
   align-items: flex-start;
   gap: 28px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .avatarWrap {
@@ -81,12 +78,21 @@
   border-radius: 999px;
   overflow: hidden;
   background: #D9D9D9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.avatarInitials {
+  font-size: 40px;
+  font-weight: 700;
+  color: #959595;
 }
 
 .statusDot {
@@ -100,29 +106,30 @@
 }
 
 .statusDotAvailable {
-  background: #4f7f45;
+  background: #3d4f3a;
 }
 
 .statusDotBusy {
-  background: #c2554b;
+  background: #d9a827;
 }
 
 .profileInfo {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .title {
-  margin: 2px 0 10px;
-  font-size: 28px;
-  line-height: 1.04;
+  margin: 10px 0 0px;
+  font-size: clamp(22px, 3vw, 28px);
+  line-height: 1.08;
   color: #8b5a3c;
   font-weight: 700;
 }
 
 .location {
-  margin: 0 0 10;
+  margin: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -147,10 +154,9 @@
   display: inline-flex;
   align-items: center;
   border-radius: 8px;
-  padding: 10px 10px;
+  padding: 8px 12px;
   font-size: 12px;
-  line-height: 1;
-  margin-bottom: 12px;
+  line-height: 1.25;
 }
 
 .stateTag {
@@ -159,26 +165,29 @@
 }
 
 .experienceTag {
-  background: #EFE4D2;
+  background: #efe4d2;
   color: #544a42;
 }
 
 .actionsRow {
   display: flex;
   gap: 10px;
-  margin-top: 4px;
+  flex-wrap: wrap;
+  margin-top: 8px;
 }
 
 .writeBtn,
 .offerBtn {
-  height: 38px;
+  min-height: 38px;
   border-radius: 8px;
   border: 1px solid #8b5a3c;
-  padding: 0 20px;
+  padding: 8px 20px;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .writeBtn {
@@ -195,15 +204,6 @@
   border-color: #784d34;
 }
 
-.writeBtn:active {
-  transform: translateY(1px);
-}
-
-.writeBtn:focus-visible {
-  outline: 2px solid #8b5a3c;
-  outline-offset: 2px;
-}
-
 .offerBtn {
   background: #f5f2ec;
   color: #5d4d43;
@@ -213,24 +213,18 @@
   background: #ede7dc;
 }
 
-.offerBtn:active {
-  transform: translateY(1px);
-}
-
-.offerBtn:focus-visible {
-  outline: 2px solid #8b5a3c;
-  outline-offset: 2px;
-}
-
 .tasksBlock {
-  padding-top: 0px;
+  justify-self: left;
+  align-self: start;
+  margin-left: -184px;
+  padding-top: 4px;
   text-align: left;
 }
 
 .tasksNumber {
   margin: 0;
-  font-size: 64px;
-  line-height: 0.92;
+  font-size: clamp(40px, 8vw, 64px);
+  line-height: 0.94;
   color: #3d4f3a;
   font-weight: 800;
 }
@@ -243,19 +237,20 @@
 
 .contentGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 36px;
-  margin-bottom: 46px;
+  align-items: start;
+  margin-bottom: 48px;
 }
 
 .mainColumn {
   display: grid;
   gap: 34px;
+  min-width: 0;
 }
 
 .infoSection {
-  max-width: 720px;
-  margin-bottom: 20px;
+  margin: 0;
 }
 
 .sectionTitle {
@@ -284,62 +279,238 @@
   align-items: center;
   min-height: 30px;
   border-radius: 8px;
-  background: #EFE4D2;
+  background: #efe4d2;
   color: #5f544b;
   padding: 8px 10px;
   font-size: 14px;
 }
 
+.skillTagAccent {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #526b4f;
+  color: #faf7f3;
+}
+
+.skillTagPetKind {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #c49a4a;
+  color: #fdf9f4;
+}
+
+.skillTagAnimal {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #d9ad7a;
+  color: #553b28;
+}
+
 .availabilityCard {
   border: 1px solid #8B5A3C;
   border-radius: 10px;
-  background: #f5f2ec;
+  margin-top: 62px;
+  background: #f0ebe2;
   box-shadow: 0 6px 12px rgb(61 43 26 / 7%);
-  padding: 32px 16px 14px 32px;
-  height: fit-content;
-  width: 358px;
-  height: 200px;
-  margin-left: 744px;
-  margin-top: -70px;
+  padding: 38px;
+  min-width: 0;
 }
 
 .availabilityTitle {
   margin: 0 0 14px;
-  color: #4a3e35;
+  color: #8B5A3C;
   font-size: 16px;
   font-weight: 700;
 }
 
-.availabilityList {
-  display: grid;
+.availabilityTable {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.availabilityRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: #000000;
+}
+
+.availabilityDay {
+  flex: 0 1 auto;
+  font-weight: 600;
+}
+
+.availabilityTime {
+  flex-shrink: 0;
+  color: #5c5450;
+}
+
+.availabilityTags {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .availabilityChip {
   display: inline-flex;
   align-items: center;
-  width: fit-content;
   min-height: 28px;
   border-radius: 8px;
   background: #738b6a;
-  color: #f5f2ec;
-  padding: 0 10px;
+  color: #f8f7f4;
+  padding: 6px 10px;
   font-size: 12px;
 }
 
-.availabilityCaption {
+.availabilityNight {
   margin: 14px 0 0;
+  font-size: 13px;
+  color: #4a453f;
+}
+
+.availabilityFooter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #d9cfc2;
   font-size: 14px;
-  color: #44403b;
+  color: #3d392f;
+  line-height: 1.4;
+}
+
+.availabilityCarIcon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.articlesSection {
+  margin-bottom: 40px;
+}
+
+.articlesTitle {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d2824;
+}
+
+.articleGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.articleCard {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid #dcd3c9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #faf7f2;
+}
+
+.articleCard:hover {
+  border-color: #b9a892;
+}
+
+.articleImage {
+  background: #d9cfc2;
+  min-height: 120px;
+}
+
+.articleImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.articleBody {
+  padding: 14px 16px 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.articleHeading {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #8b5a3c;
+  line-height: 1.3;
+}
+
+.articleSummary {
+  margin: 0;
+  font-size: 14px;
+  color: #4f473f;
+  line-height: 1.5;
+  display: -webkit-box;
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.articleMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #7d746c;
+}
+
+.articleMeta span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.articleMetaIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.articleCategory {
+  color: #5d554c;
 }
 
 .reviewsSection {
-  max-width: 1030px;
+  max-width: 100%;
+  margin-bottom: 24px;
 }
 
 .reviewsTitle {
   margin: 0 0 18px;
-  font-size: 24px;
+  font-size: 20px;
   color: #2d2824;
   font-weight: 700;
 }
@@ -400,7 +571,6 @@
 .reviewRating {
   font-size: 14px;
   color: #dd9f30;
-  letter-spacing: 1px;
 }
 
 .reviewText {
@@ -410,8 +580,109 @@
   color: #4f473f;
 }
 
-.noReviews {
-  margin: 0;
-  font-size: 15px;
-  color: #7f756d;
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgb(47 41 37 / 45%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modalCard {
+  max-width: 420px;
+  width: 100%;
+  border-radius: 12px;
+  background: #faf7f2;
+  border: 1px solid #c9bdb0;
+  padding: 24px;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 14%);
+}
+
+.modalTitle {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: #2d2824;
+}
+
+.modalText {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4f473f;
+}
+
+.modalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.modalPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 140px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: #8b5a3c;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.modalSecondary {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid #8b5a3c;
+  background: transparent;
+  color: #5d4233;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .profileHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .tasksBlock {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .articleCard {
+    grid-template-columns: 100px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .container {
+    padding: 0 18px;
+  }
+
+  .headerMain {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .articleCard {
+    grid-template-columns: 1fr;
+  }
+
+  .articleImage {
+    min-height: 160px;
+  }
+
+  .articleBody {
+    padding: 0 14px 14px;
+  }
 }

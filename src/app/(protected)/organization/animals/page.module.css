@@ -1,0 +1,418 @@
+.page {
+  background: #f3eee7;
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+.container {
+  width: 1100px;
+  margin: 0 auto;
+  padding-top: 40px;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #8B5A3C;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.addLink {
+  margin-top: 0px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: #333333;
+  font-size: 18px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.filters {
+  display: flex;
+  margin-top: 14px;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  width: 220px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #8B5A3C;
+  padding: 0 12px;
+  background: transparent;
+}
+
+.statusFilters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+
+.filterButton {
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid #8B5A3C;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.filterButtonActive {
+  background: #8d5b3d;
+  color: #fff;
+  border-color: #8d5b3d;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.animalCard {
+  background: transparent;
+}
+
+.cover {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cover img {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  display: block;
+}
+
+.urgentBadge,
+.statusBadge {
+  position: absolute;
+  left: 12px;
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.urgentBadge {
+  top: 10px;
+  background: #c59b48;
+}
+
+.statusBadge {
+  bottom: 12px;
+  background: #3f5b3e;
+}
+
+.animalBody {
+  margin-top: 10px;
+  border: 1px solid #C49A4A;
+  border-radius: 7px;
+  padding: 14px 14px 16px;
+  min-height: 220px;
+  position: relative;
+}
+
+.cardActions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+
+.menuButton {
+  border: none;
+  background: transparent;
+  color: #333333;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 10px 12px;
+}
+
+.menuDropdown {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid #e6d4bd;
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.menuDropdown button {
+  width: 100%;
+  border: none;
+  background: #fff;
+  text-align: left;
+  padding: 10px 12px;
+  color: #6f533d;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.menuDropdown button:hover {
+  background: #f9f2e8;
+}
+
+.animalName {
+  font-size: 28px;
+  color: #8B5A3C;
+  font-weight: 700;
+  margin: 0 0 14px 4px;
+}
+
+.tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tags span {
+  font-size: 14px;
+  padding: 10px;
+  color: #333333;
+  border-radius: 8px;
+  background: #EFE4D2;
+  margin: 0 0 14px 4px;
+}
+
+.organizationLine {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 5px 4px;
+  color: #00000099;
+  font-size: 14px;
+}
+
+.moreButton {
+  margin-top: 32px;
+  margin-left: 230px;
+  border: none;
+  background: transparent;
+  color: #8d5b3d;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.emptyState {
+  border: 1px dashed #c9b29a;
+  border-radius: 12px;
+  background: #fffaf3;
+  color: #8d5b3d;
+  padding: 32px;
+  font-size: 20px;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32, 39, 32, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 16px;
+  z-index: 200;
+  overflow-y: auto;
+}
+
+.modal {
+  width: min(1180px, 100%);
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px;
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  color: #8d5b3d;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #33333399;
+  font-size: 16px;
+}
+
+.input,
+.select,
+.textarea {
+  border: 1px solid #33333399;
+  border-radius: 6px;
+  background: #fff;
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #33333399;
+  font-size: 16px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.primaryButton {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 26px;
+  background: #8d5b3d;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondaryButton {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 22px;
+  background: transparent;
+  color: #8d5b3d;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detailsModal {
+  width: min(920px, 100%);
+  background: #fffaf3;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #d9c2a6;
+}
+
+.detailsImage {
+  width: 100%;
+  height: 320px;
+  object-fit: cover;
+}
+
+.detailsBody {
+  padding: 18px;
+}
+
+.detailsBody h2 {
+  margin: 0 0 12px;
+  color: #8d5b3d;
+  font-size: 42px;
+}
+
+.detailsBody p {
+  margin: 0 0 8px;
+  color: #5f5348;
+  font-size: 20px;
+}
+
+@media (max-width: 1180px) {
+  .list {
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+  }
+
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .header {
+    flex-direction: column;
+  }
+
+  .filters {
+    min-width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .searchInput {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .statusFilters {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .container {
+    padding: 0 12px;
+  }
+
+  .title {
+    font-size: 38px;
+  }
+
+  .addLink {
+    font-size: 22px;
+  }
+
+  .list {
+    grid-template-columns: 1fr;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .label {
+    font-size: 18px;
+  }
+
+  .input,
+  .select,
+  .textarea,
+  .checkbox,
+  .primaryButton,
+  .secondaryButton {
+    font-size: 16px;
+  }
+}

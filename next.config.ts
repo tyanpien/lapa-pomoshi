@@ -1,15 +1,16 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
-const nextConfig = {
+const projectRoot = path.join(__dirname);
+
+const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
+  outputFileTracingRoot: projectRoot,
+  turbopack: {
+    root: projectRoot,
   },
-};
-
-module.exports = {
   async rewrites() {
     return [
       {

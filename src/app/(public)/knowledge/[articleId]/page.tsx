@@ -52,7 +52,7 @@ export default function ArticlePage() {
 
           <div className={styles.meta}>
             <div className={styles.metaItem}>
-              <img src="/clock.svg" className={styles.metaIcon} />
+              <img src="/clock.svg" className={styles.metaIcon} alt="" />
               <span>{article.read_minutes} мин чтения</span>
             </div>
           </div>

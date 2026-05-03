@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
 import { organizationsApi, Organization, OrganizationCatalogs, NeedOption } from "@/shared/api/endpoints/organizations";
+import { getOrganizationCabinetEventName, getOrganizationCabinetRecordByName } from "@/shared/lib/organizationCabinet";
+import { getOrganizationAnimalsByName } from "@/shared/lib/organizationAnimals";
 import { getImageUrl } from "@/shared/api/client";
 
 const needsMap: Record<string, string> = {
@@ -27,6 +29,7 @@ export default function OrganizationsPage() {
   const [openCity, setOpenCity] = useState(false);
   const [openNeeds, setOpenNeeds] = useState(false);
   const [showCount, setShowCount] = useState(6);
+  const [cabinetVersion, setCabinetVersion] = useState(0);
 
   const cityRef = useRef<HTMLDivElement>(null);
   const needsRef = useRef<HTMLDivElement>(null);
@@ -63,6 +66,13 @@ export default function OrganizationsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const eventName = getOrganizationCabinetEventName();
+    const syncFromCabinet = () => setCabinetVersion((prev) => prev + 1);
+    window.addEventListener(eventName, syncFromCabinet);
+    return () => window.removeEventListener(eventName, syncFromCabinet);
+  }, []);
+
   const toggleNeed = (value: string) => {
     setNeeds(
       needs.includes(value)
@@ -89,7 +99,7 @@ export default function OrganizationsPage() {
 
   const filteredOrganizations = organizations.filter((org) => {
     const matchesSearch = search === "" ||
-      org.name.toLowerCase().includes(search.toLowerCase());
+      (org.name || "").toLowerCase().includes(search.toLowerCase());
 
     const matchesSpecialization =
       specialization === "all" || org.specialization === specialization;
@@ -111,6 +121,24 @@ export default function OrganizationsPage() {
   });
 
   const displayedOrganizations = sortedOrganizations.slice(0, showCount);
+
+  const organizationsWithCabinetData = useMemo(() => {
+    void cabinetVersion;
+    return displayedOrganizations.map((org) => {
+      const cabinetRecord = getOrganizationCabinetRecordByName(org.name || "");
+      const organizationAnimals = getOrganizationAnimalsByName(org.name || "");
+      const wardsCount = organizationAnimals.length || org.wards_count || 0;
+      const adoptedYearlyCount = cabinetRecord?.greetingsFromHome.length || org.adopted_yearly_count || 0;
+
+      return {
+        ...org,
+        displayName: cabinetRecord?.profile.organizationName?.trim() || org.name || "Без названия",
+        displayAddress: cabinetRecord?.profile.territory?.trim() || org.address || "Адрес не указан",
+        displayWardsCount: wardsCount,
+        displayAdoptedYearlyCount: adoptedYearlyCount,
+      };
+    });
+  }, [cabinetVersion, displayedOrganizations]);
 
   if (loading) {
     return (
@@ -229,56 +257,58 @@ export default function OrganizationsPage() {
           </aside>
 
           <div className={styles.grid}>
-            {displayedOrganizations.map((org) => (
+            {organizationsWithCabinetData.map((org) => (
               <div key={org.id} className={styles.orgCard}>
                 <div className={styles.orgHeader}>
                   <div className={styles.orgLogo}>
                     <img
                       src={getImageUrl(org.logo) || "/event.png"}
-                      alt={org.name}
+                      alt={org.displayName}
                     />
                   </div>
                   <div className={styles.orgInfo}>
-                    <h3>{org.name}</h3>
+                    <h3>{org.displayName}</h3>
                     <div className={styles.orgStats}>
                       <span>
                         <img src="/lapa.svg" alt="подопечные" className={styles.orgIcon} />
-                        {org.wards_count} подопечных
+                        {org.displayWardsCount} подопечных
                       </span>
                       <span>
                         <img src="/home.svg" alt="пристроено" className={styles.orgIcon} />
-                        {org.adopted_yearly_count} пристроено за год
+                        {org.displayAdoptedYearlyCount} пристроено за год
                       </span>
                     </div>
                     <div className={styles.orgAddress}>
                       <img src="/org.svg" alt="адрес" className={styles.orgIcon} />
-                      {org.address}
+                      {org.displayAddress}
                     </div>
                   </div>
                 </div>
 
-                {(org.needs?.length > 0) && (
-                  <div className={styles.orgBottomRow}>
-                    <div className={styles.orgNeeds}>
-                      <div className={styles.needsTags}>
-                        {org.needs?.map((needId, idx) => (
+                <div className={styles.orgBottomRow}>
+                  <div className={styles.orgNeeds}>
+                    <div className={styles.needsTags}>
+                      {org.needs?.length ? (
+                        org.needs.map((needId, idx) => (
                           <span
                             key={idx}
                             className={needId === "urgent" ? styles.needTagUrgent : styles.needTag}
                           >
                             {getNeedLabel(needId)}
                           </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className={styles.orgButtons}>
-                      <button className={styles.helpBtn}>Помочь</button>
-                      <Link href={`/catalog/organizations/${org.id}`} className={styles.detailsBtn}>
-                        Подробнее
-                      </Link>
+                        ))
+                      ) : (
+                        <span className={styles.needTag}>Потребности не указаны</span>
+                      )}
                     </div>
                   </div>
-                )}
+                  <div className={styles.orgButtons}>
+                    <button className={styles.helpBtn}>Помочь</button>
+                    <Link href={`/catalog/organizations/${org.id}`} className={styles.detailsBtn}>
+                      Подробнее
+                    </Link>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

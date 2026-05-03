@@ -85,9 +85,19 @@ export default function HomePage() {
 
   const getSpeciesType = (species: string): string => {
     if (!species) return "other";
-    const val = species.toLowerCase();
-    if (val.includes("кот") || val.includes("кош")) return "Кошка";
-    if (val.includes("соб")) return "Собака";
+    const val = species.toLowerCase().trim();
+    
+    const catKeywords = ["кот", "кош", "котёнок", "котенок", "котяра", "котик"];
+    const dogKeywords = ["соб", "пёс", "пес", "щен", "собач", "дог", "dog", "псина", "собака", "пёсик", "песик"];
+    
+    if (catKeywords.some(keyword => val.includes(keyword))) {
+      return "Кошка";
+    }
+    
+    if (dogKeywords.some(keyword => val.includes(keyword))) {
+      return "Собака";
+    }
+    
     return "other";
   };
 
@@ -262,7 +272,9 @@ export default function HomePage() {
                 <img src="/help3.svg" alt="" className={styles.helpPhoto}/>
                 <h3>Приютить</h3>
                 <p>Найдите питомца, который подойдет именно вам, и заберите его домой навсегда</p>
-                <a href="/catalog/animals" className={styles.helpLink}>Смотреть животных →</a>
+                <Link href="/catalog/animals" className={styles.helpLink}>
+                  Смотреть животных →
+                </Link>
               </div>
             </div>
             <div className={styles.helpCard}>
@@ -363,7 +375,9 @@ export default function HomePage() {
         <div className={styles.container}>
           <div className={styles.eventsHeader}>
             <h2>Ближайшие мероприятия</h2>
-            <a href="/events" className={styles.showAllRight}>Смотреть все →</a>
+            <Link href="/events" className={styles.showAllRight}>
+              Смотреть все →
+            </Link>
           </div>
           <div className={styles.eventsGrid}>
             {[1, 2, 3].map((item) => (
@@ -372,7 +386,9 @@ export default function HomePage() {
                 <div className={styles.eventBody}>
                   <h3>Название мероприятия</h3>
                   <p className={styles.eventMeta}>12 мая • Рига</p>
-                  <a href="/events/1" className={styles.eventLink}>Подробнее →</a>
+                  <Link href="/events/1" className={styles.eventLink}>
+                    Подробнее →
+                  </Link>
                 </div>
               </div>
             ))}

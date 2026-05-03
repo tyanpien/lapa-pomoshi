@@ -2,27 +2,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import styles from "./page.module.css";
-import { eventsApi } from "@/shared/api/endpoints/events";
+import { eventsApi, EventItem, EventsCatalogs } from "@/shared/api/endpoints/events";
 import Link from "next/link";
 
-type Format = "all" | "online" | "offline";
-
-interface EventItem {
-  id: number;
-  title: string;
-  summary: string;
-  organization_name: string;
-  city: string;
-  address: string;
-  format: Format;
-  help_type: string;
-  starts_at: string;
-  ends_at: string;
-}
+type Format = "all" | EventItem["format"];
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [catalogs, setCatalogs] = useState<any>(null);
+  const [catalogs, setCatalogs] = useState<EventsCatalogs | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
@@ -159,11 +146,11 @@ export default function EventsPage() {
             <div className={styles.block}>
               <p>Формат</p>
               <div className={styles.buttons}>
-                {catalogs?.formats?.map((f: any) => (
+                {catalogs?.formats?.map((f) => (
                   <button
                     key={f.id}
                     className={format === f.id ? styles.activeBtn : ""}
-                    onClick={() => setFormat(f.id)}
+                    onClick={() => setFormat(f.id as Format)}
                   >
                     {f.label}
                   </button>
@@ -174,7 +161,7 @@ export default function EventsPage() {
             <div className={styles.block}>
               <p>Как помочь</p>
               <div className={styles.column}>
-                {catalogs?.help_types?.map((t: any) => (
+                {catalogs?.help_types?.map((t) => (
                   <label key={t.id} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"

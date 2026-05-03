@@ -3,13 +3,15 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import styles from "./page.module.css";
-import { eventsApi } from "@/shared/api/endpoints/events";
+import { eventsApi, EventItem } from "@/shared/api/endpoints/events";
+
+type EventDetail = EventItem & { description?: string };
 
 export default function EventPage() {
   const params = useParams();
   const id = Number(params.id);
 
-  const [event, setEvent] = useState<any>(null);
+  const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
