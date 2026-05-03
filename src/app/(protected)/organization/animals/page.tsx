@@ -10,6 +10,8 @@ import {
   getOrganizationAnimalsEventName,
   updateOrganizationAnimal,
 } from "@/shared/lib/organizationAnimals";
+import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
+import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 
 type FormState = {
   name: string;
@@ -44,8 +46,9 @@ const initialForm: FormState = {
 };
 
 export default function OrganizationAnimalsPage() {
+  const apiPayload = useOrganizationPublicCabinetPayload();
   const [form, setForm] = useState(initialForm);
-  const [animals, setAnimals] = useState(getCurrentOrganizationAnimals());
+  const [localAnimals, setLocalAnimals] = useState(getCurrentOrganizationAnimals());
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [editingAnimalId, setEditingAnimalId] = useState<number | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -54,8 +57,14 @@ export default function OrganizationAnimalsPage() {
     "all"
   );
 
+  const animals = useMemo(
+    () => mergeApiAndLocalAnimals(apiPayload.apiAnimals, localAnimals),
+    [apiPayload.apiAnimals, localAnimals]
+  );
+  const apiAnimalIds = apiPayload.apiAnimalIds;
+
   const reloadAnimals = () => {
-    setAnimals(getCurrentOrganizationAnimals());
+    setLocalAnimals(getCurrentOrganizationAnimals());
   };
 
   useEffect(() => {
@@ -161,10 +170,12 @@ export default function OrganizationAnimalsPage() {
   const statusLabel = (status: string) => {
     if (status === "looking_for_home") return "ищет дом";
     if (status === "on_treatment") return "на лечении";
+    if (status === "looking_for_foster") return "ищет передержку";
     return "в приюте";
   };
 
   const openEditModal = (animalId: number) => {
+    if (apiAnimalIds.has(animalId)) return;
     const animal = animals.find((item) => item.id === animalId);
     if (!animal) return;
 
@@ -192,6 +203,7 @@ export default function OrganizationAnimalsPage() {
   };
 
   const handleDelete = (animalId: number) => {
+    if (apiAnimalIds.has(animalId)) return;
     const isConfirmed = window.confirm("Удалить карточку животного?");
     if (!isConfirmed) return;
 
@@ -275,25 +287,29 @@ export default function OrganizationAnimalsPage() {
                 </div>
                 <div className={styles.animalBody}>
                   <div className={styles.cardActions}>
-                    <button
-                      className={styles.menuButton}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenMenuId((prev) => (prev === animal.id ? null : animal.id));
-                      }}
-                    >
-                      ⋮
-                    </button>
-                    {openMenuId === animal.id ? (
-                      <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
-                        <button type="button" onClick={() => openEditModal(animal.id)}>
-                          Редактировать
+                    {!apiAnimalIds.has(animal.id) ? (
+                      <>
+                        <button
+                          className={styles.menuButton}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMenuId((prev) => (prev === animal.id ? null : animal.id));
+                          }}
+                        >
+                          ⋮
                         </button>
-                        <button type="button" onClick={() => handleDelete(animal.id)}>
-                          Удалить анкету
-                        </button>
-                      </div>
+                        {openMenuId === animal.id ? (
+                          <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
+                            <button type="button" onClick={() => openEditModal(animal.id)}>
+                              Редактировать
+                            </button>
+                            <button type="button" onClick={() => handleDelete(animal.id)}>
+                              Удалить анкету
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                   <h3 className={styles.animalName}>{animal.name}</h3>

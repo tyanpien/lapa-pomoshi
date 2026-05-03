@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
-import { volunteersApi, VolunteerDetail } from "@/shared/api/endpoints/volunteers";
+import { volunteersApi, volunteerAvailabilityText, type VolunteerDetail } from "@/shared/api/endpoints/volunteers";
 import type { KnowledgeItem } from "@/shared/api/endpoints/knowledge";
 import { knowledgeApi } from "@/shared/api/endpoints/knowledge";
 import { getImageUrl } from "@/shared/api/client";
@@ -66,12 +66,12 @@ function buildCompetencyChips(volunteer: VolunteerDetail | null, overlay: Stored
     }
   }
 
-  for (const raw of volunteer.animal_type_labels ?? []) {
+  for (const raw of volunteer.animal_category_labels ?? []) {
     const pet = resolvePetKindLabel(raw ?? "");
     if (pet) pushPetKind(pet, "api");
   }
 
-  for (const label of volunteer.competency_labels ?? []) {
+  for (const label of volunteer.competency_tags ?? []) {
     const t = label?.trim();
     if (!t) continue;
     if (has(t)) continue;
@@ -95,7 +95,7 @@ function buildCompetencyChips(volunteer: VolunteerDetail | null, overlay: Stored
     }
   }
 
-  for (const animal of volunteer.animal_type_labels ?? []) {
+  for (const animal of volunteer.animal_category_labels ?? []) {
     const a = animal?.trim();
     if (!a) continue;
     if (resolvePetKindLabel(a)) continue;
@@ -114,8 +114,12 @@ function initialsFromFullName(fullName: string): string {
 }
 
 function experienceBadgeFromVolunteer(v: VolunteerDetail): string {
-  const label = v.experience_level_label?.trim();
-  if (label) return label;
+  const badge = v.hero_experience_badges?.find((s) => s?.trim());
+  if (badge) return badge.trim();
+  const readiness = v.readiness_label?.trim();
+  if (readiness) return readiness;
+  const legacy = (v as { experience_level_label?: string }).experience_level_label?.trim();
+  if (legacy) return legacy;
 
   const n = v.completed_tasks_count ?? 0;
   if (n <= 5) return "Новичок";
@@ -152,15 +156,37 @@ export default function VolunteerPage() {
   useEffect(() => {
     if (!volunteer?.user_id) return;
 
+    const fromProfile = (volunteer.articles ?? []).map(
+      (a): KnowledgeArticle => ({
+        id: a.id,
+        title: a.title,
+        summary: a.summary ?? "",
+        category: a.category,
+        category_label: a.category_label,
+        read_minutes: a.read_minutes,
+        is_context_tip: false,
+        created_at: new Date().toISOString(),
+      })
+    );
+
     knowledgeApi
       .getList()
       .then((response) => {
         const raw: KnowledgeArticle[] = (response.items ?? []) as KnowledgeArticle[];
-        const authored = raw.filter((item) => typeof item.author_user_id === "number" && item.author_user_id === volunteer.user_id);
-        setArticles(authored.slice(0, 4));
+        const authored = raw.filter(
+          (item) => typeof item.author_user_id === "number" && item.author_user_id === volunteer.user_id
+        );
+        const seen = new Set<number>();
+        const merged: KnowledgeArticle[] = [];
+        for (const item of [...fromProfile, ...authored]) {
+          if (seen.has(item.id)) continue;
+          seen.add(item.id);
+          merged.push(item);
+        }
+        setArticles(merged.slice(0, 8));
       })
-      .catch(() => setArticles([]));
-  }, [volunteer?.user_id]);
+      .catch(() => setArticles(fromProfile.slice(0, 8)));
+  }, [volunteer]);
 
   useEffect(() => {
     const refreshOverlay = () => {
@@ -185,7 +211,10 @@ export default function VolunteerPage() {
   const mergedAvailabilityRaw = useMemo(() => {
     if (!volunteer) return "";
     const parts: string[] = [];
-    const apiAvail = volunteer.availability?.trim();
+    const apiAvail =
+      volunteerAvailabilityText(volunteer).trim() ||
+      (volunteer as { availability?: string | undefined }).availability?.trim() ||
+      "";
     if (apiAvail) parts.push(apiAvail);
 
     if (
@@ -237,7 +266,8 @@ export default function VolunteerPage() {
   }, [volunteer, localOverlay]);
 
   const mergedCity = useMemo(() => {
-    const fromApi = volunteer?.location_city?.trim();
+    const fromApi =
+      volunteer?.location_display?.trim() || volunteer?.location_city?.trim() || volunteer?.location_district?.trim();
     const fromLc = localOverlay?.location?.trim();
     return (fromApi || fromLc || "").trim();
   }, [volunteer, localOverlay]);
@@ -257,22 +287,34 @@ export default function VolunteerPage() {
       });
 
     const fromSchedule = hasVolunteerLogisticsSection(
-      mergedAvailabilityRaw || (volunteer.availability ?? ""),
+      mergedAvailabilityRaw ||
+        volunteerAvailabilityText(volunteer) ||
+        (volunteer as { availability?: string }).availability ||
+        "",
       volunteer.travel_radius_km
     );
 
     const fromNight = Boolean(localOverlay?.nightOutings);
     const fromRadiusNote = Boolean(localOverlay?.travelRadius?.trim());
     const fromTravelOutTown = Boolean(localOverlay?.travelOutOfTown);
+    const fromApiNight = Boolean(volunteer.logistics?.accepts_night_urgency);
 
-    return Boolean(fromSchedule || fromNight || fromRadiusNote || hasLocalSchedule || fromTravelOutTown);
+    return Boolean(
+      fromSchedule || fromNight || fromRadiusNote || hasLocalSchedule || fromTravelOutTown || fromApiNight
+    );
   }, [volunteer, mergedAvailabilityRaw, localOverlay]);
+
+  const apiAvailLegacy = (v: VolunteerDetail) =>
+    volunteerAvailabilityText(v) || (v as { availability?: string }).availability || "";
 
   const hasNightOutgoing =
     Boolean(localOverlay?.nightOutings) ||
+    Boolean(volunteer?.logistics?.accepts_night_urgency) ||
     Boolean(
-      volunteer?.availability?.trim() &&
-        (/ночн(ых|ые|ой)\s+выезд/i.test(volunteer.availability ?? "") || /ночные\s+выезды/i.test(volunteer.availability ?? ""))
+      volunteer &&
+        apiAvailLegacy(volunteer).trim() &&
+        (/ночн(ых|ые|ой)\s+выезд/i.test(apiAvailLegacy(volunteer)) ||
+          /ночные\s+выезды/i.test(apiAvailLegacy(volunteer)))
     );
 
   const isOrganization = role === "organization";
@@ -308,7 +350,7 @@ export default function VolunteerPage() {
   }
 
   const avatarSrc = volunteer.avatar_url ? getImageUrl(volunteer.avatar_url) : null;
-  const isAvailable = resolveVolunteerCatalogIsAvailable(Boolean(volunteer.is_available), localOverlay);
+  const isAvailable = resolveVolunteerCatalogIsAvailable(volunteer.readiness_status === "available", localOverlay);
   const experienceLabel = experienceBadgeFromVolunteer(volunteer);
 
   return (
@@ -317,7 +359,7 @@ export default function VolunteerPage() {
         <nav className={styles.breadcrumbs} aria-label="Хлебные крошки">
           <Link href="/catalog/volunteers">Волонтёры</Link>
           <span>/</span>
-          <span>{volunteer.full_name}</span>
+          <span>{volunteer.full_name ?? ""}</span>
         </nav>
 
         <header className={styles.profileHeader}>
@@ -325,10 +367,10 @@ export default function VolunteerPage() {
             <div className={styles.avatarWrap}>
               <div className={styles.avatar}>
                 {avatarSrc ? (
-                  <img src={avatarSrc || "/placeholder.jpg"} alt={volunteer.full_name} />
+                  <img src={avatarSrc || "/placeholder.jpg"} alt={volunteer.full_name ?? ""} />
                 ) : (
                   <span className={styles.avatarInitials} aria-hidden="true">
-                    {initialsFromFullName(volunteer.full_name)}
+                    {initialsFromFullName(volunteer.full_name ?? "")}
                   </span>
                 )}
               </div>
@@ -339,7 +381,7 @@ export default function VolunteerPage() {
             </div>
 
             <div className={styles.profileInfo}>
-              <h1 className={styles.title}>{volunteer.full_name}</h1>
+              <h1 className={styles.title}>{volunteer.full_name ?? "Волонтёр"}</h1>
               <p className={styles.location}>
                 <img src="/city.svg" alt="" aria-hidden="true" className={styles.locationIcon} />
                 {mergedCity || "Город не указан"}
@@ -357,7 +399,7 @@ export default function VolunteerPage() {
                       pathname: "/messages",
                       query: {
                         recipientId: volunteer.user_id,
-                        recipientName: volunteer.full_name,
+                        recipientName: volunteer.full_name ?? "",
                       },
                     }}
                     className={styles.writeBtn}

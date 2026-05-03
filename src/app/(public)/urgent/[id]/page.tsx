@@ -61,7 +61,7 @@ export default function AnimalPage() {
   }
 
   const progress =
-    data.target_amount
+    data.target_amount && data.collected_amount != null
       ? Math.round((data.collected_amount / data.target_amount) * 100)
       : null;
 

@@ -27,10 +27,11 @@ export default function EventPage() {
       year: "numeric",
     });
 
-  const formatTime = (start: string, end: string) =>
-    new Date(start).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) +
-    " - " +
-    new Date(end).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const formatTime = (start: string, end: string | null) => {
+    const a = new Date(start).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    if (!end) return a;
+    return `${a} — ${new Date(end).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
+  };
 
   if (loading) return <div className={styles.loading}>Загрузка...</div>;
   if (!event) return <div className={styles.notFound}>Не найдено</div>;
@@ -48,7 +49,7 @@ export default function EventPage() {
         <p className={styles.org}>{event.organization_name}</p>
 
         <p className={styles.location}>
-          {event.city}, {event.address}
+          {[event.city, event.address].filter(Boolean).join(", ") || "Место уточняется"}
         </p>
 
         <div className={styles.description}>

@@ -55,6 +55,14 @@ export const getAllOrganizationAnimals = (): Animal[] => {
   return readRecords().map((record) => record.animal);
 };
 
+export const ORGANIZATION_ANIMAL_STATUS_LOOKING_FOR_HOME = "looking_for_home" as const;
+
+export const isOrganizationAnimalPublishedToHomeCatalog = (animal: Animal): boolean =>
+  animal.status === ORGANIZATION_ANIMAL_STATUS_LOOKING_FOR_HOME;
+
+export const getOrganizationAnimalsPublishedToHomeCatalog = (): Animal[] =>
+  getAllOrganizationAnimals().filter(isOrganizationAnimalPublishedToHomeCatalog);
+
 export const getCurrentOrganizationAnimals = (): Animal[] => {
   const currentOrganizationName = getCurrentOrganizationName();
   return readRecords()

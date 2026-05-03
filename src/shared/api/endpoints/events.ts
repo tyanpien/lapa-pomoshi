@@ -3,14 +3,15 @@ import { apiFetch } from "../client";
 export interface EventItem {
   id: number;
   title: string;
-  summary: string;
-  organization_name: string;
-  city: string;
-  address: string;
-  format: "online" | "offline";
-  help_type: string;
+  summary: string | null;
+  organization_name: string | null;
+  city: string | null;
+  address: string | null;
+  format: string;
+  help_type: string | null;
   starts_at: string;
-  ends_at: string;
+  ends_at: string | null;
+  description?: string | null;
 }
 
 export interface EventsResponse {

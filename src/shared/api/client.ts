@@ -1,15 +1,20 @@
 import axios from "axios";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+function normalizeApiOrigin(url: string | undefined): string {
+  const trimmed = (url ?? "").trim().replace(/\/+$/, "");
+  return trimmed || "http://127.0.0.1:8000";
+}
 
-const PROXY_BASE_URL = "";
+export const API_BASE_URL = normalizeApiOrigin(process.env.NEXT_PUBLIC_API_URL);
 
 const toRequestUrl = (endpoint: string): string => {
   if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
     return endpoint;
   }
-
-  return `${PROXY_BASE_URL}${endpoint}`;
+  if (endpoint.startsWith("/api/")) {
+    return `${API_BASE_URL}${endpoint}`;
+  }
+  return endpoint;
 };
 
 export const getImageUrl = (photoUrl: string | null | undefined): string => {
@@ -36,7 +41,7 @@ export const apiFetch = async (endpoint: string, options?: RequestInit) => {
 };
 
 export const apiClient = axios.create({
-  baseURL: PROXY_BASE_URL,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },

@@ -410,8 +410,8 @@
 }
 
 .articlesTitle {
-  margin: 0 0 20px;
-  font-size: 20px;
+  margin: 0px 0px 20px;
+  font-size: 16px;
   font-weight: 700;
   color: #2d2824;
 }
@@ -423,59 +423,45 @@
 }
 
 .articleCard {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 18px;
-  align-items: stretch;
-  text-decoration: none;
-  color: inherit;
-  border: 1px solid #dcd3c9;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #faf7f2;
+  display: flex;
+  gap: 20px;
+  max-height: 230px;
+  padding: 24px;
+  border: 1px solid #8B5A3C;
+  border-radius: 8px;
+  background: #F7F3ED;
 }
 
 .articleCard:hover {
   border-color: #b9a892;
 }
 
-.articleImage {
-  background: #d9cfc2;
-  min-height: 120px;
-}
-
 .articleImage img {
-  width: 100%;
-  height: 100%;
+  width: 196px;
+  height: 180px;
   object-fit: cover;
+  border-radius: 8px;
 }
 
 .articleBody {
-  padding: 14px 16px 14px 0;
+  padding: 1px 1px 14px 0px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 0;
+  min-width: 800px;
 }
 
 .articleHeading {
-  margin: 0;
-  font-size: 17px;
+  margin: 20px 10px 10px 10px;
+  font-size: 22px;
   font-weight: 700;
-  color: #8b5a3c;
-  line-height: 1.3;
+  color: #8B5A3C;
 }
 
 .articleSummary {
-  margin: 0;
+  margin: 0px 10px 42px 10px;
+  color: #333333;
   font-size: 14px;
-  color: #4f473f;
-  line-height: 1.5;
-  display: -webkit-box;
-  line-clamp: 3;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .articleMeta {
@@ -486,6 +472,7 @@
   justify-content: space-between;
   font-size: 12px;
   color: #7d746c;
+  margin: 0 10px 12px;
 }
 
 .articleMeta span:first-child {
@@ -495,12 +482,17 @@
 }
 
 .articleMetaIcon {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
+  margin-right: 4px;
+  vertical-align: middle;
 }
 
 .articleCategory {
-  color: #5d554c;
+  font-size: 16px;
+  font-weight: 700;
+  font-style: italic;
+  color: #3D4F3A;
 }
 
 .reviewsSection {

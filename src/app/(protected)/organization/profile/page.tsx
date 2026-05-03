@@ -11,13 +11,16 @@ import {
   saveOrganizationProfile,
 } from "@/shared/lib/organizationCabinet";
 import { getCurrentOrganizationAnimals, getOrganizationAnimalsEventName } from "@/shared/lib/organizationAnimals";
+import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
 import { getThreadsByRole } from "@/shared/lib/messages";
 import { useUser } from "@/shared/lib/hooks/useUser";
+import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 
 export default function OrganizationProfilePage() {
   const { role } = useUser();
+  const apiPayload = useOrganizationPublicCabinetPayload();
   const [profile, setProfile] = useState(getOrganizationProfile());
-  const [animals, setAnimals] = useState(getCurrentOrganizationAnimals());
+  const [localAnimals, setLocalAnimals] = useState(getCurrentOrganizationAnimals());
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -26,7 +29,7 @@ export default function OrganizationProfilePage() {
     const animalsEvent = getOrganizationAnimalsEventName();
     const sync = () => {
       setProfile(getOrganizationProfile());
-      setAnimals(getCurrentOrganizationAnimals());
+      setLocalAnimals(getCurrentOrganizationAnimals());
     };
     sync();
     window.addEventListener(cabinetEvent, sync);
@@ -41,9 +44,15 @@ export default function OrganizationProfilePage() {
 
   const previewThreads = threads.slice(0, 3);
 
+  const displayAnimals = useMemo(
+    () => mergeApiAndLocalAnimals(apiPayload.apiAnimals, localAnimals),
+    [apiPayload.apiAnimals, localAnimals]
+  );
+
   const statusLabel = (status: string) => {
     if (status === "looking_for_home") return "ищет дом";
     if (status === "on_treatment") return "на лечении";
+    if (status === "looking_for_foster") return "ищет передержку";
     return "в приюте";
   };
 
@@ -109,11 +118,11 @@ export default function OrganizationProfilePage() {
             </Link>
           </div>
 
-          {animals.length === 0 ? (
+          {displayAnimals.length === 0 ? (
             <p className={styles.emptyState}>Добавьте подопечных в разделе «Подопечные».</p>
           ) : (
             <div className={animalsStyles.list}>
-              {animals.slice(0, 3).map((animal) => (
+              {displayAnimals.slice(0, 3).map((animal) => (
                 <article key={animal.id} className={animalsStyles.animalCard}>
                   <div className={animalsStyles.cover}>
                     <img src={animal.primary_photo_url || "/cat.png"} alt={animal.name} />

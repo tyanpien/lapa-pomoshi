@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 
 const projectRoot = path.join(__dirname);
 
+const backendOrigin = (
+  process.env.NEXT_PUBLIC_API_URL?.trim() || "http://127.0.0.1:8000"
+).replace(/\/+$/, "");
+
 const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -15,7 +19,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:8000/api/:path*",
+        destination: `${backendOrigin}/api/:path*`,
       },
     ];
   },

@@ -4,16 +4,16 @@ export interface Animal {
   id: number;
   name: string;
   species: string;
-  breed: string;
-  sex: string;
+  breed?: string | null;
+  sex?: string;
   age_months: number;
   location_city: string | null;
   is_urgent: boolean;
   status: string;
-  full_description: string;
+  full_description?: string | null;
   primary_photo_url: string | null;
-  photo_urls: string[];
-  organization: {
+  photo_urls?: string[];
+  organization?: {
     id: number;
     name: string;
     city: string;
@@ -24,6 +24,7 @@ export interface Animal {
   character_tags?: string[];
   organization_name?: string;
   catalog_features?: string[];
+  created_at?: string;
 }
 
 export const animalsApi = {

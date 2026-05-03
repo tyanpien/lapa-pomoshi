@@ -5,7 +5,8 @@ import styles from "./page.module.css";
 import Link from "next/link";
 import { animalsApi, Animal } from "@/shared/api/endpoints/animals";
 import { useRouter } from "next/navigation";
-import { organizationsApi, Organization } from "@/shared/api/endpoints/organizations";
+import { organizationsApi, organizationLogoPath, type Organization } from "@/shared/api/endpoints/organizations";
+import { eventsApi, type EventItem } from "@/shared/api/endpoints/events";
 import { getImageUrl } from "@/shared/api/client";
 import { urgentApi, UrgentItem } from "@/shared/api/endpoints/urgent";
 
@@ -17,6 +18,8 @@ export default function HomePage() {
   const [loadingOrgs, setLoadingOrgs] = useState(true);
   const [urgentList, setUrgentList] = useState<UrgentItem[]>([]);
   const [loadingUrgent, setLoadingUrgent] = useState(true);
+  const [homeEvents, setHomeEvents] = useState<EventItem[]>([]);
+  const [loadingHomeEvents, setLoadingHomeEvents] = useState(true);
 
   useEffect(() => {
     urgentApi.getList()
@@ -51,6 +54,17 @@ export default function HomePage() {
       });
   }, []);
 
+  useEffect(() => {
+    eventsApi
+      .getList()
+      .then((data) => setHomeEvents((data.items || []).slice(0, 3)))
+      .catch((e) => {
+        console.error(e);
+        setHomeEvents([]);
+      })
+      .finally(() => setLoadingHomeEvents(false));
+  }, []);
+
   const getHelpLabel = (type: string) => {
     switch (type) {
       case "financial": return "Сбор";
@@ -63,7 +77,8 @@ export default function HomePage() {
   };
 
   const getProgress = (item: UrgentItem) => {
-    if (!item.target_amount) return null;
+    if (item.target_amount == null || item.target_amount <= 0) return null;
+    if (item.collected_amount == null) return null;
     return Math.round((item.collected_amount / item.target_amount) * 100);
   };
 
@@ -187,7 +202,7 @@ export default function HomePage() {
                       />
                     </Link>
 
-                    {getProgress(bigCard) !== null && (
+                    {getProgress(bigCard) !== null && bigCard.collected_amount != null && (
                       <div className={styles.progressOnImage}>
                         <div className={styles.progressBarWrapper}>
                           <div
@@ -356,7 +371,10 @@ export default function HomePage() {
                 <div key={org.id} className={styles.orgCard}>
                   <div className={styles.orgTop}>
                     <div className={styles.orgLogo}>
-                      <img src={getImageUrl(org.logo) || "/org-placeholder.png"} alt={org.name} />
+                      <img
+                        src={getImageUrl(organizationLogoPath(org)) || "/org-placeholder.png"}
+                        alt={org.name}
+                      />
                     </div>
                     <h3>{org.name}</h3>
                   </div>
@@ -380,18 +398,31 @@ export default function HomePage() {
             </Link>
           </div>
           <div className={styles.eventsGrid}>
-            {[1, 2, 3].map((item) => (
-              <div key={item} className={styles.eventCard}>
-                <img src="/event.png" alt="" />
-                <div className={styles.eventBody}>
-                  <h3>Название мероприятия</h3>
-                  <p className={styles.eventMeta}>12 мая • Рига</p>
-                  <Link href="/events/1" className={styles.eventLink}>
-                    Подробнее →
-                  </Link>
+            {loadingHomeEvents ? (
+              <div>Загрузка...</div>
+            ) : homeEvents.length === 0 ? (
+              <p>Ближайших мероприятий пока нет.</p>
+            ) : (
+              homeEvents.map((ev) => (
+                <div key={ev.id} className={styles.eventCard}>
+                  <img src="/event.png" alt="" />
+                  <div className={styles.eventBody}>
+                    <h3>{ev.title}</h3>
+                    <p className={styles.eventMeta}>
+                      {new Date(ev.starts_at).toLocaleDateString("ru-RU", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                      {ev.city ? ` • ${ev.city}` : ""}
+                    </p>
+                    <Link href={`/events/${ev.id}`} className={styles.eventLink}>
+                      Подробнее →
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>

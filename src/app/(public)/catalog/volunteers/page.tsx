@@ -142,8 +142,8 @@ export default function VolunteersPage() {
     const competencyPool = mergeVolunteerFilterCompetencyTags(v, enrichment);
     const animalPool = mergeVolunteerAnimalTypes(v, enrichment);
 
-    const matchesSearch = search === "" ||
-      v.full_name.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch =
+      search === "" || (v.full_name ?? "").toLowerCase().includes(search.toLowerCase());
 
     const matchesCity = city === "" || v.location_city === city;
 
@@ -159,7 +159,8 @@ export default function VolunteersPage() {
       competenciesSelected.every((comp) => matchesCompetency(competencyPool, comp));
 
     const matchesExperience =
-      experience.length === 0 || experience.includes(v.experience_level_label);
+      experience.length === 0 ||
+      (v.experience_level_label != null && experience.includes(v.experience_level_label));
 
     return (
       matchesSearch &&
@@ -174,7 +175,7 @@ export default function VolunteersPage() {
   filteredVolunteers = [...filteredVolunteers].sort((a, b) => {
     if (sortBy === "сначала свободные") {
       const eff = (v: Volunteer) =>
-        resolveVolunteerCatalogIsAvailable(v.is_available, volunteerEnrichmentFor(v));
+        resolveVolunteerCatalogIsAvailable(v.is_available ?? false, volunteerEnrichmentFor(v));
       return (eff(b) ? 1 : 0) - (eff(a) ? 1 : 0);
     }
     if (sortBy === "по опыту") {
@@ -183,7 +184,9 @@ export default function VolunteersPage() {
         "Опытный": 2,
         "Ветеринарное образование": 3
       };
-      return (expOrder[b.experience_level_label] || 0) - (expOrder[a.experience_level_label] || 0);
+      const rank = (label: string | null | undefined) =>
+        label ? expOrder[label] ?? 0 : 0;
+      return rank(b.experience_level_label) - rank(a.experience_level_label);
     }
     return 0;
   });
@@ -353,7 +356,7 @@ export default function VolunteersPage() {
           <div className={styles.grid}>
             {displayedVolunteers.map((v) => {
               const enrichment = volunteerEnrichmentFor(v);
-              const isAvailOnCard = resolveVolunteerCatalogIsAvailable(v.is_available, enrichment);
+              const isAvailOnCard = resolveVolunteerCatalogIsAvailable(v.is_available ?? false, enrichment);
               const previewChips = buildVolunteerCatalogCardChips(v, enrichment, 6);
               return (
               <div key={v.user_id} className={styles.volunteerCard}>
@@ -362,7 +365,7 @@ export default function VolunteersPage() {
                     <div className={styles.avatar}>
                       <img
                         src={getImageUrl(v.avatar_url) || "/event.png"}
-                        alt={v.full_name}
+                        alt={v.full_name ?? ""}
                       />
                     </div>
                     <span

@@ -3,10 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
-import { organizationsApi, Organization, OrganizationCatalogs, NeedOption } from "@/shared/api/endpoints/organizations";
-import { getOrganizationCabinetEventName, getOrganizationCabinetRecordByName } from "@/shared/lib/organizationCabinet";
-import { getOrganizationAnimalsByName } from "@/shared/lib/organizationAnimals";
+import {
+  organizationsApi,
+  organizationLogoPath,
+  type Organization,
+  type OrganizationCatalogs,
+  type NeedOption,
+} from "@/shared/api/endpoints/organizations";
 import { getImageUrl } from "@/shared/api/client";
+import { statsFromOrganizationPublicPage } from "@/shared/lib/organizationPublicCabinet";
 
 const needsMap: Record<string, string> = {
   urgent: "Срочно",
@@ -17,10 +22,13 @@ const needsMap: Record<string, string> = {
   auto: "Автопомощь",
 };
 
+type OrgPublicStats = { wards: number; adopted: number };
+
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [catalogs, setCatalogs] = useState<OrganizationCatalogs | null>(null);
   const [loading, setLoading] = useState(true);
+  const [publicStatsByOrgId, setPublicStatsByOrgId] = useState<Record<number, OrgPublicStats>>({});
 
   const [search, setSearch] = useState("");
   const [specialization, setSpecialization] = useState("all");
@@ -29,7 +37,6 @@ export default function OrganizationsPage() {
   const [openCity, setOpenCity] = useState(false);
   const [openNeeds, setOpenNeeds] = useState(false);
   const [showCount, setShowCount] = useState(6);
-  const [cabinetVersion, setCabinetVersion] = useState(0);
 
   const cityRef = useRef<HTMLDivElement>(null);
   const needsRef = useRef<HTMLDivElement>(null);
@@ -66,13 +73,6 @@ export default function OrganizationsPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const eventName = getOrganizationCabinetEventName();
-    const syncFromCabinet = () => setCabinetVersion((prev) => prev + 1);
-    window.addEventListener(eventName, syncFromCabinet);
-    return () => window.removeEventListener(eventName, syncFromCabinet);
-  }, []);
-
   const toggleNeed = (value: string) => {
     setNeeds(
       needs.includes(value)
@@ -97,48 +97,85 @@ export default function OrganizationsPage() {
     return org.needs?.includes("urgent") || false;
   };
 
-  const filteredOrganizations = organizations.filter((org) => {
-    const matchesSearch = search === "" ||
-      (org.name || "").toLowerCase().includes(search.toLowerCase());
+  const matchesSpecializationFilter = (org: Organization, spec: string): boolean => {
+    if (spec === "all") return true;
+    const s = (org.specialization || "").toLowerCase();
+    if (spec === "cat" || spec === "dog") {
+      return s === spec || s === "both";
+    }
+    return s === spec;
+  };
 
-    const matchesSpecialization =
-      specialization === "all" || org.specialization === specialization;
+  const filteredOrganizations = useMemo(() => {
+    return organizations.filter((org) => {
+      const matchesSearch =
+        search === "" || (org.name || "").toLowerCase().includes(search.toLowerCase());
 
-    const matchesCity = city === "" || org.city === city;
+      const matchesSpecialization = matchesSpecializationFilter(org, specialization);
 
-    const matchesNeeds =
-      needs.length === 0 ||
-      needs.some((n) => org.needs?.includes(n));
+      const matchesCity = city === "" || org.city === city;
 
-    return matchesSearch && matchesSpecialization && matchesCity && matchesNeeds;
-  });
+      const matchesNeeds = needs.length === 0 || needs.some((n) => org.needs?.includes(n));
 
-  const sortedOrganizations = [...filteredOrganizations].sort((a, b) => {
-    const aUrgent = isUrgent(a);
-    const bUrgent = isUrgent(b);
-    if (aUrgent === bUrgent) return 0;
-    return aUrgent ? -1 : 1;
-  });
-
-  const displayedOrganizations = sortedOrganizations.slice(0, showCount);
-
-  const organizationsWithCabinetData = useMemo(() => {
-    void cabinetVersion;
-    return displayedOrganizations.map((org) => {
-      const cabinetRecord = getOrganizationCabinetRecordByName(org.name || "");
-      const organizationAnimals = getOrganizationAnimalsByName(org.name || "");
-      const wardsCount = organizationAnimals.length || org.wards_count || 0;
-      const adoptedYearlyCount = cabinetRecord?.greetingsFromHome.length || org.adopted_yearly_count || 0;
-
-      return {
-        ...org,
-        displayName: cabinetRecord?.profile.organizationName?.trim() || org.name || "Без названия",
-        displayAddress: cabinetRecord?.profile.territory?.trim() || org.address || "Адрес не указан",
-        displayWardsCount: wardsCount,
-        displayAdoptedYearlyCount: adoptedYearlyCount,
-      };
+      return matchesSearch && matchesSpecialization && matchesCity && matchesNeeds;
     });
-  }, [cabinetVersion, displayedOrganizations]);
+  }, [organizations, search, specialization, city, needs]);
+
+  const sortedOrganizations = useMemo(() => {
+    return [...filteredOrganizations].sort((a, b) => {
+      const aUrgent = isUrgent(a);
+      const bUrgent = isUrgent(b);
+      if (aUrgent === bUrgent) return 0;
+      return aUrgent ? -1 : 1;
+    });
+  }, [filteredOrganizations]);
+
+  const displayedOrganizations = useMemo(
+    () => sortedOrganizations.slice(0, showCount),
+    [sortedOrganizations, showCount]
+  );
+
+  useEffect(() => {
+    const ids = filteredOrganizations.map((o) => o.id);
+    if (!ids.length) return;
+
+    let cancelled = false;
+    void Promise.all(
+      ids.map((id) =>
+        organizationsApi
+          .getById(id)
+          .then((page) => {
+            const org = organizations.find((o) => o.id === id);
+            const fallback = {
+              wards_count: org?.wards_count ?? 0,
+              adopted_yearly_count: org?.adopted_yearly_count ?? 0,
+            };
+            return { id, ...statsFromOrganizationPublicPage(page, fallback) };
+          })
+          .catch(() => {
+            const org = organizations.find((o) => o.id === id);
+            return {
+              id,
+              wards: org?.wards_count ?? 0,
+              adopted: org?.adopted_yearly_count ?? 0,
+            };
+          })
+      )
+    ).then((rows) => {
+      if (cancelled) return;
+      setPublicStatsByOrgId((prev) => {
+        const next = { ...prev };
+        for (const r of rows) {
+          next[r.id] = { wards: r.wards, adopted: r.adopted };
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [organizations, filteredOrganizations]);
 
   if (loading) {
     return (
@@ -257,30 +294,38 @@ export default function OrganizationsPage() {
           </aside>
 
           <div className={styles.grid}>
-            {organizationsWithCabinetData.map((org) => (
+            {displayedOrganizations.map((org) => {
+              const displayName = org.name?.trim() || "Без названия";
+              const displayAddress =
+                (org.address && org.address.trim()) || (org.city && org.city.trim()) || "Адрес не указан";
+              const fromPublic = publicStatsByOrgId[org.id];
+              const wardsCount = fromPublic?.wards ?? org.wards_count ?? 0;
+              const adoptedYearlyCount = fromPublic?.adopted ?? org.adopted_yearly_count ?? 0;
+
+              return (
               <div key={org.id} className={styles.orgCard}>
                 <div className={styles.orgHeader}>
                   <div className={styles.orgLogo}>
                     <img
-                      src={getImageUrl(org.logo) || "/event.png"}
-                      alt={org.displayName}
+                      src={getImageUrl(organizationLogoPath(org)) || "/event.png"}
+                      alt={displayName}
                     />
                   </div>
                   <div className={styles.orgInfo}>
-                    <h3>{org.displayName}</h3>
+                    <h3>{displayName}</h3>
                     <div className={styles.orgStats}>
                       <span>
                         <img src="/lapa.svg" alt="подопечные" className={styles.orgIcon} />
-                        {org.displayWardsCount} подопечных
+                        {wardsCount} подопечных
                       </span>
                       <span>
                         <img src="/home.svg" alt="пристроено" className={styles.orgIcon} />
-                        {org.displayAdoptedYearlyCount} пристроено за год
+                        {adoptedYearlyCount} пристроено за год
                       </span>
                     </div>
                     <div className={styles.orgAddress}>
                       <img src="/org.svg" alt="адрес" className={styles.orgIcon} />
-                      {org.displayAddress}
+                      {displayAddress}
                     </div>
                   </div>
                 </div>
@@ -310,7 +355,8 @@ export default function OrganizationsPage() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

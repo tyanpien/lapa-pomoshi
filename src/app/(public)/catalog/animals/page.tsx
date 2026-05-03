@@ -6,8 +6,8 @@ import Link from "next/link";
 import { animalsApi, Animal } from "@/shared/api/endpoints/animals";
 import { getImageUrl } from "@/shared/api/client";
 import {
-  getAllOrganizationAnimals,
   getOrganizationAnimalsEventName,
+  getOrganizationAnimalsPublishedToHomeCatalog,
 } from "@/shared/lib/organizationAnimals";
 
 interface AgeGroup {
@@ -61,7 +61,7 @@ export default function Page() {
     ])
       .then(([animalsData, catalogsData]) => {
         const apiAnimals = animalsData.items || [];
-        const organizationAnimals = getAllOrganizationAnimals();
+        const organizationAnimals = getOrganizationAnimalsPublishedToHomeCatalog();
         setAnimals([...organizationAnimals, ...apiAnimals]);
         setCatalogs(catalogsData);
         setLoading(false);
@@ -77,7 +77,7 @@ export default function Page() {
     const handleUpdate = () => {
       setAnimals((previous) => {
         const externalAnimals = previous.filter((animal) => animal.id < 1_000_000_000_000);
-        const organizationAnimals = getAllOrganizationAnimals();
+        const organizationAnimals = getOrganizationAnimalsPublishedToHomeCatalog();
         return [...organizationAnimals, ...externalAnimals];
       });
     };
@@ -187,7 +187,7 @@ export default function Page() {
     return (
       animal.name?.toLowerCase().includes(search.toLowerCase()) &&
       (type === "all" || species === type) &&
-      (gender.length === 0 || gender.includes(animal.sex)) &&
+      (gender.length === 0 || (animal.sex != null && gender.includes(animal.sex))) &&
       (status.length === 0 || status.includes(mappedStatus)) &&
       matchAge(animal.age_months) &&
       (features.length === 0 ||

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "../organization.module.css";
 import {
   addOrganizationReport,
@@ -8,20 +8,28 @@ import {
   getOrganizationReports,
   toggleOrganizationReportArchive,
 } from "@/shared/lib/organizationCabinet";
+import { mergeApiFirstById } from "@/shared/lib/organizationPublicCabinet";
+import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 
 export default function OrganizationReportsPage() {
+  const apiPayload = useOrganizationPublicCabinetPayload();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
-  const [reports, setReports] = useState(getOrganizationReports());
+  const [localReports, setLocalReports] = useState(getOrganizationReports());
 
   useEffect(() => {
     const eventName = getOrganizationCabinetEventName();
-    const sync = () => setReports(getOrganizationReports());
+    const sync = () => setLocalReports(getOrganizationReports());
     sync();
     window.addEventListener(eventName, sync);
     return () => window.removeEventListener(eventName, sync);
   }, []);
+
+  const reports = useMemo(
+    () => mergeApiFirstById(apiPayload.apiReports, localReports),
+    [apiPayload.apiReports, localReports]
+  );
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -87,12 +95,14 @@ export default function OrganizationReportsPage() {
                       <span className={styles.badge}>{report.archived ? "Архив" : "Опубликовано"}</span>
                     </div>
                     <div className={styles.actions}>
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={() => toggleOrganizationReportArchive(report.id)}
-                      >
-                        {report.archived ? "Вернуть из архива" : "В архив"}
-                      </button>
+                      {!apiPayload.apiReportIds.has(report.id) ? (
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={() => toggleOrganizationReportArchive(report.id)}
+                        >
+                          {report.archived ? "Вернуть из архива" : "В архив"}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </article>

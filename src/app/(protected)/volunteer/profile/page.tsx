@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import { volunteersApi } from "@/shared/api/endpoints/volunteers";
@@ -17,6 +18,8 @@ import {
   type VolunteerHelpFrequency,
 } from "@/shared/lib/volunteerProfileStorage";
 import styles from "./page.module.css";
+import responseStyles from "../responses/page.module.css";
+import { responsesMock, responsesStorageKey, statusClassMap, type StoredResponse } from "../responses/page";
 import {
   AVAILABILITY_PERIOD_COLUMNS,
   WEEKDAY_EDIT_LABELS,
@@ -31,27 +34,12 @@ const messagesMock = [
   { id: 2, name: "Приют «Лапа помощи»", unread: 1 },
 ];
 
-type ResponseStatus = "На рассмотрении" | "В работе" | "Завершено" | "Отменено" | "Отклонено";
-
-const responsesMock = [
-  { id: 1, title: "Перевозка в ветклинику", status: "На рассмотрении" as ResponseStatus },
-  { id: 2, title: "Помощь на передержке", status: "В работе" as ResponseStatus },
-];
-
 const formsMock = [
   { id: 1, title: "Анкета волонтера #1", status: "На рассмотрении" },
   { id: 2, title: "Анкета волонтера #2", status: "Подтверждено" },
 ];
 
-type StoredResponse = {
-  id: number;
-  title: string;
-  status: string;
-};
-
 const HELP_FREQUENCY_OPTIONS: VolunteerHelpFrequency[] = ["Разовая помощь", "Регулярная помощь"];
-
-const responsesStorageKey = "volunteer.responses.v1";
 
 const defaultCompetencyOptions = [
   "Выгул / Уход",
@@ -75,32 +63,8 @@ const defaultHelpFormatOptions = [
   "Другое",
 ];
 
-const statusClassMap: Record<ResponseStatus, string> = {
-  "На рассмотрении": "statusPending",
-  "В работе": "statusActive",
-  Завершено: "statusDone",
-  Отменено: "statusCancelled",
-  Отклонено: "statusArchive",
-};
-
-const isResponseStatus = (status: string): status is ResponseStatus =>
-  status === "На рассмотрении" ||
-  status === "В работе" ||
-  status === "Завершено" ||
-  status === "Отменено" ||
-  status === "Отклонено";
-
-const normalizeResponseStatus = (status: string): ResponseStatus => {
-  if (status === "Подтверждено") {
-    return "В работе";
-  }
-  if (isResponseStatus(status)) {
-    return status;
-  }
-  return "На рассмотрении";
-};
-
 export default function VolunteerProfilePage() {
+  const router = useRouter();
   const { userName } = useUser();
   const [savedResponses, setSavedResponses] = useState<StoredResponse[]>([]);
   const [competencyOptions, setCompetencyOptions] = useState<string[]>(defaultCompetencyOptions);
@@ -127,9 +91,9 @@ export default function VolunteerProfilePage() {
   useEffect(() => {
     Promise.allSettled([volunteersApi.getCatalogs(), eventsApi.getCatalogs()]).then((results) => {
       const volunteersCatalogs =
-        results[0].status === "fulfilled" ? (results[0].value as Record<string, unknown>) : null;
+        results[0].status === "fulfilled" ? (results[0].value as unknown as Record<string, unknown>) : null;
       const eventsCatalogs =
-        results[1].status === "fulfilled" ? (results[1].value as Record<string, unknown>) : null;
+        results[1].status === "fulfilled" ? (results[1].value as unknown as Record<string, unknown>) : null;
 
       const readStringOptions = (value: unknown): string[] => {
         if (!Array.isArray(value)) {
@@ -194,17 +158,12 @@ export default function VolunteerProfilePage() {
   );
 
   const profileResponses = useMemo(() => {
-    const mappedSaved = savedResponses.map((item) => ({
-      id: item.id,
-      title: item.title,
-      status: normalizeResponseStatus(item.status),
-    }));
-
-    const fallbackResponses = responsesMock.filter(
-      (item) => !mappedSaved.some((saved) => saved.title === item.title)
+    const dedupedMock = responsesMock.filter(
+      (item) =>
+        !savedResponses.some((saved) => saved.title === item.title && saved.organization === item.organization)
     );
-
-    return [...mappedSaved, ...fallbackResponses].slice(0, 3);
+    const merged = [...savedResponses, ...dedupedMock];
+    return merged.slice(0, 3);
   }, [savedResponses]);
 
   const detailsEntries = useMemo(
@@ -404,13 +363,15 @@ export default function VolunteerProfilePage() {
 
           <div className={styles.messageList}>
             {messagesMock.map((item) => (
-              <article className={styles.messageItem} key={item.id}>
-                <div className={styles.smallAvatar} />
-                <div className={styles.messageMeta}>
-                  <p>{item.name}</p>
-                </div>
-                <span className={styles.unread}>{item.unread}</span>
-              </article>
+              <Link href={`/messages?thread=${item.id}`} className={styles.messageItemLink} key={item.id}>
+                <article className={styles.messageItem}>
+                  <div className={styles.smallAvatar} />
+                  <div className={styles.messageMeta}>
+                    <p>{item.name}</p>
+                  </div>
+                  <span className={styles.unread}>{item.unread}</span>
+                </article>
+              </Link>
             ))}
           </div>
         </section>
@@ -423,17 +384,89 @@ export default function VolunteerProfilePage() {
             </Link>
           </div>
 
-          <div className={styles.cardList}>
-            {profileResponses.map((item) => (
-              <article className={styles.card} key={item.id}>
-                <div>
-                  <h3>{item.title}</h3>
-                  <p>Задача волонтера</p>
-                </div>
-                <span className={`${styles.status} ${styles[statusClassMap[item.status]]}`}>{item.status}</span>
-              </article>
-            ))}
-          </div>
+          {profileResponses.length === 0 ? (
+            <p className={styles.responsesPreviewEmpty}>Пока нет откликов.</p>
+          ) : (
+            <div className={styles.responsesPreviewGrid}>
+              {profileResponses.map((item) => (
+                <article
+                  key={item.id}
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`Отклик «${item.title}». Открыть на странице откликов`}
+                  className={`${responseStyles.card} ${styles.responsePreviewCard} ${styles.responsePreviewCardInteractive} ${
+                    item.status === "Отменено" || item.status === "Отклонено" ? responseStyles.cardCancelled : ""
+                  }`}
+                  onClick={() => router.push(`/volunteer/responses?response=${item.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/volunteer/responses?response=${item.id}`);
+                    }
+                  }}
+                >
+                  <div className={responseStyles.cardTop}>
+                    <div className={responseStyles.metaLeft}>
+                      <span className={responseStyles.typeTag}>{item.helpType}</span>
+                      <Link
+                        href={item.organizationHref}
+                        className={responseStyles.organization}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {item.organization}
+                      </Link>
+                    </div>
+                    {item.urgent ? <span className={responseStyles.urgent}>срочно</span> : null}
+                  </div>
+
+                  <h2 className={responseStyles.title}>{item.title}</h2>
+                  <p className={responseStyles.description}>{item.description}</p>
+
+                  <div className={responseStyles.timeRow}>
+                    <img src="/clock.svg" alt="" aria-hidden="true" />
+                    <span>{item.dateLabel}</span>
+                  </div>
+
+                  <div className={responseStyles.bottom}>
+                    <div className={responseStyles.actions}>
+                      {item.status !== "Отменено" && item.status !== "Отклонено" ? (
+                        <Link
+                          href="/messages"
+                          className={`${responseStyles.chatBtn} ${styles.previewChatBtn}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          Чат
+                        </Link>
+                      ) : null}
+                      {item.status === "На рассмотрении" ? (
+                        <Link
+                          href={`/volunteer/responses?response=${item.id}`}
+                          className={`${responseStyles.secondaryBtn} ${styles.previewSecondaryBtn}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          Отменить отклик
+                        </Link>
+                      ) : null}
+                      {item.status === "В работе" ? (
+                        <Link
+                          href={`/volunteer/responses?response=${item.id}`}
+                          className={`${responseStyles.secondaryBtn} ${styles.previewSecondaryBtn}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          Отправить отчет
+                        </Link>
+                      ) : null}
+                    </div>
+                    <span
+                      className={`${responseStyles.status} ${responseStyles[statusClassMap[item.status]]} ${styles.previewStatus}`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className={styles.section}>

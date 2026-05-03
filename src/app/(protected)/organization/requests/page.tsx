@@ -10,6 +10,9 @@ import {
   type OrganizationRequestStatus,
 } from "@/shared/lib/organizationCabinet";
 import { getCurrentOrganizationAnimals, getOrganizationAnimalsEventName } from "@/shared/lib/organizationAnimals";
+import { mergeApiFirstById } from "@/shared/lib/organizationPublicCabinet";
+import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
+import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 
 type HelpTypeOption = "Приютить" | "Накормить" | "Вылечить" | "Другое";
 
@@ -42,9 +45,10 @@ const normalizeHelpType = (value: string): HelpFilter => {
 };
 
 export default function OrganizationRequestsPage() {
+  const apiPayload = useOrganizationPublicCabinetPayload();
   const [form, setForm] = useState(initialState);
-  const [requests, setRequests] = useState(getOrganizationRequests());
-  const [animals, setAnimals] = useState(getCurrentOrganizationAnimals());
+  const [localRequests, setLocalRequests] = useState(getOrganizationRequests());
+  const [localAnimals, setLocalAnimals] = useState(getCurrentOrganizationAnimals());
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [helpFilter, setHelpFilter] = useState<HelpFilter>("all");
@@ -54,8 +58,8 @@ export default function OrganizationRequestsPage() {
     const cabinetEventName = getOrganizationCabinetEventName();
     const animalsEventName = getOrganizationAnimalsEventName();
     const sync = () => {
-      setRequests(getOrganizationRequests());
-      setAnimals(getCurrentOrganizationAnimals());
+      setLocalRequests(getOrganizationRequests());
+      setLocalAnimals(getCurrentOrganizationAnimals());
     };
     sync();
     window.addEventListener(cabinetEventName, sync);
@@ -71,6 +75,16 @@ export default function OrganizationRequestsPage() {
     window.addEventListener("click", closeMenu);
     return () => window.removeEventListener("click", closeMenu);
   }, []);
+
+  const requests = useMemo(
+    () => mergeApiFirstById(apiPayload.apiRequests, localRequests),
+    [apiPayload.apiRequests, localRequests]
+  );
+
+  const animals = useMemo(
+    () => mergeApiAndLocalAnimals(apiPayload.apiAnimals, localAnimals),
+    [apiPayload.apiAnimals, localAnimals]
+  );
 
   const visibleRequests = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -109,6 +123,7 @@ export default function OrganizationRequestsPage() {
   };
 
   const setStatus = (id: number, status: OrganizationRequestStatus) => {
+    if (apiPayload.apiRequestIds.has(id)) return;
     updateOrganizationRequestStatus(id, status);
   };
 
@@ -171,28 +186,32 @@ export default function OrganizationRequestsPage() {
 
                 <div className={styles.requestBody}>
                   <div className={styles.cardActions}>
-                    <button
-                      className={styles.menuButton}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenMenuId((prev) => (prev === request.id ? null : request.id));
-                      }}
-                    >
-                      ⋮
-                    </button>
-                    {openMenuId === request.id ? (
-                      <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
-                        <button type="button" onClick={() => setStatus(request.id, "published")}>
-                          Публиковать
+                    {!apiPayload.apiRequestIds.has(request.id) ? (
+                      <>
+                        <button
+                          className={styles.menuButton}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMenuId((prev) => (prev === request.id ? null : request.id));
+                          }}
+                        >
+                          ⋮
                         </button>
-                        <button type="button" onClick={() => setStatus(request.id, "in_progress")}>
-                          В работе
-                        </button>
-                        <button type="button" onClick={() => setStatus(request.id, "closed")}>
-                          Закрыть
-                        </button>
-                      </div>
+                        {openMenuId === request.id ? (
+                          <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
+                            <button type="button" onClick={() => setStatus(request.id, "published")}>
+                              Публиковать
+                            </button>
+                            <button type="button" onClick={() => setStatus(request.id, "in_progress")}>
+                              В работе
+                            </button>
+                            <button type="button" onClick={() => setStatus(request.id, "closed")}>
+                              Закрыть
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
 

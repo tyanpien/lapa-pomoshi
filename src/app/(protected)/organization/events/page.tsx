@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "../organization.module.css";
 import {
   addOrganizationEvent,
@@ -8,21 +8,29 @@ import {
   getOrganizationEvents,
   toggleOrganizationEventArchive,
 } from "@/shared/lib/organizationCabinet";
+import { mergeApiFirstById } from "@/shared/lib/organizationPublicCabinet";
+import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 
 export default function OrganizationEventsPage() {
+  const apiPayload = useOrganizationPublicCabinetPayload();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [dateLabel, setDateLabel] = useState("");
-  const [events, setEvents] = useState(getOrganizationEvents());
+  const [localEvents, setLocalEvents] = useState(getOrganizationEvents());
 
   useEffect(() => {
     const eventName = getOrganizationCabinetEventName();
-    const sync = () => setEvents(getOrganizationEvents());
+    const sync = () => setLocalEvents(getOrganizationEvents());
     sync();
     window.addEventListener(eventName, sync);
     return () => window.removeEventListener(eventName, sync);
   }, []);
+
+  const events = useMemo(
+    () => mergeApiFirstById(apiPayload.apiEvents, localEvents),
+    [apiPayload.apiEvents, localEvents]
+  );
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -97,12 +105,14 @@ export default function OrganizationEventsPage() {
                       <span className={styles.badge}>{eventItem.archived ? "Архив" : "Опубликовано"}</span>
                     </div>
                     <div className={styles.actions}>
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={() => toggleOrganizationEventArchive(eventItem.id)}
-                      >
-                        {eventItem.archived ? "Вернуть из архива" : "В архив"}
-                      </button>
+                      {!apiPayload.apiEventIds.has(eventItem.id) ? (
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={() => toggleOrganizationEventArchive(eventItem.id)}
+                        >
+                          {eventItem.archived ? "Вернуть из архива" : "В архив"}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </article>

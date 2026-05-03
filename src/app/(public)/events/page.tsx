@@ -71,20 +71,18 @@ export default function EventsPage() {
     });
   };
 
-  const formatTime = (start: string, end: string) => {
-    return (
-      new Date(start).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) +
-      " - " +
-      new Date(end).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
-    );
+  const formatTime = (start: string, end: string | null) => {
+    const startLabel = new Date(start).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    if (!end) return startLabel;
+    return `${startLabel} — ${new Date(end).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
   };
 
   const filtered = events.filter((e) => {
     return (
       e.title.toLowerCase().includes(search.toLowerCase()) &&
-      (city === "" || e.city === city) &&
+      (city === "" || (e.city ?? "") === city) &&
       (format === "all" || e.format === format) &&
-      (types.length === 0 || types.includes(e.help_type))
+      (types.length === 0 || (e.help_type ? types.includes(e.help_type) : false))
     );
   });
 

@@ -1,15 +1,48 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import { getThreadsByRole } from "@/shared/lib/messages";
 import styles from "./page.module.css";
 
-export default function MessagesPage() {
+function MessagesPageContent() {
   const { role } = useUser();
-  const isVolunteer = role === "volunteer";
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const threads = useMemo(() => getThreadsByRole(role), [role]);
-  const [activeThreadId, setActiveThreadId] = useState(threads[0]?.id ?? 0);
+
+  const activeThreadId = useMemo(() => {
+    const raw = searchParams.get("thread");
+    if (raw != null && raw !== "") {
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && threads.some((thread) => thread.id === parsed)) {
+        return parsed;
+      }
+    }
+    return threads[0]?.id ?? 0;
+  }, [searchParams, threads]);
+
+  const selectThread = useCallback(
+    (id: number) => {
+      router.replace(`/messages?thread=${id}`, { scroll: false });
+    },
+    [router]
+  );
+
+  useEffect(() => {
+    const raw = searchParams.get("thread");
+    if (raw == null || raw === "") {
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || !threads.some((thread) => thread.id === parsed)) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      document.getElementById(`thread-${parsed}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, [searchParams, threads]);
 
   const activeThread =
     threads.find((thread) => thread.id === activeThreadId) ??
@@ -26,9 +59,10 @@ export default function MessagesPage() {
             {threads.map((thread) => (
               <button
                 key={thread.id}
+                id={`thread-${thread.id}`}
                 type="button"
                 className={`${styles.chatListItem} ${activeThread.id === thread.id ? styles.active : ""}`}
-                onClick={() => setActiveThreadId(thread.id)}
+                onClick={() => selectThread(thread.id)}
               >
                 <span className={styles.avatar} />
                 <span className={styles.chatListText}>
@@ -73,7 +107,7 @@ export default function MessagesPage() {
               <form className={styles.messageForm}>
                 <input
                   type="text"
-                  placeholder={isVolunteer ? "Ответ волонтера..." : "Сообщение..."}
+                  placeholder={role === "volunteer" ? "Ответ волонтера..." : "Сообщение..."}
                   className={styles.messageInput}
                 />
                 <div className={styles.messageActions}>
@@ -90,5 +124,13 @@ export default function MessagesPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<div className={styles.page} style={{ minHeight: "50vh" }} />}>
+      <MessagesPageContent />
+    </Suspense>
   );
 }

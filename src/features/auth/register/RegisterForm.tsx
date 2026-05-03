@@ -26,7 +26,6 @@ const ORGANIZATION_TYPES = [
 
 const MIN_PASSWORD_LENGTH = 8;
 
-/** Имя пользователя или волонтера: только буквы (в т.ч. кириллица) и пробелы между словами. */
 const PERSON_NAME_PATTERN = /^\p{L}+(?:\s+\p{L}+)*$/u;
 
 const isValidPersonDisplayName = (value: string): boolean => {

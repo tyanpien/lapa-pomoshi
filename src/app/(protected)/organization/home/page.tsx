@@ -10,6 +10,9 @@ import {
   updateOrganizationGreeting,
 } from "@/shared/lib/organizationCabinet";
 import { getCurrentOrganizationAnimals, getOrganizationAnimalsEventName } from "@/shared/lib/organizationAnimals";
+import { mergeApiFirstById } from "@/shared/lib/organizationPublicCabinet";
+import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
+import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 
 const initialState = {
   petName: "",
@@ -19,9 +22,10 @@ const initialState = {
 };
 
 export default function OrganizationHomeGreetingsPage() {
+  const apiPayload = useOrganizationPublicCabinetPayload();
   const [form, setForm] = useState(initialState);
-  const [greetings, setGreetings] = useState(getOrganizationGreetings());
-  const [animals, setAnimals] = useState(getCurrentOrganizationAnimals());
+  const [localGreetings, setLocalGreetings] = useState(getOrganizationGreetings());
+  const [localAnimals, setLocalAnimals] = useState(getCurrentOrganizationAnimals());
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [editingGreetingId, setEditingGreetingId] = useState<number | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -31,8 +35,8 @@ export default function OrganizationHomeGreetingsPage() {
     const cabinetEventName = getOrganizationCabinetEventName();
     const animalsEventName = getOrganizationAnimalsEventName();
     const sync = () => {
-      setGreetings(getOrganizationGreetings());
-      setAnimals(getCurrentOrganizationAnimals());
+      setLocalGreetings(getOrganizationGreetings());
+      setLocalAnimals(getCurrentOrganizationAnimals());
     };
     sync();
     window.addEventListener(cabinetEventName, sync);
@@ -48,6 +52,16 @@ export default function OrganizationHomeGreetingsPage() {
     window.addEventListener("click", closeMenu);
     return () => window.removeEventListener("click", closeMenu);
   }, []);
+
+  const greetings = useMemo(
+    () => mergeApiFirstById(apiPayload.apiGreetings, localGreetings),
+    [apiPayload.apiGreetings, localGreetings]
+  );
+
+  const animals = useMemo(
+    () => mergeApiAndLocalAnimals(apiPayload.apiAnimals, localAnimals),
+    [apiPayload.apiAnimals, localAnimals]
+  );
 
   const visibleGreetings = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -97,6 +111,7 @@ export default function OrganizationHomeGreetingsPage() {
   };
 
   const openEditModal = (greetingId: number) => {
+    if (apiPayload.apiGreetingIds.has(greetingId)) return;
     const greeting = greetings.find((item) => item.id === greetingId);
     if (!greeting) return;
 
@@ -112,6 +127,7 @@ export default function OrganizationHomeGreetingsPage() {
   };
 
   const handleDelete = (greetingId: number) => {
+    if (apiPayload.apiGreetingIds.has(greetingId)) return;
     const isConfirmed = window.confirm("Удалить публикацию?");
     if (!isConfirmed) return;
     deleteOrganizationGreeting(greetingId);
@@ -159,25 +175,29 @@ export default function OrganizationHomeGreetingsPage() {
 
                 <div className={styles.requestBody}>
                   <div className={styles.cardActions}>
-                    <button
-                      className={styles.menuButton}
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenMenuId((prev) => (prev === item.id ? null : item.id));
-                      }}
-                    >
-                      ⋮
-                    </button>
-                    {openMenuId === item.id ? (
-                      <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
-                        <button type="button" onClick={() => openEditModal(item.id)}>
-                          Редактировать
+                    {!apiPayload.apiGreetingIds.has(item.id) ? (
+                      <>
+                        <button
+                          className={styles.menuButton}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMenuId((prev) => (prev === item.id ? null : item.id));
+                          }}
+                        >
+                          ⋮
                         </button>
-                        <button type="button" onClick={() => handleDelete(item.id)}>
-                          Удалить публикацию
-                        </button>
-                      </div>
+                        {openMenuId === item.id ? (
+                          <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
+                            <button type="button" onClick={() => openEditModal(item.id)}>
+                              Редактировать
+                            </button>
+                            <button type="button" onClick={() => handleDelete(item.id)}>
+                              Удалить публикацию
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                   <h3 className={styles.requestName}>{item.petName}</h3>

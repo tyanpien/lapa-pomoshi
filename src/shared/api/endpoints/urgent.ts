@@ -21,7 +21,7 @@ export interface UrgentItem {
   status: string;
 
   target_amount: number | null;
-  collected_amount: number;
+  collected_amount?: number | null;
 
   primary_photo_url: string | null;
 

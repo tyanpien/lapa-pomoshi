@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import styles from "./page.module.css";
 
-type ResponseStatus = "На рассмотрении" | "В работе" | "Завершено" | "Отменено" | "Отклонено";
-type ResponseFilter = ResponseStatus | "Архив" | "Все";
+export type ResponseStatus = "На рассмотрении" | "В работе" | "Завершено" | "Отменено" | "Отклонено";
+export type ResponseFilter = ResponseStatus | "Архив" | "Все";
 
-type ResponseCard = {
+export type ResponseCard = {
   id: number;
   helpType: string;
   organization: string;
@@ -19,11 +20,11 @@ type ResponseCard = {
   urgent?: boolean;
 };
 
-type StoredResponse = ResponseCard & {
+export type StoredResponse = ResponseCard & {
   sourceTaskId?: number;
 };
 
-const responsesStorageKey = "volunteer.responses.v1";
+export const responsesStorageKey = "volunteer.responses.v1";
 
 const filterOptions: { label: string; value: ResponseFilter }[] = [
   { label: "На рассмотрении", value: "На рассмотрении" },
@@ -33,7 +34,7 @@ const filterOptions: { label: string; value: ResponseFilter }[] = [
   { label: "Все", value: "Все" },
 ];
 
-const responsesMock: ResponseCard[] = [
+export const responsesMock: ResponseCard[] = [
   {
     id: 1,
     helpType: "Авто",
@@ -92,7 +93,7 @@ const responsesMock: ResponseCard[] = [
   },
 ];
 
-const statusClassMap: Record<ResponseStatus, string> = {
+export const statusClassMap: Record<ResponseStatus, string> = {
   "На рассмотрении": "statusPending",
   "В работе": "statusActive",
   Завершено: "statusDone",
@@ -100,10 +101,42 @@ const statusClassMap: Record<ResponseStatus, string> = {
   Отклонено: "statusArchive",
 };
 
+function ResponseScrollFromQuery({
+  onTargetId,
+}: {
+  onTargetId: (id: number | null) => void;
+}) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const raw = searchParams.get("response");
+    if (raw == null || raw === "") {
+      onTargetId(null);
+      return;
+    }
+    const id = Number(raw);
+    if (!Number.isFinite(id)) {
+      onTargetId(null);
+      return;
+    }
+    onTargetId(id);
+  }, [searchParams, onTargetId]);
+
+  return null;
+}
+
 export default function VolunteerResponsesPage() {
   const [activeFilter, setActiveFilter] = useState<ResponseFilter>("Все");
+  const [scrollToResponseId, setScrollToResponseId] = useState<number | null>(null);
   const [savedResponses, setSavedResponses] = useState<ResponseCard[]>([]);
   const [statusOverrides, setStatusOverrides] = useState<Record<number, ResponseStatus>>({});
+
+  const applyResponseFromQuery = useCallback((id: number | null) => {
+    setScrollToResponseId(id);
+    if (id != null) {
+      setActiveFilter("Все");
+    }
+  }, []);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -146,6 +179,42 @@ export default function VolunteerResponsesPage() {
     return responsesWithOverrides.filter((item) => item.status === activeFilter);
   }, [activeFilter, responsesWithOverrides]);
 
+  useEffect(() => {
+    if (scrollToResponseId == null) {
+      return;
+    }
+    const id = scrollToResponseId;
+    if (!responsesWithOverrides.some((item) => item.id === id)) {
+      return;
+    }
+
+    let cancelled = false;
+    let removeHighlightTimer: number | undefined;
+    const raf = requestAnimationFrame(() => {
+      if (cancelled) {
+        return;
+      }
+      const el = document.getElementById(`response-${id}`);
+      if (!el) {
+        return;
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add(styles.cardFocused);
+      removeHighlightTimer = window.setTimeout(() => {
+        el.classList.remove(styles.cardFocused);
+      }, 2200);
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      if (removeHighlightTimer !== undefined) {
+        window.clearTimeout(removeHighlightTimer);
+      }
+      document.getElementById(`response-${id}`)?.classList.remove(styles.cardFocused);
+    };
+  }, [scrollToResponseId, responsesWithOverrides]);
+
   const handleCancelResponse = (id: number) => {
     setStatusOverrides((prev) => ({
       ...prev,
@@ -175,6 +244,9 @@ export default function VolunteerResponsesPage() {
 
   return (
     <main className={styles.page}>
+      <Suspense fallback={null}>
+        <ResponseScrollFromQuery onTargetId={applyResponseFromQuery} />
+      </Suspense>
       <div className={styles.container}>
         <header className={styles.top}>
           <h1>Мои отклики</h1>
@@ -196,6 +268,7 @@ export default function VolunteerResponsesPage() {
           {filteredResponses.map((item) => (
             <article
               key={item.id}
+              id={`response-${item.id}`}
               className={`${styles.card} ${
                 item.status === "Отменено" || item.status === "Отклонено" ? styles.cardCancelled : ""
               }`}

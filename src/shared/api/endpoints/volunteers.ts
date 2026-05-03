@@ -2,26 +2,69 @@ import { apiFetch, getImageUrl } from "../client";
 
 export interface Volunteer {
   user_id: number;
-  full_name: string;
+  full_name: string | null;
   avatar_url: string | null;
-  rating: number;
-  location_city: string;
-  experience_level: string;
-  experience_level_label: string;
+  rating?: number;
+  location_city: string | null;
+  experience_level: string | null;
+  experience_level_label: string | null;
   completed_tasks_count: number;
-  is_available: boolean;
+  is_available?: boolean;
   competency_tags: string[];
   animal_types: string[];
-  travel_radius_km: number;
-  availability: string;
+  travel_radius_km: number | null;
+  availability: string | null;
 }
 
-export interface VolunteerDetail extends Volunteer {
-  competencies: string[];
-  competency_labels: string[];
-  about_me: string;
-  animal_type_labels: string[];
-  reviews: Review[];
+export interface VolunteerWeekdayScheduleOut {
+  weekday: string;
+  weekday_label: string;
+  ranges: { start: string; end: string }[];
+}
+
+export interface VolunteerPublicLogistics {
+  weekly_schedule: VolunteerWeekdayScheduleOut[];
+  accepts_night_urgency: boolean;
+  night_urgency_label: string | null;
+}
+
+export interface VolunteerPublicArticleCard {
+  id: number;
+  title: string;
+  summary: string | null;
+  read_minutes: number;
+  category: string;
+  category_label: string;
+}
+
+export interface VolunteerViewerActions {
+  can_write_message: boolean;
+  can_offer_task: boolean;
+}
+
+export interface VolunteerDetail {
+  user_id: number;
+  full_name: string | null;
+  avatar_url: string | null;
+  completed_tasks_count: number;
+  readiness_status: "available" | "paused";
+  readiness_label: string;
+  hero_experience_badges: string[];
+  location_city: string | null;
+  location_district: string | null;
+  location_display: string | null;
+  help_format: string | null;
+  help_format_label: string | null;
+  competency_slugs: string[];
+  competency_tags: string[];
+  animal_category_ids: string[];
+  animal_category_labels: string[];
+  logistics: VolunteerPublicLogistics | null;
+  about_me: string | null;
+  articles: VolunteerPublicArticleCard[];
+  viewer: VolunteerViewerActions;
+  travel_radius_km: number | null;
+  reviews?: Review[];
 }
 
 export interface Review {
@@ -42,11 +85,24 @@ export interface VolunteersCatalogs {
   competencies: CatalogOption[];
   experience_levels: CatalogOption[];
   animal_types: CatalogOption[];
+  help_formats?: CatalogOption[];
+  travel_area_modes?: CatalogOption[];
+  weekdays?: CatalogOption[];
+}
+
+export function volunteerAvailabilityText(detail: VolunteerDetail): string {
+  const lines: string[] = [];
+  const sched = detail.logistics?.weekly_schedule ?? [];
+  for (const day of sched) {
+    const ranges = day.ranges.map((r) => `${r.start}–${r.end}`).join(", ");
+    if (day.weekday_label && ranges) lines.push(`${day.weekday_label}: ${ranges}`);
+  }
+  return lines.join("\n");
 }
 
 export const volunteersApi = {
-  getList: () => apiFetch('/api/v1/volunteers'),
-  getCatalogs: () => apiFetch('/api/v1/volunteers/catalogs'),
-  getById: (id: number) => apiFetch(`/api/v1/volunteers/${id}`),
+  getList: () => apiFetch("/api/v1/volunteers") as Promise<{ total: number; items: Volunteer[] }>,
+  getCatalogs: () => apiFetch("/api/v1/volunteers/catalogs") as Promise<VolunteersCatalogs>,
+  getById: (id: number) => apiFetch(`/api/v1/volunteers/${id}`) as Promise<VolunteerDetail>,
   getImageUrl,
 };

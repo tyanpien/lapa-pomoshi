@@ -49,6 +49,12 @@
   color: #f5f1eb;
 }
 
+.statusMessage {
+  margin: 0 0 8px;
+  color: #74482d;
+  font-size: 15px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

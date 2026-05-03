@@ -4,13 +4,23 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import styles from "./page.module.css";
-import { organizationsApi, Organization } from "@/shared/api/endpoints/organizations";
+import {
+  organizationsApi,
+  type OrganizationListItem,
+  type OrganizationPublicPage,
+  type OrgPublicUrgentNeed,
+  type OrgPublicEvent,
+  type OrgPublicHomeStory,
+  type OrgPublicArticle,
+  type OrgPublicReport,
+} from "@/shared/api/endpoints/organizations";
 import { getOrganizationAnimalsByName } from "@/shared/lib/organizationAnimals";
 import {
   getOrganizationCabinetEventName,
   getOrganizationCabinetRecordByName,
 } from "@/shared/lib/organizationCabinet";
 import { getImageUrl } from "@/shared/api/client";
+import type { OrganizationRequest, OrganizationEvent, GreetingFromHome, OrganizationArticle, OrganizationReport } from "@/shared/lib/organizationCabinet";
 
 const tabs = [
   { key: "wards", label: "Подопечные" },
@@ -24,11 +34,88 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number]["key"];
 
+type WardRow = {
+  id: number;
+  name: string;
+  primary_photo_url: string | null;
+  breed: string;
+  age_months: number;
+  status: string;
+  location_city: string | null;
+};
+
+function mapUrgentToRequest(u: OrgPublicUrgentNeed): OrganizationRequest {
+  return {
+    id: u.id,
+    title: u.title,
+    location: "",
+    problemDescription: u.description,
+    helpType: u.help_type,
+    urgency: u.is_urgent ? "urgent" : "normal",
+    linkedAnimalId: u.animal_id ?? undefined,
+    needVolunteer: u.volunteer_needed,
+    volunteerCompetencies: "",
+    status: "published",
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function mapOrgEvent(e: OrgPublicEvent): OrganizationEvent {
+  return {
+    id: e.id,
+    title: e.title,
+    description: e.description,
+    location: e.location_display || "",
+    dateLabel: new Date(e.starts_at).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }),
+    archived: false,
+    createdAt: e.starts_at,
+  };
+}
+
+function mapHomeStory(s: OrgPublicHomeStory): GreetingFromHome {
+  return {
+    id: s.id,
+    petName: s.animal_name,
+    text: s.story,
+    photoUrl: s.photo_url ? getImageUrl(s.photo_url) : undefined,
+    linkedAnimalId: undefined,
+    createdAt: s.adopted_at,
+  };
+}
+
+function mapOrgArticle(a: OrgPublicArticle): OrganizationArticle {
+  return {
+    id: a.id,
+    title: a.title,
+    articleType: a.category,
+    author: "",
+    content: "",
+    archived: false,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function mapOrgReport(r: OrgPublicReport): OrganizationReport {
+  return {
+    id: r.id,
+    title: r.title,
+    content: r.summary || "",
+    isUrgent: false,
+    archived: false,
+    createdAt: r.published_at,
+  };
+}
+
 export default function OrganizationPage() {
   const params = useParams<{ id: string }>();
   const organizationId = Number(params?.id);
   const [activeTab, setActiveTab] = useState<TabKey>("wards");
-  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [listItem, setListItem] = useState<OrganizationListItem | null>(null);
+  const [publicPage, setPublicPage] = useState<OrganizationPublicPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [organizationNameFromRecord, setOrganizationNameFromRecord] = useState("");
@@ -43,7 +130,8 @@ export default function OrganizationPage() {
 
   useEffect(() => {
     if (!Number.isFinite(organizationId)) {
-      setOrganization(null);
+      setListItem(null);
+      setPublicPage(null);
       setLoading(false);
       return;
     }
@@ -53,30 +141,27 @@ export default function OrganizationPage() {
     const loadOrganization = async () => {
       try {
         const listData = await organizationsApi.getList();
-        const fromList = (listData?.items ?? []).find((item: Organization) => item.id === organizationId) ?? null;
+        const fromList = (listData?.items ?? []).find((item) => item.id === organizationId) ?? null;
 
-        let resolved = fromList;
+        let page: OrganizationPublicPage | null = null;
         try {
-          const byId = await organizationsApi.getById(organizationId);
-          if (byId?.id === organizationId) {
-            resolved = {
-              ...(fromList || {}),
-              ...byId,
-            };
-          }
+          page = await organizationsApi.getById(organizationId);
         } catch {
-          
+          page = null;
         }
 
         if (mounted) {
-          setOrganization(resolved);
-          setNotFound(!resolved);
-          setOrganizationNameFromRecord(resolved?.name || "");
+          setListItem(fromList);
+          setPublicPage(page);
+          const displayName = fromList?.name ?? page?.hero.name ?? "";
+          setOrganizationNameFromRecord(displayName);
+          setNotFound(!fromList && !page);
         }
       } catch (error) {
         console.error("Не удалось загрузить организацию:", error);
         if (mounted) {
-          setOrganization(null);
+          setListItem(null);
+          setPublicPage(null);
           setNotFound(true);
         }
       } finally {
@@ -98,23 +183,85 @@ export default function OrganizationPage() {
     return getOrganizationCabinetRecordByName(organizationNameFromRecord);
   }, [organizationNameFromRecord, cabinetTick]);
 
-  const organizationAnimals = useMemo(() => {
+  const wardRows = useMemo((): WardRow[] => {
+    const apiWards = (publicPage?.wards ?? []).map((w) => ({
+      id: w.id,
+      name: w.name,
+      primary_photo_url: w.photo_url ? getImageUrl(w.photo_url) : null,
+      breed: w.species,
+      age_months: w.age_months,
+      status: w.status,
+      location_city: null as string | null,
+    }));
+    if (apiWards.length > 0) return apiWards;
     if (!organizationNameFromRecord) return [];
-    return getOrganizationAnimalsByName(organizationNameFromRecord);
-  }, [organizationNameFromRecord]);
+    return getOrganizationAnimalsByName(organizationNameFromRecord).map((a) => ({
+      id: a.id,
+      name: a.name,
+      primary_photo_url: a.primary_photo_url,
+      breed: a.breed || a.species || "Метис",
+      age_months: a.age_months,
+      status: a.status,
+      location_city: a.location_city,
+    }));
+  }, [publicPage, organizationNameFromRecord]);
 
   const orgName =
-    cabinetRecord?.profile.organizationName.trim() || organization?.name || "Организация";
-  const orgAddress = organization?.address || "Адрес не указан";
+    cabinetRecord?.profile.organizationName.trim() ||
+    publicPage?.hero.name ||
+    listItem?.name ||
+    "Организация";
+  const orgAddress =
+    listItem?.address ||
+    publicPage?.hero.address ||
+    publicPage?.hero.geography_display ||
+    listItem?.city ||
+    publicPage?.hero.city ||
+    "Адрес не указан";
   const orgDescription =
-    cabinetRecord?.profile.description || cabinetRecord?.profile.helpWays || organization?.description || "Описание пока не заполнено.";
-  const orgLogo = getImageUrl(organization?.logo) || "/event.png";
-  const organizationRequests = cabinetRecord?.requests ?? [];
-  const organizationEvents = cabinetRecord?.events ?? [];
-  const organizationGreetings = cabinetRecord?.greetingsFromHome ?? [];
-  const organizationReports = cabinetRecord?.reports ?? [];
-  const organizationArticles = (cabinetRecord?.articles ?? []).filter((article) => !article.archived);
-  const adoptedYearlyCount = organizationGreetings.length || organization?.adopted_yearly_count || 0;
+    cabinetRecord?.profile.description ||
+    cabinetRecord?.profile.helpWays ||
+    publicPage?.hero.description?.trim() ||
+    publicPage?.about.about?.trim() ||
+    "Описание пока не заполнено.";
+  const logoPath = publicPage?.hero.logo_url ?? listItem?.logo_url ?? null;
+  const orgLogo = (logoPath ? getImageUrl(logoPath) : "") || "/event.png";
+
+  const organizationRequests = useMemo(() => {
+    const c = cabinetRecord?.requests ?? [];
+    if (c.length) return c;
+    return (publicPage?.urgent_help ?? []).map(mapUrgentToRequest);
+  }, [cabinetRecord, publicPage]);
+
+  const organizationEvents = useMemo(() => {
+    const c = cabinetRecord?.events ?? [];
+    if (c.length) return c;
+    return (publicPage?.events ?? []).map(mapOrgEvent);
+  }, [cabinetRecord, publicPage]);
+
+  const organizationGreetings = useMemo(() => {
+    const c = cabinetRecord?.greetingsFromHome ?? [];
+    if (c.length) return c;
+    return (publicPage?.home_stories ?? []).map(mapHomeStory);
+  }, [cabinetRecord, publicPage]);
+
+  const organizationReports = useMemo(() => {
+    const c = cabinetRecord?.reports ?? [];
+    if (c.length) return c;
+    return (publicPage?.reports ?? []).map(mapOrgReport);
+  }, [cabinetRecord, publicPage]);
+
+  const organizationArticles = useMemo(() => {
+    const c = (cabinetRecord?.articles ?? []).filter((article) => !article.archived);
+    if (c.length) return c;
+    return (publicPage?.articles ?? []).map(mapOrgArticle);
+  }, [cabinetRecord, publicPage]);
+
+  const adoptedYearlyCount =
+    organizationGreetings.length ||
+    publicPage?.hero.adopted_yearly_count ||
+    listItem?.adopted_yearly_count ||
+    0;
 
   const formatAge = (months: number) => {
     if (!months) return "Возраст не указан";
@@ -158,7 +305,7 @@ export default function OrganizationPage() {
           ) : (
             organizationRequests.map((request) => {
               const linkedAnimal = request.linkedAnimalId
-                ? organizationAnimals.find((animal) => animal.id === request.linkedAnimalId)
+                ? wardRows.find((animal) => animal.id === request.linkedAnimalId)
                 : null;
               const imageSrc = request.mediaUrl?.trim() || linkedAnimal?.primary_photo_url || "/cat-placeholder.jpg";
 
@@ -227,7 +374,7 @@ export default function OrganizationPage() {
                     <span>Привет из дома</span>
                     {story.linkedAnimalId ? (
                       <span>
-                        Животное: {organizationAnimals.find((animal) => animal.id === story.linkedAnimalId)?.name || "не указано"}
+                        Животное: {wardRows.find((animal) => animal.id === story.linkedAnimalId)?.name || "не указано"}
                       </span>
                     ) : null}
                   </div>
@@ -310,12 +457,12 @@ export default function OrganizationPage() {
     return (
       <section className={styles.cardsSection} aria-label="Подопечные организации">
         <div className={styles.cardsGrid}>
-          {organizationAnimals.length === 0 ? (
+          {wardRows.length === 0 ? (
             <article className={styles.infoCard}>
               <p>Подопечные пока не добавлены.</p>
             </article>
           ) : (
-            organizationAnimals.map((animal) => (
+            wardRows.map((animal) => (
               <article className={styles.card} key={animal.id}>
                 <div className={styles.imageWrap}>
                   <img src={animal.primary_photo_url || "/cat-placeholder.jpg"} alt={animal.name} className={styles.image} />
@@ -377,7 +524,7 @@ export default function OrganizationPage() {
             {orgName}
           </h1>
           <p className={styles.organizationSubtitle}>
-            {cabinetRecord?.profile.specialization || "Организация помощи животным"}
+            {cabinetRecord?.profile.specialization || publicPage?.hero.tagline || "Организация помощи животным"}
           </p>
         </div>
 
@@ -429,7 +576,7 @@ export default function OrganizationPage() {
             <aside className={styles.statsCard} aria-label="Статистика фонда">
               <p>
                 <img src="/lapa-org.svg" alt="" aria-hidden="true" className={styles.statIcon} />
-                {organizationAnimals.length || organization?.wards_count || 0} подопечных
+                {wardRows.length || publicPage?.hero.wards_count || listItem?.wards_count || 0} подопечных
               </p>
               <p>
                 <img src="/home-org.svg" alt="" aria-hidden="true" className={styles.statIcon} />

@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import {
-  getAllOrganizationRequests,
-  getOrganizationCabinetEventName,
-  type OrganizationRequest,
-} from "@/shared/lib/organizationCabinet";
-import {
-  getOrganizationAnimalById,
-  getOrganizationAnimalsEventName,
-} from "@/shared/lib/organizationAnimals";
+  helpApi,
+  type HelpAnimalApiTab,
+  type HelpAnimalItem,
+} from "@/shared/api/endpoints/help";
 
 type HelpFilter = "all" | "adopt" | "food" | "treatment" | "other";
 type NeedType = "adopt" | "food" | "treatment" | "other";
@@ -30,65 +26,6 @@ interface HelpCard {
   amount: string | null;
 }
 
-const cards: HelpCard[] = [
-  {
-    id: 1,
-    name: "Муся",
-    image: "/cat.png",
-    isUrgent: true,
-    species: "кошка",
-    age: "2 года",
-    statusTag: "На лечении",
-    organization: "Название организации",
-    needText: "На операцию на лапу",
-    needIcon: "/operation.svg",
-    needType: "treatment",
-    amount: "15 000 ₽",
-  },
-  {
-    id: 2,
-    name: "Муся",
-    image: "/cat.png",
-    isUrgent: true,
-    species: "кошка",
-    age: "2 года",
-    statusTag: "Готова к пристрою",
-    organization: "Название организации",
-    needText: "На корм Gastrointestinal",
-    needIcon: "/food.svg",
-    needType: "food",
-    amount: "5 000 ₽",
-  },
-  {
-    id: 3,
-    name: "Муся",
-    image: "/cat.png",
-    isUrgent: false,
-    species: "кошка",
-    age: "2 года",
-    statusTag: "Готова к пристрою",
-    organization: "Название организации",
-    needText: "Ищет дом и любящую семью",
-    needIcon: "/home_.svg",
-    needType: "adopt",
-    amount: null,
-  },
-  {
-    id: 4,
-    name: "Муся",
-    image: "/cat.png",
-    isUrgent: false,
-    species: "кошка",
-    age: "2 года",
-    statusTag: "На лечении",
-    organization: "Название организации",
-    needText: "Новые поводки и ошейники",
-    needIcon: "/povodok.svg",
-    needType: "other",
-    amount: "3 000 ₽",
-  },
-];
-
 const FILTER_LABELS: Record<HelpFilter, string> = {
   all: "Все",
   adopt: "Приютить",
@@ -97,97 +34,105 @@ const FILTER_LABELS: Record<HelpFilter, string> = {
   other: "Другое",
 };
 
-const matchesAdoptStatusTag = (statusTag: string) => {
-  const t = statusTag.trim().toLowerCase();
-  return t === "готов к пристрою" || t === "готова к пристрою";
+const filterToApiTab = (filter: HelpFilter): HelpAnimalApiTab => {
+  const map: Record<HelpFilter, HelpAnimalApiTab> = {
+    all: "all",
+    adopt: "adopt",
+    food: "feed",
+    treatment: "heal",
+    other: "other",
+  };
+  return map[filter];
 };
 
-const visibleInAdoptFilter = (card: HelpCard) =>
-  card.needType === "adopt" || matchesAdoptStatusTag(card.statusTag);
-
-const getNeedTypeByHelp = (helpType: string): NeedType => {
-  const normalized = helpType.trim().toLowerCase();
-  if (normalized === "приютить") return "adopt";
-  if (normalized === "накормить") return "food";
-  if (normalized === "вылечить") return "treatment";
+const needTypeFromBucket = (bucket: string): NeedType => {
+  const n = bucket.trim().toLowerCase();
+  if (n === "adopt" || n.includes("пристро")) return "adopt";
+  if (n === "feed" || n === "food" || n.includes("корм") || n.includes("накорм")) return "food";
+  if (n === "heal" || n === "treatment" || n.includes("леч")) return "treatment";
   return "other";
 };
 
-const formatAge = (months?: number) => {
-  if (!months || months <= 0) return "Возраст не указан";
-  if (months < 12) {
-    return `${months} ${months === 1 ? "месяц" : months < 5 ? "месяца" : "месяцев"}`;
+const needIconForType = (needType: NeedType) =>
+  needType === "adopt"
+    ? "/home_.svg"
+    : needType === "food"
+      ? "/food.svg"
+      : needType === "treatment"
+        ? "/operation.svg"
+        : "/povodok.svg";
+
+const formatRub = (amount: number) =>
+  amount > 0 ? `${new Intl.NumberFormat("ru-RU").format(amount)} ₽` : null;
+
+const inferNeedType = (item: HelpAnimalItem): NeedType => {
+  if (item.monetary?.length) {
+    return needTypeFromBucket(item.monetary[0].help_bucket);
   }
-  const years = Math.floor(months / 12);
-  const remainder = months % 12;
-  if (!remainder) return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
-  return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"} ${remainder} ${
-    remainder === 1 ? "месяц" : remainder < 5 ? "месяца" : "месяцев"
-  }`;
+  if (item.adopt_ready) return "adopt";
+  return "other";
 };
 
-const statusTagFromAnimalStatus = (status?: string) => {
-  if (status === "on_treatment") return "На лечении";
-  if (status === "in_shelter") return "В приюте";
-  if (status === "looking_for_home") return "Готов к пристрою";
-  return "Готов к пристрою";
-};
+const mapItemToCard = (item: HelpAnimalItem): HelpCard => {
+  const needType = inferNeedType(item);
+  const lines = (item.monetary ?? []).map((m) => m.line).filter(Boolean);
+  const needText =
+    lines.length > 0
+      ? lines.join(" · ")
+      : item.adopt_ready
+        ? "Ищет дом и любящую семью"
+        : "Нужна помощь";
 
-const mapRequestToCard = (request: OrganizationRequest): HelpCard => {
-  const linkedAnimal = request.linkedAnimalId ? getOrganizationAnimalById(request.linkedAnimalId) : null;
-  const needType = getNeedTypeByHelp(request.helpType);
-  const fallbackImage = linkedAnimal?.primary_photo_url || "/cat.png";
+  const totalRub = (item.monetary ?? []).reduce((s, m) => s + (Number(m.amount_rub) || 0), 0);
+  const amountStr = needType === "adopt" && !totalRub ? null : formatRub(totalRub);
 
   return {
-    id: request.id,
-    name: linkedAnimal?.name || request.title || "Подопечный",
-    image: request.mediaUrl?.trim() || fallbackImage,
-    isUrgent: request.urgency === "urgent",
-    species: (linkedAnimal?.species || "животное").toLowerCase(),
-    age: formatAge(linkedAnimal?.age_months),
-    statusTag: statusTagFromAnimalStatus(linkedAnimal?.status),
-    organization: linkedAnimal?.organization_name || "Название организации",
-    needText: request.problemDescription,
-    needIcon:
-      needType === "adopt" ? "/home_.svg" : needType === "food" ? "/food.svg" : needType === "treatment" ? "/operation.svg" : "/povodok.svg",
+    id: item.animal_id,
+    name: item.name,
+    image: helpApi.getImageUrl(item.primary_photo_url),
+    isUrgent: item.is_urgent,
+    species: item.species_tag?.trim() ? item.species_tag.trim().toLowerCase() : "животное",
+    age: item.age_tag?.trim() || "Возраст не указан",
+    statusTag: item.status_chip?.trim() || "—",
+    organization: item.organization_name?.trim() || "Организация",
+    needText,
+    needIcon: needIconForType(needType),
     needType,
-    amount: needType === "adopt" ? null : "5 000 ₽",
+    amount: amountStr,
   };
 };
 
 export default function HelpPage() {
   const [activeFilter, setActiveFilter] = useState<HelpFilter>("all");
-  const [organizationCards, setOrganizationCards] = useState<HelpCard[]>([]);
+  const [apiCards, setApiCards] = useState<HelpCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async (filter: HelpFilter) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const tab = filterToApiTab(filter);
+      const res = await helpApi.getAnimalHelp(tab);
+      setApiCards((res.items ?? []).map(mapItemToCard));
+    } catch (e) {
+      setApiCards([]);
+      setError(e instanceof Error ? e.message : "Не удалось загрузить список");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const sync = () => {
-      const requests = getAllOrganizationRequests().filter((item) => item.status !== "closed");
-      setOrganizationCards(requests.map(mapRequestToCard));
-    };
-
-    sync();
-    const cabinetEvent = getOrganizationCabinetEventName();
-    const animalsEvent = getOrganizationAnimalsEventName();
-    window.addEventListener(cabinetEvent, sync);
-    window.addEventListener(animalsEvent, sync);
-    return () => {
-      window.removeEventListener(cabinetEvent, sync);
-      window.removeEventListener(animalsEvent, sync);
-    };
-  }, []);
+    void load(activeFilter);
+  }, [activeFilter, load]);
 
   const FALLBACK_AMOUNT_FOOD = "5 000 ₽";
   const FALLBACK_AMOUNT_TREATMENT = "15 000 ₽";
   const FALLBACK_AMOUNT_OTHER = "3 000 ₽";
 
   const renderData = useMemo(() => {
-    const sourceCards = [...organizationCards, ...cards];
-    const filteredCards = sourceCards.filter((card) => {
-      if (activeFilter === "all") return true;
-      if (activeFilter === "adopt") return visibleInAdoptFilter(card);
-      return card.needType === activeFilter;
-    });
-    const mappedCards = filteredCards.map((card) => {
+    const mappedCards = apiCards.map((card) => {
       if (activeFilter === "adopt") {
         return {
           ...card,
@@ -198,7 +143,7 @@ export default function HelpPage() {
 
       if (activeFilter === "food") {
         const sum =
-          card.needType === "food" ? card.amount ?? FALLBACK_AMOUNT_FOOD : FALLBACK_AMOUNT_FOOD;
+          card.needType === "food" ? (card.amount ?? FALLBACK_AMOUNT_FOOD) : FALLBACK_AMOUNT_FOOD;
         return {
           ...card,
           actionLabel: "Помочь",
@@ -209,7 +154,7 @@ export default function HelpPage() {
       if (activeFilter === "treatment") {
         const sum =
           card.needType === "treatment"
-            ? card.amount ?? FALLBACK_AMOUNT_TREATMENT
+            ? (card.amount ?? FALLBACK_AMOUNT_TREATMENT)
             : FALLBACK_AMOUNT_TREATMENT;
         return {
           ...card,
@@ -220,7 +165,9 @@ export default function HelpPage() {
 
       if (activeFilter === "other") {
         const sum =
-          card.needType === "other" ? card.amount ?? FALLBACK_AMOUNT_OTHER : FALLBACK_AMOUNT_OTHER;
+          card.needType === "other"
+            ? (card.amount ?? FALLBACK_AMOUNT_OTHER)
+            : FALLBACK_AMOUNT_OTHER;
         return {
           ...card,
           actionLabel: "Помочь",
@@ -248,7 +195,7 @@ export default function HelpPage() {
     }
 
     return mappedCards.sort((a, b) => Number(b.isUrgent) - Number(a.isUrgent));
-  }, [activeFilter, organizationCards]);
+  }, [activeFilter, apiCards]);
 
   return (
     <main className={styles.page}>
@@ -269,45 +216,49 @@ export default function HelpPage() {
           </div>
         </div>
 
+        {loading && <p className={styles.statusMessage}>Загрузка…</p>}
+        {error && !loading && <p className={styles.statusMessage}>{error}</p>}
+
         <div className={styles.grid}>
-          {renderData.map((card) => (
-            <article key={card.id} className={styles.card}>
-              <div className={styles.imageWrapper}>
-                <img src={card.image} alt={card.name} className={styles.image} />
-                {card.isUrgent && <span className={styles.urgentBadge}>срочно</span>}
-              </div>
-
-              <div className={styles.cardBody}>
-                <h2 className={styles.cardName}>{card.name}</h2>
-
-                <div className={styles.metaTags}>
-                  <span className={styles.metaTag}>{card.species}</span>
-                  <span className={styles.metaTag}>{card.age}</span>
-                  <span className={`${styles.metaTag} ${styles.statusTag}`}>{card.statusTag}</span>
+          {!loading &&
+            renderData.map((card) => (
+              <article key={card.id} className={styles.card}>
+                <div className={styles.imageWrapper}>
+                  <img src={card.image} alt={card.name} className={styles.image} />
+                  {card.isUrgent && <span className={styles.urgentBadge}>срочно</span>}
                 </div>
 
-                <p className={styles.lineWithIcon}>
-                  <img src="/org.svg" alt="" aria-hidden="true" />
-                  <span>{card.organization}</span>
-                </p>
+                <div className={styles.cardBody}>
+                  <h2 className={styles.cardName}>{card.name}</h2>
 
-                <p className={styles.need}>
-                  <img src={card.needIcon} alt="" aria-hidden="true" />
-                  <span>{card.needText}</span>
-                </p>
+                  <div className={styles.metaTags}>
+                    <span className={styles.metaTag}>{card.species}</span>
+                    <span className={styles.metaTag}>{card.age}</span>
+                    <span className={`${styles.metaTag} ${styles.statusTag}`}>{card.statusTag}</span>
+                  </div>
 
-                {card.amount ? (
-                  <p className={styles.amount}>{card.amount}</p>
-                ) : (
-                  <div className={styles.amountPlaceholder} aria-hidden="true" />
-                )}
+                  <p className={styles.lineWithIcon}>
+                    <img src="/org.svg" alt="" aria-hidden="true" />
+                    <span>{card.organization}</span>
+                  </p>
 
-                <button type="button" className={styles.actionButton}>
-                  {card.actionLabel}
-                </button>
-              </div>
-            </article>
-          ))}
+                  <p className={styles.need}>
+                    <img src={card.needIcon} alt="" aria-hidden="true" />
+                    <span>{card.needText}</span>
+                  </p>
+
+                  {card.amount ? (
+                    <p className={styles.amount}>{card.amount}</p>
+                  ) : (
+                    <div className={styles.amountPlaceholder} aria-hidden="true" />
+                  )}
+
+                  <button type="button" className={styles.actionButton}>
+                    {card.actionLabel}
+                  </button>
+                </div>
+              </article>
+            ))}
         </div>
       </section>
     </main>
