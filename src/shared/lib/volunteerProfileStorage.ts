@@ -1,7 +1,11 @@
 import { volunteersApi, type Volunteer } from "@/shared/api/endpoints/volunteers";
 import {
   emptyAvailabilityGrid,
+  emptyDayRanges,
+  migrateGridToDayRanges,
   normalizeAvailabilityGrid,
+  normalizeDayRanges,
+  type AvailabilityDayRangesState,
   type AvailabilityGridState,
 } from "@/shared/lib/volunteerAvailabilityGrid";
 
@@ -16,6 +20,15 @@ function normalizeProfileStorageIdentity(identity: string): string {
 
 export function volunteerProfileDetailsStorageKey(userIdentity: string): string {
   return `${VOLUNTEER_DETAILS_KEY}:${normalizeProfileStorageIdentity(userIdentity)}`;
+}
+
+export function volunteerProfileStorageIdentity(
+  userEmail: string | null | undefined,
+  displayName: string | null | undefined,
+): string {
+  const e = userEmail?.trim();
+  if (e) return e;
+  return (displayName ?? "").trim();
 }
 
 export type VolunteerHelpFrequency = "" | "Разовая помощь" | "Регулярная помощь";
@@ -40,8 +53,10 @@ export type StoredVolunteerDetails = {
   animalKinds: VolunteerAnimalKindTag[];
   availabilityGrid: AvailabilityGridState;
   availabilityAroundClock: boolean;
+  availabilityDayRanges: AvailabilityDayRangesState;
   travelOutOfTown: boolean;
   catalogIsAvailable: boolean | null;
+  availabilityPlainText: string;
 };
 
 export const emptyVolunteerDetails: StoredVolunteerDetails = {
@@ -60,8 +75,10 @@ export const emptyVolunteerDetails: StoredVolunteerDetails = {
   animalKinds: [],
   availabilityGrid: emptyAvailabilityGrid(),
   availabilityAroundClock: false,
+  availabilityDayRanges: emptyDayRanges(),
   travelOutOfTown: false,
   catalogIsAvailable: null,
+  availabilityPlainText: "",
 };
 
 function normalizeAnimalKinds(raw: unknown): VolunteerAnimalKindTag[] {
@@ -138,9 +155,18 @@ export function normalizeVolunteerDetailsFromStorage(parsed: Partial<StoredVolun
     animalKinds: normalizeAnimalKinds(parsed.animalKinds),
     availabilityGrid: normalizeAvailabilityGrid(parsed.availabilityGrid),
     availabilityAroundClock: Boolean(parsed.availabilityAroundClock),
+    availabilityDayRanges: (() => {
+      const grid = normalizeAvailabilityGrid(parsed.availabilityGrid);
+      const aroundClock = Boolean(parsed.availabilityAroundClock);
+      if (parsed.availabilityDayRanges != null && typeof parsed.availabilityDayRanges === "object") {
+        return normalizeDayRanges(parsed.availabilityDayRanges);
+      }
+      return migrateGridToDayRanges(grid, aroundClock);
+    })(),
     travelOutOfTown: Boolean(parsed.travelOutOfTown),
     catalogIsAvailable:
       parsed.catalogIsAvailable === true || parsed.catalogIsAvailable === false ? parsed.catalogIsAvailable : null,
+    availabilityPlainText: typeof parsed.availabilityPlainText === "string" ? parsed.availabilityPlainText : "",
   };
 }
 
@@ -197,15 +223,34 @@ export function readLinkedVolunteerCatalogUserId(): number | null {
   }
 }
 
-export async function syncVolunteerCatalogUserId(displayName: string): Promise<VolunteerCatalogLinkResult> {
-  const needle = displayName.trim().toLowerCase();
-  if (!needle) {
-    return { catalogUserId: null, listIsAvailable: null };
-  }
+export async function syncVolunteerCatalogUserId(
+  displayName: string,
+  options?: { userId?: number },
+): Promise<VolunteerCatalogLinkResult> {
+  const resolvedUserId =
+    options?.userId != null && Number.isFinite(options.userId) && options.userId > 0
+      ? Math.floor(options.userId)
+      : null;
 
   try {
     const list = await volunteersApi.getList();
     const items: Volunteer[] = list.items ?? [];
+
+    if (resolvedUserId != null) {
+      const match = items.find((v: Volunteer) => v.user_id === resolvedUserId);
+      localStorage.setItem(VOLUNTEER_CATALOG_USER_ID_KEY, String(resolvedUserId));
+      return {
+        catalogUserId: resolvedUserId,
+        listIsAvailable: typeof match?.is_available === "boolean" ? match.is_available : null,
+      };
+    }
+
+    const needle = displayName.trim().toLowerCase();
+    if (!needle) {
+      localStorage.removeItem(VOLUNTEER_CATALOG_USER_ID_KEY);
+      return { catalogUserId: null, listIsAvailable: null };
+    }
+
     const exact = items.find((v: Volunteer) => v.full_name?.trim().toLowerCase() === needle);
     const match = exact ?? items.find((v: Volunteer) => v.full_name?.trim().toLowerCase().includes(needle));
     const id = match?.user_id;
@@ -221,6 +266,10 @@ export async function syncVolunteerCatalogUserId(displayName: string): Promise<V
     localStorage.removeItem(VOLUNTEER_CATALOG_USER_ID_KEY);
     return { catalogUserId: null, listIsAvailable: null };
   } catch {
+    if (resolvedUserId != null) {
+      localStorage.setItem(VOLUNTEER_CATALOG_USER_ID_KEY, String(resolvedUserId));
+      return { catalogUserId: resolvedUserId, listIsAvailable: null };
+    }
     return { catalogUserId: null, listIsAvailable: null };
   }
 }

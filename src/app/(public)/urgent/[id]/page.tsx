@@ -1,26 +1,28 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { useUser } from "@/shared/lib/hooks/useUser";
 import styles from "./page.module.css";
 import { urgentApi, UrgentItem } from "@/shared/api/endpoints/urgent";
 import { getImageUrl } from "@/shared/api/client";
+import { getUrgentHelpTypeLabel } from "@/shared/lib/urgentHelpTypeLabels";
+import { formatUrgentAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
+import { parseUrgentDescription } from "@/shared/lib/urgentDescriptionBlocks";
+import { formatRub } from "@/shared/lib/formatRub";
 
 export default function AnimalPage() {
   const params = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const id = Number(params.id);
+  const { isAuth } = useUser();
 
   const [data, setData] = useState<UrgentItem | null>(null);
   const [mainImage, setMainImage] = useState("/cat-placeholder.jpg");
   const [loading, setLoading] = useState(true);
-    const HELP_TYPE_LABELS: Record<string, string> = {
-    financial: "Финансовая помощь",
-    foster: "Передержка",
-    manual: "Помощь руками",
-    auto: "Автопомощь",
-    medical: "Лекарства и кровь",
-    };
 
   useEffect(() => {
     urgentApi.getById(id)
@@ -60,10 +62,17 @@ export default function AnimalPage() {
     );
   }
 
-  const progress =
-    data.target_amount && data.collected_amount != null
-      ? Math.round((data.collected_amount / data.target_amount) * 100)
+  const collectionProgressPercent =
+    data.target_amount != null && data.target_amount > 0
+      ? (() => {
+          const raw = data.collected_amount;
+          const collected =
+            raw == null || !Number.isFinite(Number(raw)) ? 0 : Number(raw);
+          return Math.min(100, Math.round((collected / data.target_amount) * 100));
+        })()
       : null;
+
+  const speciesLabel = formatUrgentAnimalSpeciesLabel(data.animal_species);
 
   return (
     <main className={styles.page}>
@@ -95,42 +104,68 @@ export default function AnimalPage() {
                 <span className={styles.urgentTag}>Срочно</span>
               )}
 
-              {data.animal_species && <span>{data.animal_species}</span>}
-              <span>{HELP_TYPE_LABELS[data.help_type] || data.help_type}</span>
+              {speciesLabel ? <span>{speciesLabel}</span> : null}
+              <span>{getUrgentHelpTypeLabel(data.help_type)}</span>
               <span>{data.city}</span>
             </div>
 
-            <p className={styles.description}>
-              {data.description}
-            </p>
+            <div className={styles.descriptionWrap}>
+              {parseUrgentDescription(data.description).map((block, i) => {
+                if (block.type === "paragraph") {
+                  return (
+                    <p key={i} className={styles.description}>
+                      {block.text}
+                    </p>
+                  );
+                }
+                if (block.type === "routeList") {
+                  return (
+                    <div key={i} className={styles.descriptionRouteBlock}>
+                      <p className={styles.descriptionRouteTitle}>Маршрут:</p>
+                      <ul className={styles.descriptionList}>
+                        {block.items.map((item, j) => (
+                          <li key={j}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                }
+                return (
+                  <p key={i} className={styles.description}>
+                    <strong>{block.label}</strong> {block.body}
+                  </p>
+                );
+              })}
+            </div>
 
             <div className={styles.orgBlock}>
               <img src="/org.svg" className={styles.orgIcon} alt="" />
               <span>{data.organization_name}</span>
             </div>
 
-            {progress !== null && (
+            {collectionProgressPercent !== null && (
               <div className={styles.progressBlock}>
                 <div className={styles.progressBar}>
-                  <div style={{ width: `${progress}%` }} />
+                  <div style={{ width: `${collectionProgressPercent}%` }} />
                 </div>
-                <span>
-                  {data.collected_amount} / {data.target_amount}
-                </span>
+                <span>{formatRub(data.target_amount)}</span>
               </div>
             )}
 
             <div className={styles.actionButtons}>
-              <button className={styles.helpBtn}>Помочь</button>
-
-              {data.animal_id && (
-                <Link
-                  href={`/urgent/${data.animal_id}`}
-                  className={styles.adoptBtn}
-                >
-                  Перейти к животному
-                </Link>
-              )}
+              <button
+                type="button"
+                className={styles.helpBtn}
+                onClick={() => {
+                  if (!isAuth) {
+                    router.push(getLoginHref(pathname || `/urgent/${id}`));
+                    return;
+                  }
+                  router.push("/help");
+                }}
+              >
+                Помочь
+              </button>
             </div>
           </div>
         </div>

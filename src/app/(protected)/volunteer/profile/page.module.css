@@ -39,28 +39,40 @@
 .avatarWithStatusWrap {
   position: relative;
   flex-shrink: 0;
+  align-self: flex-start;
+  width: 120px;
 }
 
 .avatarPlaceholder {
-  width: 100px;
-  height: 100px;
+  display: block;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
-  background: #d7d7d7;
+  overflow: hidden;
+  background-color: #d7d7d7;
+  flex-shrink: 0;
+}
+
+.avatarPlaceholder img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
 }
 
 .statusDot {
   position: absolute;
-  right: 4px;
-  bottom: 2px;
-  width: 14px;
-  height: 14px;
+  right: 2px;
+  bottom: 1px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  border: 2px solid #f3f1ec;
   box-sizing: border-box;
 }
 
 .statusDotAvailable {
-  background: #4f7f45;
+  background: #3D4F3A;
 }
 
 .statusDotBusy {
@@ -571,74 +583,97 @@
   }
 }
 
-.availabilityGridWrap {
-  overflow-x: auto;
+.availabilityDayListWrap {
   margin-top: 10px;
-  border-radius: 8px;
-  border: 1px solid #d7d0c4;
-  background: #fff;
 }
 
-.availabilityGridTable {
-  width: 100%;
-  border-collapse: collapse;
+.availabilityDayList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.availabilityDayRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
   font-size: 14px;
   color: #2f2f2f;
 }
 
-.availabilityGridCorner {
-  width: 1%;
-  border-right: 1px solid #e8dfd4;
-  border-bottom: 1px solid #e8dfd4;
-  background: #faf8f4;
-}
-
-.availabilityGridHead,
-.availabilityGridDay {
-  padding: 10px 8px;
-  text-align: center;
-  font-weight: 600;
-  vertical-align: middle;
-  border: 1px solid #e8dfd4;
-  background: #faf8f4;
-}
-
-.availabilityGridDay {
-  text-align: left;
-  white-space: nowrap;
+.availabilityDayName {
+  min-width: 110px;
   font-weight: 500;
   color: #3e3e3e;
+  text-transform: capitalize;
 }
 
-.availabilityGridHead {
-  font-size: 13px;
-  line-height: 1.3;
+.availabilityTimePair {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.availabilityGridHead span {
-  display: block;
+.field input[type="time"].availabilityTimeInput,
+.field .availabilityTimeInput {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0 4px 0 0;
+  margin: 0;
+  min-width: 0;
+  font-size: 15px;
+  font-family: inherit;
+  color: #2f2f2f;
 }
 
-.availabilityGridHeadRange {
-  font-weight: 500;
-  font-size: 11px;
+.field input[type="time"].availabilityTimeInput::-webkit-calendar-picker-indicator,
+.field .availabilityTimeInput::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.field input[type="time"].availabilityTimeInput::-moz-calendar-picker-indicator,
+.field .availabilityTimeInput::-moz-calendar-picker-indicator {
+  display: none;
+}
+
+.field input[type="time"].availabilityTimeInput::-webkit-datetime-edit-fields-wrapper,
+.field .availabilityTimeInput::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+.field input[type="time"].availabilityTimeInput::-webkit-datetime-edit,
+.field .availabilityTimeInput::-webkit-datetime-edit {
+  padding: 0;
+}
+
+.availabilityTimeInput:focus {
+  outline: none;
+}
+
+.availabilityTimeInput:focus-visible {
+  outline: 2px solid #3d4f3a;
+  outline-offset: 2px;
+}
+
+.availabilityTimeInput:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.availabilityTimeDash {
   color: #6b665f;
-  margin-top: 2px;
-}
-
-.availabilityGridCell {
-  text-align: center;
-  vertical-align: middle;
-  padding: 8px;
-  border: 1px solid #e8dfd4;
-  background: #fff;
-}
-
-.availabilityGridCell input {
-  width: 18px;
-  height: 18px;
-  accent-color: #3d4f3a;
-  cursor: pointer;
+  font-weight: 500;
+  user-select: none;
 }
 
 .availabilityAroundClockRow {

@@ -1,25 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
+import { urgentApi, type UrgentItem } from "@/shared/api/endpoints/urgent";
+import { normalizeUrgentFeedItems } from "@/shared/lib/urgentFeedNormalize";
+import { getUrgentHelpTypeLabel } from "@/shared/lib/urgentHelpTypeLabels";
+import { meVolunteerResponsesApi } from "@/shared/api/endpoints/meVolunteerResponses";
 
-type TaskFilter = "all" | "shelter" | "photo" | "walkcare" | "transport" | "nearby" | "new";
-
-type VolunteerTask = {
-  id: number;
-  type: Exclude<TaskFilter, "all" | "nearby" | "new">;
-  title: string;
-  organization: string;
-  description: string;
-  dateLabel: string;
-  distance: string;
-  latOffset: number;
-  lonOffset: number;
-  urgent?: boolean;
-  applied?: boolean;
-};
+type TaskFilter = "all" | "shelter" | "photo" | "walkcare" | "new" | "nearby" | "transport";
 
 const filters: { id: TaskFilter; label: string }[] = [
   { id: "all", label: "Все" },
@@ -31,88 +21,44 @@ const filters: { id: TaskFilter; label: string }[] = [
   { id: "transport", label: "Перевозка" },
 ];
 
-const tasksMock: VolunteerTask[] = [
-  {
-    id: 1,
-    type: "transport",
-    title: "Перевозка",
-    organization: "Фонд «Верный друг»",
-    description:
-      "Срочно нужна перевозка кота Василия в ветклинику на ул. Малышева. Требуется аккуратная транспортировка после операции. Самостоятельно доставить животное нет возможности, поэтому ищем волонтера с машиной. Муся спокойная, находится в переноске.",
-    dateLabel: "Сегодня, 17:00",
-    distance: "2.5 км",
-    latOffset: 0.014,
-    lonOffset: 0.008,
-    urgent: true,
-  },
-  {
-    id: 2,
-    type: "transport",
-    title: "Перевозка",
-    organization: "Фонд «Верный друг»",
-    description:
-      "Кошке Мусе требуется поездка в ветеринарную клинику на операцию.\nСамостоятельно доставить животное нет возможности, поэтому ищем волонтера с машиной.\nМуся спокойная, находится в переноске.\nМаршрут:\nОткуда: Передержка, ул. Ленина, 10\nКуда: Ветклиника \"Айболит\", ул. Мира, 25\nЧто нужно сделать: забрать животное с передержки -> аккуратно перевезти в клинику -> передать сотрудникам\nДополнительно: переноска предоставляется.",
-    dateLabel: "15 мая, 17:00",
-    distance: "3 км",
-    latOffset: -0.012,
-    lonOffset: 0.017,
-    applied: true,
-  },
-  {
-    id: 3,
-    type: "shelter",
-    title: "Помощь в приюте",
-    organization: "Приют «Хвостики»",
-    description: "Нужно помочь с уборкой и кормлением подопечных в вечернюю смену.",
-    dateLabel: "Завтра, 11:00",
-    distance: "1.4 км",
-    latOffset: -0.01,
-    lonOffset: -0.018,
-  },
-  {
-    id: 4,
-    type: "photo",
-    title: "Фото / Видео",
-    organization: "Центр «Добрые лапы»",
-    description: "Сделать 10-12 фото для карточек животных и короткое видео для соцсетей.",
-    dateLabel: "6 мая, 14:00",
-    distance: "4.1 км",
-    latOffset: 0.016,
-    lonOffset: -0.01,
-  },
-  {
-    id: 5,
-    type: "walkcare",
-    title: "Выгул / Уход",
-    organization: "Приют «Лапа»",
-    description: "Нужна помощь с выгулом двух собак и уходом за вольером в утреннюю смену.",
-    dateLabel: "Сегодня, 09:30",
-    distance: "1.2 км",
-    latOffset: 0.004,
-    lonOffset: -0.006,
-  },
-];
+type TaskLane = "transport" | "photo" | "walkcare" | "shelter" | "other";
 
-const pinColorByType: Record<VolunteerTask["type"], string> = {
-  shelter: "#6F8A6E",
+const pinColorByLane: Record<TaskLane, string> = {
+  transport: "#8B5A3C",
   photo: "#7F6D9A",
   walkcare: "#4E7A9A",
-  transport: "#8B5A3C",
+  shelter: "#6F8A6E",
+  other: "#757575",
 };
 
-type LocatedTask = VolunteerTask & { lat: number; lon: number };
-type StoredResponse = {
-  id: number;
-  sourceTaskId: number;
-  helpType: string;
-  organization: string;
-  organizationHref: string;
-  title: string;
-  description: string;
-  dateLabel: string;
-  status: "На рассмотрении";
-  urgent?: boolean;
-};
+function deriveTaskLane(task: UrgentItem): TaskLane {
+  const blob = `${task.title ?? ""} ${task.description ?? ""}`.toLowerCase();
+  const ht = (task.help_type ?? "").trim().toLowerCase();
+
+  if (ht === "auto" || /перевоз|транспорт|машин|авто|довезти|подвезти|перевезти|ветклиник|вет\.?\s*клиник/i.test(blob)) {
+    return "transport";
+  }
+
+  if (ht === "manual") {
+    const photoHit = /фото|видео|съём|съемк|сним|камер|видеосъём|видеосъемк|контент|соцсет|instagram|tiktok/i.test(blob);
+    if (photoHit) return "photo";
+
+    const walkHit = /выгул|прогул|гулять|выгулять|погулять|выгулить|выводить\s+гулять/i.test(blob);
+    if (walkHit) return "walkcare";
+
+    const shelterHit =
+      /приют|уборк|смен[аыу]|вольер|санитар|подопечн|животн|кормлен|накорми|передерж|содержани|территори|хвост/i.test(blob);
+    if (shelterHit) return "shelter";
+  }
+
+  if (ht === "foster") {
+    return "shelter";
+  }
+
+  return "other";
+}
+
+type LocatedTask = UrgentItem & { lat: number; lon: number };
 
 type YMapBounds = [[number, number], [number, number]];
 
@@ -157,14 +103,23 @@ declare global {
 
 const yekaterinburgCenter: [number, number] = [56.838926, 60.605703];
 const yandexApiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
-const responsesStorageKey = "volunteer.responses.v1";
 
-const helpTypeLabelByTaskType: Record<VolunteerTask["type"], string> = {
-  shelter: "Помощь в приюте",
-  photo: "Фото / Видео",
-  walkcare: "Выгул / Уход",
-  transport: "Перевозка",
-};
+function pseudoOffsetForId(id: number): [number, number] {
+  const nx = (((id * 7919) % 1001) / 1001 - 0.5) * 0.12;
+  const ny = (((id * 4177) % 1001) / 1001 - 0.5) * 0.12;
+  return [nx, ny];
+}
+
+function locateTasks(items: UrgentItem[], center: [number, number]): LocatedTask[] {
+  return items.map((item) => {
+    const [dx, dy] = pseudoOffsetForId(item.id);
+    return {
+      ...item,
+      lat: center[0] + dx,
+      lon: center[1] + dy,
+    };
+  });
+}
 
 export default function VolunteerTasksPage() {
   const router = useRouter();
@@ -172,7 +127,6 @@ export default function VolunteerTasksPage() {
   const mapRef = useRef<YMapInstance | null>(null);
   const placemarkRef = useRef<Record<number, YGeoObject>>({});
   const cardsRef = useRef<Record<number, HTMLElement | null>>({});
-  const nextResponseIdRef = useRef(10_000);
 
   const [scriptReady, setScriptReady] = useState(false);
   const [userCenter] = useState<[number, number]>(yekaterinburgCenter);
@@ -183,55 +137,82 @@ export default function VolunteerTasksPage() {
   const [activePinId, setActivePinId] = useState<number | null>(null);
   const [appliedTaskIds, setAppliedTaskIds] = useState<number[]>([]);
   const [expandedTaskIds, setExpandedTaskIds] = useState<number[]>([]);
+  const [tasks, setTasks] = useState<UrgentItem[]>([]);
+  const [tasksError, setTasksError] = useState("");
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [applyBusyId, setApplyBusyId] = useState<number | null>(null);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      try {
-        const raw = localStorage.getItem(responsesStorageKey);
-        if (!raw) {
-          return;
+    let cancelled = false;
+    setTasksLoading(true);
+    Promise.all([
+      urgentApi.getList({ limit: 100 }),
+      meVolunteerResponsesApi.getList({ tab: "all", limit: 100, offset: 0 }).catch(() => ({ total: 0, items: [] })),
+    ])
+      .then(([urgent, responses]) => {
+        if (cancelled) return;
+        const rows = normalizeUrgentFeedItems(urgent.items ?? []);
+        const filtered = rows.filter((r) => r.volunteer_needed && String(r.status).toLowerCase() !== "closed");
+        setTasks(filtered);
+        const helpIds = new Set<number>();
+        for (const it of responses.items ?? []) {
+          const hid = (it as { help_request_id?: number }).help_request_id;
+          if (typeof hid === "number" && Number.isFinite(hid)) helpIds.add(hid);
         }
-        const stored = JSON.parse(raw) as StoredResponse[];
-        const ids = stored.map((item) => item.sourceTaskId);
-        setAppliedTaskIds(ids);
-      } catch {
-        setAppliedTaskIds([]);
-      }
-    });
+        setAppliedTaskIds(Array.from(helpIds));
+        setTasksError("");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTasks([]);
+          setTasksError("Не удалось загрузить задачи.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTasksLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const locatedTasks = useMemo<LocatedTask[]>(() => {
-    return tasksMock.map((task) => ({
-      ...task,
-      lat: userCenter[0] + task.latOffset,
-      lon: userCenter[1] + task.lonOffset,
-    }));
-  }, [userCenter]);
+  const locatedTasks = useMemo<LocatedTask[]>(() => locateTasks(tasks, userCenter), [tasks, userCenter]);
 
   const byFilter = useMemo<LocatedTask[]>(() => {
     const normalizedSearch = search.trim().toLowerCase();
-
     const withSearch = locatedTasks.filter((task) => {
-      if (!normalizedSearch) {
-        return true;
-      }
+      if (!normalizedSearch) return true;
+      const org = task.organization_name ?? "";
       return (
         task.title.toLowerCase().includes(normalizedSearch) ||
-        task.organization.toLowerCase().includes(normalizedSearch) ||
+        org.toLowerCase().includes(normalizedSearch) ||
         task.description.toLowerCase().includes(normalizedSearch)
       );
     });
 
-    if (activeFilter === "all") {
-      return withSearch;
-    }
+    if (activeFilter === "all") return withSearch;
     if (activeFilter === "new") {
-      return withSearch.filter((task) => !task.applied && !appliedTaskIds.includes(task.id));
+      return withSearch.filter((task) => !appliedTaskIds.includes(task.id));
     }
     if (activeFilter === "nearby") {
-      return withSearch.filter((task) => parseFloat(task.distance.replace(",", ".")) <= 3);
+      return withSearch.filter((task) => {
+        const [dx, dy] = pseudoOffsetForId(task.id);
+        return Math.hypot(dx, dy) <= 0.06;
+      });
     }
-    return withSearch.filter((task) => task.type === activeFilter);
+    if (activeFilter === "transport") {
+      return withSearch.filter((task) => deriveTaskLane(task) === "transport");
+    }
+    if (activeFilter === "photo") {
+      return withSearch.filter((task) => deriveTaskLane(task) === "photo");
+    }
+    if (activeFilter === "walkcare") {
+      return withSearch.filter((task) => deriveTaskLane(task) === "walkcare");
+    }
+    if (activeFilter === "shelter") {
+      return withSearch.filter((task) => deriveTaskLane(task) === "shelter");
+    }
+    return withSearch;
   }, [activeFilter, locatedTasks, search, appliedTaskIds]);
 
   useEffect(() => {
@@ -284,15 +265,16 @@ export default function VolunteerTasksPage() {
     placemarkRef.current = {};
 
     byFilter.forEach((task) => {
+      const color = pinColorByLane[deriveTaskLane(task)];
       const placemark = new ymaps.Placemark(
         [task.lat, task.lon],
         {
           hintContent: task.title,
-          balloonContent: `<strong>${task.title}</strong><br/>${task.organization}`,
+          balloonContent: `<strong>${task.title}</strong><br/>${task.organization_name}`,
         },
         {
           preset: highlightedPreset(task.id, hoveredTaskId, activePinId),
-          iconColor: pinColorByType[task.type],
+          iconColor: color,
         }
       );
 
@@ -320,47 +302,39 @@ export default function VolunteerTasksPage() {
     }
 
     const [[south, west], [north, east]] = bounds;
-    return byFilter.filter(
-      (task) => task.lat >= south && task.lat <= north && task.lon >= west && task.lon <= east
-    );
+    return byFilter.filter((task) => task.lat >= south && task.lat <= north && task.lon >= west && task.lon <= east);
   }, [bounds, byFilter]);
 
-  const handleApply = (task: LocatedTask) => {
-    if (appliedTaskIds.includes(task.id)) {
-      router.push("/volunteer/responses");
-      return;
-    }
-
-    const response: StoredResponse = {
-      id: ++nextResponseIdRef.current,
-      sourceTaskId: task.id,
-      helpType: helpTypeLabelByTaskType[task.type],
-      organization: task.organization,
-      organizationHref: "/catalog/organizations/1",
-      title: task.title,
-      description: task.description,
-      dateLabel: task.dateLabel,
-      status: "На рассмотрении",
-      urgent: task.urgent,
-    };
-
-    try {
-      const raw = localStorage.getItem(responsesStorageKey);
-      const stored = raw ? (JSON.parse(raw) as StoredResponse[]) : [];
-      const next = [response, ...stored];
-      localStorage.setItem(responsesStorageKey, JSON.stringify(next));
-      setAppliedTaskIds((prev) => [...prev, task.id]);
-    } catch {
-    }
-
-    router.push("/volunteer/responses");
-  };
+  const handleApply = useCallback(
+    (task: LocatedTask) => {
+      if (appliedTaskIds.includes(task.id)) {
+        router.push("/volunteer/responses");
+        return;
+      }
+      setApplyBusyId(task.id);
+      void meVolunteerResponsesApi
+        .create({ help_request_id: task.id, message: null })
+        .then(() => {
+          setAppliedTaskIds((prev) => (prev.includes(task.id) ? prev : [...prev, task.id]));
+          router.push(`/volunteer/responses?response=${task.id}`);
+        })
+        .catch(() => {
+          setTasksError("Не удалось отправить отклик. Проверьте авторизацию и права волонтёра.");
+        })
+        .finally(() => setApplyBusyId(null));
+    },
+    [appliedTaskIds, router]
+  );
 
   const toggleDescription = (taskId: number) => {
     setExpandedTaskIds((prev) =>
       prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
     );
   };
+
+  const dateLabel = (task: UrgentItem) =>
+    task.deadline_label?.trim() ||
+    (task.deadline_at ? new Date(task.deadline_at).toLocaleString("ru-RU") : "Срок не указан");
 
   return (
     <main className={styles.page}>
@@ -389,6 +363,9 @@ export default function VolunteerTasksPage() {
           ))}
         </div>
 
+        {tasksError ? <p>{tasksError}</p> : null}
+        {tasksLoading ? <p>Загрузка задач…</p> : null}
+
         <section className={styles.layout}>
           <aside className={styles.cardsColumn}>
             {visibleTasks.map((task) => (
@@ -404,41 +381,43 @@ export default function VolunteerTasksPage() {
                 onMouseLeave={() => setHoveredTaskId(null)}
               >
                 <div className={styles.cardTop}>
-                  <span className={styles.org}>{task.organization}</span>
-                  {task.urgent ? <span className={styles.urgent}>срочно</span> : null}
+                  <span className={styles.org}>{task.organization_name}</span>
+                  {task.is_urgent ? <span className={styles.urgent}>срочно</span> : null}
                 </div>
                 <h2>{task.title}</h2>
+                <p style={{ margin: "0 0 6px", opacity: 0.75, fontSize: 13 }}>{getUrgentHelpTypeLabel(task.help_type)}</p>
                 <p
                   className={`${styles.description} ${
-                    task.description.length > 100 && !expandedTaskIds.includes(task.id) ? styles.descriptionCollapsed : ""
+                    task.description.length > 160 && !expandedTaskIds.includes(task.id) ? styles.descriptionCollapsed : ""
                   }`}
                 >
                   {task.description}
                 </p>
-                {task.description.length > 100 ? (
-                  <button
-                    type="button"
-                    className={styles.moreBtn}
-                    onClick={() => toggleDescription(task.id)}
-                  >
+                {task.description.length > 160 ? (
+                  <button type="button" className={styles.moreBtn} onClick={() => toggleDescription(task.id)}>
                     {expandedTaskIds.includes(task.id) ? "Меньше" : "Подробнее"}
                   </button>
                 ) : null}
                 <div className={styles.cardBottom}>
                   <div className={styles.time}>
                     <img src="/clock.svg" alt="" aria-hidden="true" />
-                    <span>{task.dateLabel}</span>
+                    <span>{dateLabel(task)}</span>
                   </div>
-                  <span className={styles.distance}>{task.distance}</span>
+                  <span className={styles.distance}>{task.city ?? "Город не указан"}</span>
                 </div>
                 <button
                   type="button"
                   className={`${styles.actionBtn} ${
-                    task.applied || appliedTaskIds.includes(task.id) ? styles.actionBtnMuted : ""
+                    appliedTaskIds.includes(task.id) ? styles.actionBtnMuted : ""
                   }`}
+                  disabled={applyBusyId === task.id}
                   onClick={() => handleApply(task)}
                 >
-                  {task.applied || appliedTaskIds.includes(task.id) ? "Вы откликнулись" : "Откликнуться"}
+                  {applyBusyId === task.id
+                    ? "Отправка…"
+                    : appliedTaskIds.includes(task.id)
+                      ? "Вы откликнулись"
+                      : "Откликнуться"}
                 </button>
               </article>
             ))}

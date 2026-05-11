@@ -5,13 +5,11 @@ import { useEffect, useState } from "react";
 import styles from "./page.module.css";
 import { eventsApi, EventItem } from "@/shared/api/endpoints/events";
 
-type EventDetail = EventItem & { description?: string };
-
 export default function EventPage() {
   const params = useParams();
   const id = Number(params.id);
 
-  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [event, setEvent] = useState<EventItem | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

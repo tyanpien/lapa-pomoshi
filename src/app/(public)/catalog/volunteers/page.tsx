@@ -11,6 +11,7 @@ import {
   readLinkedVolunteerCatalogUserId,
   readVolunteerDetailsFromStorage,
   resolveVolunteerCatalogIsAvailable,
+  volunteerProfileStorageIdentity,
 } from "@/shared/lib/volunteerProfileStorage";
 import {
   buildVolunteerCatalogCardChips,
@@ -31,7 +32,11 @@ const competencyMapping: Record<string, string[]> = {
 };
 
 export default function VolunteersPage() {
-  const { userName } = useUser();
+  const { userName, userEmail } = useUser();
+  const profileIdentity = useMemo(
+    () => volunteerProfileStorageIdentity(userEmail, userName),
+    [userEmail, userName],
+  );
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [catalogs, setCatalogs] = useState<VolunteersCatalogs | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,11 +59,11 @@ export default function VolunteersPage() {
     void catalogLocalTick;
     const linkedId = readLinkedVolunteerCatalogUserId();
     const overlay =
-      linkedId != null && userName?.trim()
-        ? readVolunteerDetailsFromStorage(userName)
+      linkedId != null && profileIdentity.trim()
+        ? readVolunteerDetailsFromStorage(profileIdentity)
         : null;
     return { linkedId, overlay };
-  }, [catalogLocalTick, userName]);
+  }, [catalogLocalTick, profileIdentity]);
 
   useEffect(() => {
     const onProfilePersisted = () => setCatalogLocalTick((value) => value + 1);

@@ -9,9 +9,14 @@ import {
 } from "@/shared/lib/organizationPublicCabinet";
 import { useUser } from "@/shared/lib/hooks/useUser";
 
-export function useOrganizationPublicCabinetPayload(): OrganizationCabinetApiPayload {
-  const { role, userName } = useUser();
-  const [data, setData] = useState<OrganizationCabinetApiPayload>(emptyOrganizationCabinetApiPayload);
+export type OrganizationCabinetPayloadWithStatus = OrganizationCabinetApiPayload & {
+  isFetching: boolean;
+};
+
+export function useOrganizationPublicCabinetPayload(): OrganizationCabinetPayloadWithStatus {
+  const { role, userName, isLoading: userLoading } = useUser();
+  const [data, setData] = useState<OrganizationCabinetApiPayload>(() => emptyOrganizationCabinetApiPayload());
+  const [cabinetLoading, setCabinetLoading] = useState(false);
   const [cabinetTick, setCabinetTick] = useState(0);
 
   useEffect(() => {
@@ -22,15 +27,24 @@ export function useOrganizationPublicCabinetPayload(): OrganizationCabinetApiPay
   }, []);
 
   useEffect(() => {
-    if (role !== "organization") return;
+    if (role !== "organization") {
+      setData(emptyOrganizationCabinetApiPayload());
+      setCabinetLoading(false);
+      return;
+    }
     let cancelled = false;
     const hints = [
       getOrganizationProfile().organizationName?.trim() || "",
       typeof window !== "undefined" ? localStorage.getItem("userName")?.trim() || "" : "",
       userName?.trim() || "",
     ].filter(Boolean);
+
+    setCabinetLoading(true);
     fetchOrganizationCabinetApiPayload(hints).then((next) => {
-      if (!cancelled) setData(next);
+      if (!cancelled) {
+        setData(next);
+        setCabinetLoading(false);
+      }
     });
     return () => {
       cancelled = true;
@@ -38,7 +52,10 @@ export function useOrganizationPublicCabinetPayload(): OrganizationCabinetApiPay
   }, [role, userName, cabinetTick]);
 
   if (role !== "organization") {
-    return emptyOrganizationCabinetApiPayload();
+    return { ...emptyOrganizationCabinetApiPayload(), isFetching: false };
   }
-  return data;
+
+  const isFetching = userLoading || cabinetLoading;
+
+  return { ...data, isFetching };
 }

@@ -1,51 +1,109 @@
 import { UserRole } from "@/shared/types/user";
 import { clearAuthCookies, setAuthCookies } from "@/shared/lib/auth/cookies";
 import { useState, useEffect } from "react";
+import { meProfileApi } from "@/shared/api/endpoints/meProfile";
+import { getImageUrl } from "@/shared/api/client";
 
 const AUTH_CHANGED_EVENT = "auth-changed";
 
+export const USER_EMAIL_STORAGE_KEY = "userEmail";
+
+function readInitialRole(): UserRole {
+  if (typeof window === "undefined") return "guest";
+  const storedRole = localStorage.getItem("userRole") as UserRole;
+  const token = (localStorage.getItem("token") || localStorage.getItem("access_token") || "").trim();
+  if (token && storedRole && storedRole !== "guest") return storedRole;
+  return "guest";
+}
+
 export function useUser() {
-  const [role, setRole] = useState<UserRole>("guest");
+  const [role, setRole] = useState<UserRole>(readInitialRole);
   const [isLoading, setIsLoading] = useState(true);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadUser = () => {
+    const loadUser = async () => {
       try {
         const storedRole = localStorage.getItem("userRole") as UserRole;
-        const token = localStorage.getItem("token");
+        const token =
+          typeof window !== "undefined"
+            ? (localStorage.getItem("token") || localStorage.getItem("access_token") || "").trim()
+            : "";
         const avatar = localStorage.getItem("userAvatar");
         const name = localStorage.getItem("userName");
+        const email = localStorage.getItem(USER_EMAIL_STORAGE_KEY);
 
         if (token && storedRole && storedRole !== "guest") {
           setAuthCookies({ role: storedRole, token });
           setRole(storedRole);
           setUserAvatar(avatar);
           setUserName(name);
+          setUserEmail(email?.trim() || null);
+
+          try {
+            const profile = await meProfileApi.get();
+            const apiName =
+              profile.user.full_name?.trim() || profile.user.email?.trim() || null;
+            const rawAvatar =
+              profile.volunteer_profile?.avatar_url?.trim() ||
+              profile.user_profile?.avatar_url?.trim() ||
+              "";
+            const apiAvatar = rawAvatar ? getImageUrl(rawAvatar) : null;
+
+            const tokenStill =
+              typeof window !== "undefined"
+                ? (localStorage.getItem("token") || localStorage.getItem("access_token") || "").trim()
+                : "";
+            if (!tokenStill) return;
+
+            if (apiName) {
+              localStorage.setItem("userName", apiName);
+              setUserName(apiName);
+            }
+            if (apiAvatar) {
+              localStorage.setItem("userAvatar", apiAvatar);
+              setUserAvatar(apiAvatar);
+            } else {
+              localStorage.removeItem("userAvatar");
+              setUserAvatar(null);
+            }
+            const apiEmail = profile.user.email?.trim();
+            if (apiEmail) {
+              localStorage.setItem(USER_EMAIL_STORAGE_KEY, apiEmail);
+              setUserEmail(apiEmail);
+            }
+          } catch {
+          }
         } else {
           setRole("guest");
           setUserAvatar(null);
           setUserName(null);
+          setUserEmail(null);
         }
       } catch (error) {
         console.error("Error loading user:", error);
         setRole("guest");
         setUserAvatar(null);
         setUserName(null);
+        setUserEmail(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadUser();
+    void loadUser();
 
     const handleAuthChanged = () => {
       loadUser();
     };
 
     const handleStorage = (event: StorageEvent) => {
-      if (!event.key || ["userRole", "token", "userAvatar", "userName"].includes(event.key)) {
+      if (
+        !event.key ||
+        ["userRole", "token", "userAvatar", "userName", USER_EMAIL_STORAGE_KEY].includes(event.key)
+      ) {
         loadUser();
       }
     };
@@ -82,10 +140,12 @@ export function useUser() {
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("userAvatar");
     localStorage.removeItem("userName");
+    localStorage.removeItem(USER_EMAIL_STORAGE_KEY);
     clearAuthCookies();
     setRole("guest");
     setUserAvatar(null);
     setUserName(null);
+    setUserEmail(null);
     window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
   };
 
@@ -95,6 +155,7 @@ export function useUser() {
     isLoading,
     userAvatar,
     userName,
+    userEmail,
     setUserRole,
     logout,
   };

@@ -3,9 +3,15 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import styles from "./page.module.css";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { useUser } from "@/shared/lib/hooks/useUser";
 
 import { urgentApi, UrgentCatalogs, UrgentItem } from "@/shared/api/endpoints/urgent";
 import { getImageUrl } from "@/shared/api/client";
+import { normalizeUrgentFeedItems } from "@/shared/lib/urgentFeedNormalize";
+import { takeFirstSentences } from "@/shared/lib/teaserSentences";
+import { formatRub } from "@/shared/lib/formatRub";
 
 interface UrgentCard {
   id: number;
@@ -24,6 +30,8 @@ interface UrgentCard {
 }
 
 export default function UrgentPage() {
+  const router = useRouter();
+  const { isAuth } = useUser();
   const [cards, setCards] = useState<UrgentItem[]>([]);
   const [catalogs, setCatalogs] = useState<UrgentCatalogs | null>(null);
 
@@ -38,7 +46,8 @@ export default function UrgentPage() {
 
   useEffect(() => {
     urgentApi.getList().then((data) => {
-      setCards(data.items.filter((i: UrgentItem) => i.is_urgent));
+      const urgentOnly = data.items.filter((i: UrgentItem) => i.is_urgent);
+      setCards(normalizeUrgentFeedItems(urgentOnly));
       setShowCount(10);
     });
 
@@ -70,9 +79,7 @@ export default function UrgentPage() {
         tags: item.badges || [],
         helpType: item.help_type,
 
-        status: isProgress
-          ? `${item.collected_amount} из ${item.target_amount}`
-          : item.deadline_label || "",
+        status: isProgress ? formatRub(item.target_amount) : item.deadline_label || "",
 
         amount: isProgress ? "progress" : "deadline",
 
@@ -82,8 +89,8 @@ export default function UrgentPage() {
           ? getImageUrl(item.primary_photo_url)
           : "/cat-placeholder.jpg",
 
-        animalSpecies: item.animal_species || "cat",
-        city: item.city,
+        animalSpecies: item.animal_species === "dog" || item.animal_species === "cat" ? item.animal_species : "cat",
+        city: item.city ?? "",
       };
     });
   }, [cards]);
@@ -294,10 +301,21 @@ export default function UrgentPage() {
                 <div className={styles.cardBody}>
                   <p className={styles.org}>{card.org}</p>
                   <h2 className={styles.cardTitle}>{card.title}</h2>
-                  <p className={styles.description}>{card.description}</p>
+                  <p className={styles.description}>{takeFirstSentences(card.description, 2)}</p>
 
                   <div className={styles.cardActions}>
-                    <button className={styles.cardBtn}>
+                    <button
+                      type="button"
+                      className={styles.cardBtn}
+                      onClick={() => {
+                        const target = `/urgent/${card.id}`;
+                        if (!isAuth) {
+                          router.push(getLoginHref(target));
+                          return;
+                        }
+                        router.push(target);
+                      }}
+                    >
                       {card.action}
                     </button>
 

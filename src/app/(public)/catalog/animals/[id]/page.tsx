@@ -1,56 +1,62 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import styles from "./page.module.css";
 import { animalsApi, Animal } from "@/shared/api/endpoints/animals";
 import { getImageUrl } from "@/shared/api/client";
 import { getOrganizationAnimalById } from "@/shared/lib/organizationAnimals";
+import { useUser } from "@/shared/lib/hooks/useUser";
+import { meApplicationsApi } from "@/shared/api/endpoints/meApplications";
+import { getLoginHref } from "@/shared/lib/auth/loginHref";
 
 export default function AnimalPage() {
   const params = useParams();
+  const pathname = usePathname();
   const id = Number(params.id);
+
+  const { isAuth, role } = useUser();
+  const canApplyAdoption = isAuth && (role === "user" || role === "volunteer");
 
   const [animal, setAnimal] = useState<Animal | null>(null);
   const [mainImage, setMainImage] = useState("/cat-placeholder.jpg");
   const [loading, setLoading] = useState(true);
+  const [adoptOpen, setAdoptOpen] = useState(false);
+  const [adoptMessage, setAdoptMessage] = useState("");
+  const [adoptError, setAdoptError] = useState("");
+  const [adoptSending, setAdoptSending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const localAnimal = getOrganizationAnimalById(id);
-    if (localAnimal) {
-      queueMicrotask(() => {
-        if (cancelled) return;
-        setAnimal(localAnimal);
-        if (localAnimal.photo_urls?.length) {
-          setMainImage(getImageUrl(localAnimal.photo_urls[0]));
-        } else if (localAnimal.primary_photo_url) {
-          setMainImage(getImageUrl(localAnimal.primary_photo_url));
-        }
-        setLoading(false);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
 
+    const applyAnimal = (data: Animal) => {
+      setAnimal(data);
+      if (data.photo_urls?.length) {
+        setMainImage(getImageUrl(data.photo_urls[0]));
+      } else if (data.primary_photo_url) {
+        setMainImage(getImageUrl(data.primary_photo_url));
+      } else {
+        setMainImage("/cat-placeholder.jpg");
+      }
+    };
+
+    setLoading(true);
     animalsApi
       .getById(id)
       .then((data) => {
         if (cancelled) return;
-        setAnimal(data);
-
-        if (data.photo_urls?.length) {
-          setMainImage(getImageUrl(data.photo_urls[0]));
-        } else if (data.primary_photo_url) {
-          setMainImage(getImageUrl(data.primary_photo_url));
-        }
+        applyAnimal(data as Animal);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch(() => {
+        const localAnimal = getOrganizationAnimalById(id);
         if (cancelled) return;
-        console.error(err);
+        if (localAnimal) {
+          applyAnimal(localAnimal);
+        } else {
+          setAnimal(null);
+        }
         setLoading(false);
       });
     return () => {
@@ -94,8 +100,9 @@ export default function AnimalPage() {
     );
   }
 
-  const images = animal.photo_urls?.length > 0
-    ? animal.photo_urls.map(url => getImageUrl(url))
+  const photoUrls = animal.photo_urls ?? [];
+  const images = photoUrls.length > 0
+    ? photoUrls.map((url) => getImageUrl(url))
     : animal.primary_photo_url
       ? [getImageUrl(animal.primary_photo_url)]
       : ["/cat-placeholder.jpg"];
@@ -162,12 +169,21 @@ export default function AnimalPage() {
             </div>
 
             <div className={styles.actionButtons}>
-              <button className={styles.helpBtn}>Помочь</button>
-              <button className={styles.adoptBtn}>
-                {animal.status === "looking_for_home"
-                  ? "Забрать домой"
-                  : "Забрать на передержку"}
-              </button>
+              <Link
+                href={isAuth ? "/help" : getLoginHref("/help")}
+                className={styles.helpBtn}
+              >
+                Помочь
+              </Link>
+              {canApplyAdoption ? (
+                <button type="button" className={styles.adoptBtn} onClick={() => setAdoptOpen(true)}>
+                  {animal.status === "looking_for_home" ? "Забрать домой" : "Забрать на передержку"}
+                </button>
+              ) : (
+                <Link href={getLoginHref(pathname || `/catalog/animals/${id}`)} className={styles.adoptBtn}>
+                  Войти, чтобы подать анкету
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -176,22 +192,16 @@ export default function AnimalPage() {
           <h2>Здоровье и уход</h2>
 
           <div className={styles.healthGrid}>
-            <div className={styles.healthItem}>
-              <img src="/check.svg" alt="" />
-              <span>Стерилизован(а)</span>
-            </div>
-            <div className={styles.healthItem}>
-              <img src="/check.svg" alt="" />
-              <span>Привит(а)</span>
-            </div>
-            <div className={styles.healthItem}>
-              <img src="/check.svg" alt="" />
-              <span>Обработан(а) от паразитов</span>
-            </div>
-            <div className={styles.healthItem}>
-              <img src="/check.svg" alt="" />
-              <span>Приучен к лотку / выгулу</span>
-            </div>
+            {animal.health_checklist?.length ? (
+              animal.health_checklist.map((item, idx) => (
+                <div key={`${item}-${idx}`} className={styles.healthItem}>
+                  <img src="/check.svg" alt="" />
+                  <span>{item}</span>
+                </div>
+              ))
+            ) : (
+              <span>Не указано</span>
+            )}
           </div>
         </div>
 
@@ -227,6 +237,64 @@ export default function AnimalPage() {
           </div>
         </div>
       </div>
+
+      {adoptOpen && animal ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+          }}
+          role="presentation"
+          onClick={() => !adoptSending && setAdoptOpen(false)}
+        >
+          <div
+            style={{ background: "#fff", padding: 24, maxWidth: 480, width: "90%" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>Заявка на животное</h2>
+            <p>Сообщение для организации (необязательно):</p>
+            <textarea
+              rows={6}
+              style={{ width: "100%", marginTop: 8 }}
+              value={adoptMessage}
+              onChange={(e) => setAdoptMessage(e.target.value)}
+              disabled={adoptSending}
+            />
+            {adoptError ? <p style={{ color: "#a33" }}>{adoptError}</p> : null}
+            <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+              <button type="button" disabled={adoptSending} onClick={() => setAdoptOpen(false)}>
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={adoptSending}
+                onClick={() => {
+                  setAdoptSending(true);
+                  setAdoptError("");
+                  void meApplicationsApi
+                    .create({ animal_id: animal.id, message: adoptMessage.trim() || null })
+                    .then(() => {
+                      setAdoptOpen(false);
+                      setAdoptMessage("");
+                      window.location.href = "/profile/applications";
+                    })
+                    .catch((e) =>
+                      setAdoptError(e instanceof Error ? e.message : "Не удалось отправить заявку.")
+                    )
+                    .finally(() => setAdoptSending(false));
+                }}
+              >
+                {adoptSending ? "Отправка…" : "Отправить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

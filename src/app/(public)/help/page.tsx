@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "./page.module.css";
+import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { useUser } from "@/shared/lib/hooks/useUser";
 import {
   helpApi,
   type HelpAnimalApiTab,
@@ -73,9 +76,21 @@ const inferNeedType = (item: HelpAnimalItem): NeedType => {
   return "other";
 };
 
+const uniqueLinesPreservingOrder = (lines: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || seen.has(line)) continue;
+    seen.add(line);
+    out.push(line);
+  }
+  return out;
+};
+
 const mapItemToCard = (item: HelpAnimalItem): HelpCard => {
   const needType = inferNeedType(item);
-  const lines = (item.monetary ?? []).map((m) => m.line).filter(Boolean);
+  const lines = uniqueLinesPreservingOrder((item.monetary ?? []).map((m) => m.line).filter(Boolean));
   const needText =
     lines.length > 0
       ? lines.join(" · ")
@@ -103,10 +118,22 @@ const mapItemToCard = (item: HelpAnimalItem): HelpCard => {
 };
 
 export default function HelpPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { isAuth } = useUser();
+
   const [activeFilter, setActiveFilter] = useState<HelpFilter>("all");
   const [apiCards, setApiCards] = useState<HelpCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleCardAction = (animalId: number) => {
+    if (!isAuth) {
+      router.push(getLoginHref(pathname || "/help"));
+      return;
+    }
+    router.push(`/catalog/animals/${animalId}`);
+  };
 
   const load = useCallback(async (filter: HelpFilter) => {
     setLoading(true);
@@ -253,7 +280,11 @@ export default function HelpPage() {
                     <div className={styles.amountPlaceholder} aria-hidden="true" />
                   )}
 
-                  <button type="button" className={styles.actionButton}>
+                  <button
+                    type="button"
+                    className={styles.actionButton}
+                    onClick={() => handleCardAction(card.id)}
+                  >
                     {card.actionLabel}
                   </button>
                 </div>

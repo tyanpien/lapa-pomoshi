@@ -69,6 +69,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <Link href="/volunteer/profile" onClick={onClose}>Мой профиль</Link>
                 <Link href="/profile/applications" onClick={onClose}>Мои анкеты</Link>
                 <Link href="/volunteer/responses" onClick={onClose}>Мои отклики</Link>
+                <Link href="/volunteer/articles" onClick={onClose}>Мои статьи</Link>
                 <Link href="/messages" onClick={onClose}>Мои сообщения</Link>
               </>
             )}

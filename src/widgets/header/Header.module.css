@@ -81,7 +81,7 @@
   border-radius: 0 0 8px 8px;
   padding: 16px 20px;
   box-sizing: border-box;
-  z-index: 200;
+  z-index: 1;
 }
 
 .dropdown:hover .dropdownTrigger {
@@ -157,7 +157,10 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
+  background-color: #d7d7d7;
   background-image: url(/event.png);
+  background-size: cover;
+  background-position: center;
   object-fit: cover;
   margin-right: 40px;
 }

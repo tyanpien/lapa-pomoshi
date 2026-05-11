@@ -14,22 +14,20 @@ import {
   parseVolunteerAvailability,
   travelRadiusFootnoteKm,
 } from "@/shared/lib/volunteerAvailability";
-import {
-  availabilityGridToLegacyMultiline,
-  buildAvailabilityCardRows,
-  hasAvailabilityGridSelection,
-} from "@/shared/lib/volunteerAvailabilityGrid";
-import {
-  VOLUNTEER_ANIMAL_KIND_OPTIONS,
-  VOLUNTEER_PROFILE_UPDATED_EVENT,
-  readLinkedVolunteerCatalogUserId,
-  readVolunteerDetailsFromStorage,
-  resolveVolunteerCatalogIsAvailable,
-  type StoredVolunteerDetails,
-  type VolunteerAnimalKindTag,
-} from "@/shared/lib/volunteerProfileStorage";
+import { VOLUNTEER_ANIMAL_KIND_OPTIONS, type VolunteerAnimalKindTag } from "@/shared/lib/volunteerProfileStorage";
 
 const COMPETENCY_HIGHLIGHT_HINTS = /^(регулярн|разов)/i;
+
+const VOLUNTEER_AVAILABILITY_UI_MARK = "\n---VOL-UI---\n";
+
+function catalogAvailabilityHeadText(raw: string | null | undefined): string {
+  const t = (raw ?? "").trim();
+  if (!t) return "";
+  if (t.includes(VOLUNTEER_AVAILABILITY_UI_MARK)) {
+    return (t.split(VOLUNTEER_AVAILABILITY_UI_MARK)[0] ?? "").trim();
+  }
+  return t;
+}
 
 type CompetencyChip = { key: string; label: string; variant: "frequency" | "petKind" | "skill" | "animal" };
 
@@ -38,7 +36,7 @@ function resolvePetKindLabel(text: string): VolunteerAnimalKindTag | null {
   return VOLUNTEER_ANIMAL_KIND_OPTIONS.find((opt) => opt.toLowerCase() === t.toLowerCase()) ?? null;
 }
 
-function buildCompetencyChips(volunteer: VolunteerDetail | null, overlay: StoredVolunteerDetails | null): CompetencyChip[] {
+function buildCompetencyChips(volunteer: VolunteerDetail | null): CompetencyChip[] {
   if (!volunteer) return [];
   const chips: CompetencyChip[] = [];
   const seen = new Set<string>();
@@ -48,8 +46,8 @@ function buildCompetencyChips(volunteer: VolunteerDetail | null, overlay: Stored
   };
   const has = (label: string) => seen.has(label.trim().toLowerCase());
 
-  if (overlay?.helpFrequency?.trim()) {
-    const lab = overlay.helpFrequency.trim();
+  if (volunteer.help_format_label?.trim()) {
+    const lab = volunteer.help_format_label.trim();
     chips.push({ key: "hf", label: lab, variant: "frequency" });
     mark(lab);
   }
@@ -59,12 +57,6 @@ function buildCompetencyChips(volunteer: VolunteerDetail | null, overlay: Stored
     mark(canonical);
     chips.push({ key: `pet-${keySource}-${canonical}`, label: canonical, variant: "petKind" });
   };
-
-  for (const kind of VOLUNTEER_ANIMAL_KIND_OPTIONS) {
-    if (overlay?.animalKinds.includes(kind)) {
-      pushPetKind(kind, "lc");
-    }
-  }
 
   for (const raw of volunteer.animal_category_labels ?? []) {
     const pet = resolvePetKindLabel(raw ?? "");
@@ -77,22 +69,6 @@ function buildCompetencyChips(volunteer: VolunteerDetail | null, overlay: Stored
     if (has(t)) continue;
     mark(t);
     chips.push({ key: `api-${t}`, label: t, variant: "skill" });
-  }
-
-  if (overlay) {
-    const localPieces: string[] = [];
-    for (const c of overlay.competencies) {
-      if (c === "Другое" && overlay.competenciesOther.trim()) {
-        localPieces.push(`Другое: ${overlay.competenciesOther.trim()}`);
-      } else if (c !== "Другое") {
-        localPieces.push(c);
-      }
-    }
-    for (const piece of localPieces) {
-      if (has(piece)) continue;
-      mark(piece);
-      chips.push({ key: `loc-${piece}`, label: piece, variant: "skill" });
-    }
   }
 
   for (const animal of volunteer.animal_category_labels ?? []) {
@@ -132,13 +108,13 @@ type KnowledgeArticle = KnowledgeItem & { author_user_id?: number };
 export default function VolunteerPage() {
   const params = useParams();
   const id = Number(params.id);
-  const { role, userName } = useUser();
+  const { role } = useUser();
 
   const [volunteer, setVolunteer] = useState<VolunteerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [articles, setArticles] = useState<KnowledgeItem[]>([]);
   const [offerOpen, setOfferOpen] = useState(false);
-  const [localOverlay, setLocalOverlay] = useState<StoredVolunteerDetails | null>(null);
+  const [listAvailabilityLine, setListAvailabilityLine] = useState<string | null>(null);
 
   useEffect(() => {
     volunteersApi
@@ -152,6 +128,28 @@ export default function VolunteerPage() {
         setLoading(false);
       });
   }, [id]);
+
+  useEffect(() => {
+    if (!volunteer?.user_id) {
+      setListAvailabilityLine(null);
+      return;
+    }
+    let cancelled = false;
+    volunteersApi
+      .getList()
+      .then((res) => {
+        if (cancelled) return;
+        const item = (res.items ?? []).find((v) => v.user_id === volunteer.user_id);
+        const raw = item?.availability?.trim() ?? "";
+        setListAvailabilityLine(raw ? catalogAvailabilityHeadText(raw) : null);
+      })
+      .catch(() => {
+        if (!cancelled) setListAvailabilityLine(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [volunteer?.user_id]);
 
   useEffect(() => {
     if (!volunteer?.user_id) return;
@@ -188,89 +186,31 @@ export default function VolunteerPage() {
       .catch(() => setArticles(fromProfile.slice(0, 8)));
   }, [volunteer]);
 
-  useEffect(() => {
-    const refreshOverlay = () => {
-      const linkedId = readLinkedVolunteerCatalogUserId();
-      if (linkedId == null || linkedId !== id) {
-        setLocalOverlay(null);
-        return;
-      }
-      setLocalOverlay(readVolunteerDetailsFromStorage(userName));
-    };
-
-    refreshOverlay();
-
-    window.addEventListener(VOLUNTEER_PROFILE_UPDATED_EVENT, refreshOverlay);
-    window.addEventListener("storage", refreshOverlay);
-    return () => {
-      window.removeEventListener(VOLUNTEER_PROFILE_UPDATED_EVENT, refreshOverlay);
-      window.removeEventListener("storage", refreshOverlay);
-    };
-  }, [id, userName]);
-
   const mergedAvailabilityRaw = useMemo(() => {
     if (!volunteer) return "";
-    const parts: string[] = [];
-    const apiAvail =
-      volunteerAvailabilityText(volunteer).trim() ||
-      (volunteer as { availability?: string | undefined }).availability?.trim() ||
-      "";
-    if (apiAvail) parts.push(apiAvail);
-
-    if (
-      localOverlay &&
-      hasAvailabilityGridSelection({
-        availabilityGrid: localOverlay.availabilityGrid,
-        availabilityAroundClock: localOverlay.availabilityAroundClock,
-      })
-    ) {
-      const gridText = availabilityGridToLegacyMultiline({
-        availabilityGrid: localOverlay.availabilityGrid,
-        availabilityAroundClock: localOverlay.availabilityAroundClock,
-      });
-      if (gridText.trim()) parts.push(gridText.trim());
-    }
-
-    if (localOverlay && (localOverlay.availabilityDays.length > 0 || localOverlay.availabilityTimes.length > 0)) {
-      const d = localOverlay.availabilityDays.join(", ");
-      const t = localOverlay.availabilityTimes.join(", ");
-      const line = [d, t].filter(Boolean).join(" | ");
-      if (line.trim()) parts.push(line.trim());
-    }
-
-    return parts.join("\n");
-  }, [volunteer, localOverlay]);
+    const fromWeekly = volunteerAvailabilityText(volunteer).trim();
+    if (fromWeekly) return fromWeekly;
+    return (listAvailabilityLine ?? "").trim();
+  }, [volunteer, listAvailabilityLine]);
 
   const availabilityParsed = useMemo(() => parseVolunteerAvailability(mergedAvailabilityRaw || undefined), [mergedAvailabilityRaw]);
 
-  const localGridRows = useMemo(() => {
-    if (!localOverlay) return null;
-    const slice = {
-      availabilityGrid: localOverlay.availabilityGrid,
-      availabilityAroundClock: localOverlay.availabilityAroundClock,
-    };
-    if (!hasAvailabilityGridSelection(slice)) return null;
-    return buildAvailabilityCardRows(slice);
-  }, [localOverlay]);
-
-  const availabilityDisplayRows = localGridRows ?? availabilityParsed.rows;
+  const availabilityDisplayRows = availabilityParsed.rows;
 
   const travelFootnote = useMemo(() => travelRadiusFootnoteKm(volunteer?.travel_radius_km), [volunteer?.travel_radius_km]);
 
-  const competencyChips = useMemo(() => buildCompetencyChips(volunteer, localOverlay), [volunteer, localOverlay]);
+  const competencyChips = useMemo(() => buildCompetencyChips(volunteer), [volunteer]);
 
-  const mergedAbout = useMemo(() => {
-    const fromLc = localOverlay?.aboutMe?.trim();
-    const fromApi = volunteer?.about_me?.trim();
-    return (fromLc || fromApi || "").trim();
-  }, [volunteer, localOverlay]);
+  const mergedAbout = useMemo(() => (volunteer?.about_me ?? "").trim(), [volunteer]);
 
-  const mergedCity = useMemo(() => {
-    const fromApi =
-      volunteer?.location_display?.trim() || volunteer?.location_city?.trim() || volunteer?.location_district?.trim();
-    const fromLc = localOverlay?.location?.trim();
-    return (fromApi || fromLc || "").trim();
-  }, [volunteer, localOverlay]);
+  const mergedCity = useMemo(
+    () =>
+      (volunteer?.location_display?.trim() ||
+        volunteer?.location_city?.trim() ||
+        volunteer?.location_district?.trim() ||
+        "").trim(),
+    [volunteer],
+  );
 
   const showAbout = mergedAbout.length > 0;
 
@@ -278,43 +218,18 @@ export default function VolunteerPage() {
 
   const showLogistics = useMemo(() => {
     if (!volunteer) return false;
-
-    const hasLocalSchedule =
-      localOverlay &&
-      hasAvailabilityGridSelection({
-        availabilityGrid: localOverlay.availabilityGrid,
-        availabilityAroundClock: localOverlay.availabilityAroundClock,
-      });
-
-    const fromSchedule = hasVolunteerLogisticsSection(
-      mergedAvailabilityRaw ||
-        volunteerAvailabilityText(volunteer) ||
-        (volunteer as { availability?: string }).availability ||
-        "",
-      volunteer.travel_radius_km
-    );
-
-    const fromNight = Boolean(localOverlay?.nightOutings);
-    const fromRadiusNote = Boolean(localOverlay?.travelRadius?.trim());
-    const fromTravelOutTown = Boolean(localOverlay?.travelOutOfTown);
+    const fromSchedule = hasVolunteerLogisticsSection(mergedAvailabilityRaw, volunteer.travel_radius_km);
     const fromApiNight = Boolean(volunteer.logistics?.accepts_night_urgency);
-
-    return Boolean(
-      fromSchedule || fromNight || fromRadiusNote || hasLocalSchedule || fromTravelOutTown || fromApiNight
-    );
-  }, [volunteer, mergedAvailabilityRaw, localOverlay]);
-
-  const apiAvailLegacy = (v: VolunteerDetail) =>
-    volunteerAvailabilityText(v) || (v as { availability?: string }).availability || "";
+    return Boolean(fromSchedule || fromApiNight);
+  }, [volunteer, mergedAvailabilityRaw]);
 
   const hasNightOutgoing =
-    Boolean(localOverlay?.nightOutings) ||
     Boolean(volunteer?.logistics?.accepts_night_urgency) ||
     Boolean(
       volunteer &&
-        apiAvailLegacy(volunteer).trim() &&
-        (/ночн(ых|ые|ой)\s+выезд/i.test(apiAvailLegacy(volunteer)) ||
-          /ночные\s+выезды/i.test(apiAvailLegacy(volunteer)))
+        mergedAvailabilityRaw.trim() &&
+        (/ночн(ых|ые|ой)\s+выезд/i.test(mergedAvailabilityRaw) ||
+          /ночные\s+выезды/i.test(mergedAvailabilityRaw)),
     );
 
   const isOrganization = role === "organization";
@@ -350,7 +265,7 @@ export default function VolunteerPage() {
   }
 
   const avatarSrc = volunteer.avatar_url ? getImageUrl(volunteer.avatar_url) : null;
-  const isAvailable = resolveVolunteerCatalogIsAvailable(volunteer.readiness_status === "available", localOverlay);
+  const isAvailable = volunteer.readiness_status === "available";
   const experienceLabel = experienceBadgeFromVolunteer(volunteer);
 
   return (
@@ -477,25 +392,22 @@ export default function VolunteerPage() {
                 </ul>
               )}
 
+              {availabilityDisplayRows.length === 0 && availabilityParsed.tagChips.length > 0 && (
+                <p className={styles.availabilityFreeform} aria-label="Доступность, текстом">
+                  {availabilityParsed.tagChips.join(" · ")}
+                </p>
+              )}
 
               {hasNightOutgoing && (
                 <p className={styles.availabilityNight}>Готов к срочным ночным выездам</p>
               )}
 
-              {travelFootnote &&
-                !(localOverlay?.travelOutOfTown && travelFootnote === "Готов выезжать за город") && (
+              {travelFootnote ? (
                 <p className={styles.availabilityFooter}>
                   <img src="/car.svg" alt="" aria-hidden className={styles.availabilityCarIcon} />
                   <span>{travelFootnote}</span>
                 </p>
-              )}
-
-              {localOverlay?.travelRadius?.trim() && (
-                <p className={styles.availabilityFooter}>
-                  <img src="/car.svg" alt="" aria-hidden className={styles.availabilityCarIcon} />
-                  <span>{localOverlay.travelRadius.trim()}</span>
-                </p>
-              )}
+              ) : null}
             </aside>
           )}
         </div>
@@ -572,8 +484,7 @@ export default function VolunteerPage() {
               Предложить задачу
             </h2>
             <p className={styles.modalText}>
-              Выбор активных заявок организации и приглашение волонтёра будет подключено к разделу заявок. Пока
-              откройте список заявок в личном кабинете.
+              Выбор активных заявок организации и приглашение волонтёра будет подключено к разделу заявок
             </p>
             <div className={styles.modalActions}>
               <Link href="/organization/requests" className={styles.modalPrimary}>

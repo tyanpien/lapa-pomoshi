@@ -90,9 +90,35 @@ export interface VolunteersCatalogs {
   weekdays?: CatalogOption[];
 }
 
+function normalizeTimeHHMM(raw: string): string {
+  const s = raw.trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return s;
+  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+  return `${String(h).padStart(2, "0")}:${m[2]}`;
+}
+
+function isRoundTheClockWeeklySchedule(sched: VolunteerWeekdayScheduleOut[]): boolean {
+  if (sched.length !== 7) return false;
+  for (const day of sched) {
+    const ranges = day.ranges ?? [];
+    if (ranges.length !== 1) return false;
+    const { start, end } = ranges[0];
+    const ns = normalizeTimeHHMM(start);
+    const ne = normalizeTimeHHMM(end);
+    if (ns !== "00:00") return false;
+    if (ne !== "23:59" && ne !== "24:00") return false;
+  }
+  return true;
+}
+
 export function volunteerAvailabilityText(detail: VolunteerDetail): string {
-  const lines: string[] = [];
   const sched = detail.logistics?.weekly_schedule ?? [];
+  if (sched.length > 0 && isRoundTheClockWeeklySchedule(sched)) {
+    return "Круглосуточно";
+  }
+
+  const lines: string[] = [];
   for (const day of sched) {
     const ranges = day.ranges.map((r) => `${r.start}–${r.end}`).join(", ");
     if (day.weekday_label && ranges) lines.push(`${day.weekday_label}: ${ranges}`);

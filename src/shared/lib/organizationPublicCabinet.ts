@@ -7,6 +7,7 @@ import type {
   OrgPublicReport,
   OrgPublicUrgentNeed,
   OrgPublicWardCard,
+  OrganizationListItem,
   OrganizationPublicPage,
 } from "@/shared/api/endpoints/organizations";
 import { organizationsApi } from "@/shared/api/endpoints/organizations";
@@ -21,6 +22,7 @@ import type {
 export type ResolvedOrganizationPublic = {
   organizationId: number;
   page: OrganizationPublicPage;
+  listItem: OrganizationListItem;
 };
 
 export async function resolveOrganizationPublicByNameHints(
@@ -33,7 +35,7 @@ export async function resolveOrganizationPublicByNameHints(
     const item = items.find((o) => normalized.includes(o.name.trim().toLowerCase())) ?? null;
     if (!item) return null;
     const page = await organizationsApi.getById(item.id);
-    return { organizationId: item.id, page };
+    return { organizationId: item.id, page, listItem: item };
   } catch {
     return null;
   }
@@ -173,6 +175,9 @@ export type OrganizationCabinetApiPayload = {
   apiArticleIds: Set<number>;
   apiReports: OrganizationReport[];
   apiReportIds: Set<number>;
+  organizationId: number | null;
+  publicPage: OrganizationPublicPage | null;
+  listItem: OrganizationListItem | null;
 };
 
 export function emptyOrganizationCabinetApiPayload(): OrganizationCabinetApiPayload {
@@ -189,6 +194,9 @@ export function emptyOrganizationCabinetApiPayload(): OrganizationCabinetApiPayl
     apiArticleIds: new Set(),
     apiReports: [],
     apiReportIds: new Set(),
+    organizationId: null,
+    publicPage: null,
+    listItem: null,
   };
 }
 
@@ -198,7 +206,7 @@ export async function fetchOrganizationCabinetApiPayload(
   const resolved = await resolveOrganizationPublicByNameHints(nameHints);
   if (!resolved) return emptyOrganizationCabinetApiPayload();
 
-  const { page, organizationId } = resolved;
+  const { page, organizationId, listItem } = resolved;
   const title = page.hero.name?.trim() || "";
 
   const apiAnimals = (page.wards ?? []).map((w) => mapOrgPublicWardToAnimal(w, title, organizationId));
@@ -221,5 +229,8 @@ export async function fetchOrganizationCabinetApiPayload(
     apiArticleIds: new Set(apiArticles.map((a) => a.id)),
     apiReports,
     apiReportIds: new Set(apiReports.map((r) => r.id)),
+    organizationId,
+    publicPage: page,
+    listItem,
   };
 }

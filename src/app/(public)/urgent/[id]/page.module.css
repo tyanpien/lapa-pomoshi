@@ -113,7 +113,43 @@
   font-size: 15px;
   line-height: 1.6;
   color: #444;
+  margin: 0 0 12px;
+}
+
+.descriptionWrap {
   margin-bottom: 24px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #444;
+}
+
+.descriptionWrap > p:last-child {
+  margin-bottom: 0;
+}
+
+.descriptionRouteBlock {
+  margin: 4px 0 12px;
+}
+
+.descriptionRouteTitle {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+.descriptionList {
+  margin: 0;
+  padding-left: 1.2rem;
+  list-style-type: disc;
+}
+
+.descriptionList li {
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
+.descriptionList li:last-child {
+  margin-bottom: 0;
 }
 
 .orgBlock {

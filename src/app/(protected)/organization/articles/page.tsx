@@ -1,53 +1,76 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import styles from "../organization.module.css";
-import {
-  addOrganizationArticle,
-  getOrganizationArticles,
-  getOrganizationCabinetEventName,
-  toggleOrganizationArticleArchive,
-} from "@/shared/lib/organizationCabinet";
-import { mergeApiFirstById } from "@/shared/lib/organizationPublicCabinet";
-import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
+import { knowledgeApi, type KnowledgeItem } from "@/shared/api/endpoints/knowledge";
+import { useUser } from "@/shared/lib/hooks/useUser";
 
 export default function OrganizationArticlesPage() {
-  const apiPayload = useOrganizationPublicCabinetPayload();
+  const { userName } = useUser();
   const [title, setTitle] = useState("");
-  const [articleType, setArticleType] = useState("другое");
-  const [author, setAuthor] = useState("");
+  const [articleType, setArticleType] = useState("care");
   const [content, setContent] = useState("");
-  const [coverUrl, setCoverUrl] = useState("");
-  const [localArticles, setLocalArticles] = useState(getOrganizationArticles());
+  const [summary, setSummary] = useState("");
+  const [articles, setArticles] = useState<KnowledgeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorText, setErrorText] = useState("");
+  const [catalogs, setCatalogs] = useState<{ id: string; label: string }[]>([]);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editSummary, setEditSummary] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editCategory, setEditCategory] = useState("care");
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
-    const eventName = getOrganizationCabinetEventName();
-    const sync = () => setLocalArticles(getOrganizationArticles());
-    sync();
-    window.addEventListener(eventName, sync);
-    return () => window.removeEventListener(eventName, sync);
-  }, []);
-
-  const articles = useMemo(
-    () => mergeApiFirstById(apiPayload.apiArticles, localArticles),
-    [apiPayload.apiArticles, localArticles]
-  );
+    let cancelled = false;
+    setLoading(true);
+    setErrorText("");
+    Promise.all([knowledgeApi.getList(), knowledgeApi.getCatalogs()])
+      .then(([list, cats]) => {
+        if (cancelled) return;
+        const items = list.items ?? [];
+        setArticles(items);
+        const c = cats.categories ?? [];
+        setCatalogs(c);
+        const first = c[0]?.id;
+        if (first) {
+          setArticleType((prev) => (c.some((x) => x.id === prev) ? prev : first));
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setArticles([]);
+        setErrorText(e instanceof Error ? e.message : "Не удалось загрузить статьи.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userName]);
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!title.trim() || !content.trim()) return;
-    addOrganizationArticle({
-      title: title.trim(),
-      articleType,
-      author: author.trim() || "Организация",
-      content: content.trim(),
-      coverUrl: coverUrl.trim() || undefined,
-    });
-    setTitle("");
-    setArticleType("другое");
-    setAuthor("");
-    setContent("");
-    setCoverUrl("");
+    if (!title.trim() || content.trim().length < 10) return;
+    void knowledgeApi
+      .create({
+        title: title.trim(),
+        summary: (summary.trim() || content.trim().slice(0, 200)).trim(),
+        content: content.trim(),
+        category: articleType,
+        is_context_tip: false,
+        is_published: true,
+      })
+      .then(() => {
+        setTitle("");
+        setContent("");
+        setSummary("");
+        return knowledgeApi.getList();
+      })
+      .then((list) => setArticles(list.items ?? []))
+      .catch((e) => setErrorText(e instanceof Error ? e.message : "Не удалось создать статью."));
   };
 
   return (
@@ -73,32 +96,29 @@ export default function OrganizationArticlesPage() {
                   value={articleType}
                   onChange={(e) => setArticleType(e.target.value)}
                 >
-                  <option value="уход">Уход</option>
-                  <option value="первая помощь">Первая помощь</option>
-                  <option value="адаптация">Адаптация</option>
-                  <option value="социализация">Социализация</option>
-                  <option value="воспитание">Воспитание</option>
-                  <option value="лечение">Лечение</option>
-                  <option value="юридические вопросы">Юридические вопросы</option>
-                  <option value="другое">Другое</option>
+                  {catalogs.length > 0 ? (
+                    catalogs.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="care">Уход</option>
+                      <option value="first_aid">Первая помощь</option>
+                      <option value="adaptation">Адаптация</option>
+                    </>
+                  )}
                 </select>
               </label>
               <label className={styles.label}>
-                Автор
-                <input className={styles.input} value={author} onChange={(e) => setAuthor(e.target.value)} />
-              </label>
-              <label className={styles.label}>
-                Обложка (URL)
-                <input className={styles.input} value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} />
+                Краткое описание
+                <input className={styles.input} value={summary} onChange={(e) => setSummary(e.target.value)} />
               </label>
             </div>
             <label className={styles.label}>
               Содержание
-              <textarea
-                className={styles.textarea}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-              />
+              <textarea className={styles.textarea} value={content} onChange={(e) => setContent(e.target.value)} minLength={10} required />
             </label>
             <div className={styles.actions}>
               <button type="submit" className={styles.primaryButton}>
@@ -110,31 +130,62 @@ export default function OrganizationArticlesPage() {
 
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>Мои статьи</h2>
-          {articles.length === 0 ? (
+          {loading ? (
+            <p className={styles.empty}>Загрузка...</p>
+          ) : errorText ? (
+            <p className={styles.empty}>{errorText}</p>
+          ) : articles.length === 0 ? (
             <p className={styles.empty}>Пока нет созданных статей.</p>
           ) : (
             <div className={styles.list}>
               {articles.map((article) => (
                 <article key={article.id} className={styles.animalCard}>
-                  {article.coverUrl && <img src={article.coverUrl} alt={article.title} />}
                   <div className={styles.animalInfo}>
                     <h3 className={styles.animalName}>{article.title}</h3>
-                    <p className={styles.metaLine}>
-                      {article.articleType} • {article.author}
-                    </p>
-                    <p className={styles.animalMeta}>{article.content}</p>
+                    <p className={styles.metaLine}>{article.category_label}</p>
+                    <p className={styles.animalMeta}>{article.summary}</p>
                     <div className={styles.badgeRow}>
-                      <span className={styles.badge}>{article.archived ? "Архив" : "Опубликовано"}</span>
+                      <span className={styles.badge}>Опубликовано</span>
                     </div>
                     <div className={styles.actions}>
-                      {!apiPayload.apiArticleIds.has(article.id) ? (
-                        <button
-                          className={styles.secondaryButton}
-                          onClick={() => toggleOrganizationArticleArchive(article.id)}
-                        >
-                          {article.archived ? "Вернуть из архива" : "В архив"}
-                        </button>
-                      ) : null}
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => {
+                          setEditId(article.id);
+                          setEditLoading(true);
+                          void knowledgeApi
+                            .getById(article.id)
+                            .then((d) => {
+                              setEditTitle(d.title);
+                              setEditSummary(d.summary ?? "");
+                              setEditContent(d.content ?? "");
+                              setEditCategory(d.category ?? article.category);
+                            })
+                            .catch(() => setErrorText("Не удалось загрузить статью для редактирования."))
+                            .finally(() => setEditLoading(false));
+                        }}
+                      >
+                        Изменить
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() =>
+                          void knowledgeApi.archive(article.id).then(() => knowledgeApi.getList()).then((l) => setArticles(l.items ?? [])).catch(() => {})
+                        }
+                      >
+                        В архив
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() =>
+                          void knowledgeApi.delete(article.id).then(() => knowledgeApi.getList()).then((l) => setArticles(l.items ?? [])).catch(() => {})
+                        }
+                      >
+                        Удалить
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -143,6 +194,82 @@ export default function OrganizationArticlesPage() {
           )}
         </section>
       </div>
+
+      {editId !== null ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+          }}
+          role="presentation"
+          onClick={() => setEditId(null)}
+        >
+          <div
+            className={styles.card}
+            style={{ maxWidth: 560, width: "90%", maxHeight: "90vh", overflow: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className={styles.cardTitle}>Редактирование</h2>
+            {editLoading ? (
+              <p>Загрузка…</p>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (editContent.trim().length < 10) return;
+                  void knowledgeApi
+                    .patch(editId, {
+                      title: editTitle.trim(),
+                      summary: editSummary.trim() || null,
+                      content: editContent.trim(),
+                      category: editCategory,
+                    })
+                    .then(() => knowledgeApi.getList())
+                    .then((l) => setArticles(l.items ?? []))
+                    .then(() => setEditId(null))
+                    .catch(() => setErrorText("Не удалось сохранить изменения."));
+                }}
+              >
+                <label className={styles.label}>
+                  Заголовок
+                  <input className={styles.input} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required />
+                </label>
+                <label className={styles.label}>
+                  Категория
+                  <select className={styles.select} value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
+                    {(catalogs.length ? catalogs : [{ id: "care", label: "Уход" }]).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.label}>
+                  Краткое описание
+                  <input className={styles.input} value={editSummary} onChange={(e) => setEditSummary(e.target.value)} />
+                </label>
+                <label className={styles.label}>
+                  Содержание
+                  <textarea className={styles.textarea} value={editContent} onChange={(e) => setEditContent(e.target.value)} minLength={10} required />
+                </label>
+                <div className={styles.actions}>
+                  <button type="submit" className={styles.primaryButton}>
+                    Сохранить
+                  </button>
+                  <button type="button" className={styles.secondaryButton} onClick={() => setEditId(null)}>
+                    Отмена
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

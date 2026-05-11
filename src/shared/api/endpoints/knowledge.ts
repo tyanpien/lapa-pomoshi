@@ -29,8 +29,18 @@ export interface KnowledgeCatalogsResponse {
 }
 
 export const knowledgeApi = {
-  getList: () => apiFetch('/api/v1/knowledge'),
-  getCatalogs: () => apiFetch('/api/v1/knowledge/catalogs'),
-  getById: (id: number) => apiFetch(`/api/v1/knowledge/${id}`),
+  getList: () => apiFetch("/api/v1/knowledge") as Promise<KnowledgeListResponse>,
+  getCatalogs: () => apiFetch("/api/v1/knowledge/catalogs") as Promise<KnowledgeCatalogsResponse>,
+  getById: (id: number) => apiFetch(`/api/v1/knowledge/${id}`) as Promise<KnowledgeItem>,
+
+  create: (payload: Record<string, unknown>) =>
+    apiFetch("/api/v1/knowledge", { method: "POST", body: JSON.stringify(payload ?? {}) }) as Promise<KnowledgeItem>,
+
+  patch: (id: number, payload: Record<string, unknown>) =>
+    apiFetch(`/api/v1/knowledge/${id}`, { method: "PATCH", body: JSON.stringify(payload ?? {}) }) as Promise<KnowledgeItem>,
+
+  delete: (id: number) => apiFetch(`/api/v1/knowledge/${id}`, { method: "DELETE" }) as Promise<unknown>,
+
+  archive: (id: number) => apiFetch(`/api/v1/knowledge/${id}/archive`, { method: "POST" }) as Promise<unknown>,
   getImageUrl,
 };

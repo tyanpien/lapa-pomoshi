@@ -24,8 +24,9 @@ body {
   font-family: "Montserrat", sans-serif;
 }
 
+html.no-scroll,
 body.no-scroll {
-  overflow: hidden;
+  overflow: hidden !important;
 }
 
 header, .header, nav, .nav {

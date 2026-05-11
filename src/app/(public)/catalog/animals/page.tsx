@@ -9,6 +9,8 @@ import {
   getOrganizationAnimalsEventName,
   getOrganizationAnimalsPublishedToHomeCatalog,
 } from "@/shared/lib/organizationAnimals";
+import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { useUser } from "@/shared/lib/hooks/useUser";
 
 interface AgeGroup {
   id: string;
@@ -34,6 +36,7 @@ interface CatalogsData {
 }
 
 export default function Page() {
+  const { isAuth } = useUser();
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [catalogs, setCatalogs] = useState<CatalogsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -423,7 +426,14 @@ export default function Page() {
                       {animal.organization_name || "Без организации"}
                     </p>
                     <div style={{ display: "flex", justifyContent: "left" }}>
-                      <Link href={`/catalog/animals/${animal.id}`} className={styles.action}>
+                      <Link
+                        href={
+                          isAuth
+                            ? `/catalog/animals/${animal.id}`
+                            : getLoginHref(`/catalog/animals/${animal.id}`)
+                        }
+                        className={styles.action}
+                      >
                         {mappedStatus === "home" ? "Забрать домой" : "Помочь"}
                       </Link>
                     </div>

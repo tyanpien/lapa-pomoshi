@@ -8,6 +8,7 @@ import Image from "next/image";
 import axios from "axios";
 import { fetchAuthMe, fetchProfileName, login, mapBackendRoleToApp } from "@/features/auth/api/login";
 import { setAuthCookies } from "@/shared/lib/auth/cookies";
+import { USER_EMAIL_STORAGE_KEY } from "@/shared/lib/hooks/useUser";
 import { authHintKey, formatAuthCredential } from "@/shared/lib/auth/contactCredential";
 
 type AppRole = "user" | "volunteer" | "organization";
@@ -62,6 +63,12 @@ export function LoginForm() {
 
       const me = await fetchAuthMe(token);
       const roleToApply = me ? mapBackendRoleToApp(me.role) : resolveRoleHint(contact) || "user";
+
+      if (me?.email?.trim()) {
+        localStorage.setItem(USER_EMAIL_STORAGE_KEY, me.email.trim());
+      } else {
+        localStorage.removeItem(USER_EMAIL_STORAGE_KEY);
+      }
 
       localStorage.setItem("userRole", roleToApply);
       localStorage.setItem("userAvatar", "/event.png");

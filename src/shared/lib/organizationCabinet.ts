@@ -4,15 +4,24 @@ const ORGANIZATION_CABINET_EVENT = "organization-cabinet-updated";
 export type OrganizationRequestStatus = "draft" | "published" | "in_progress" | "closed";
 export type OrganizationRequestUrgency = "normal" | "urgent";
 
+export type OrganizationSocialExtra = {
+  id: string;
+  messenger: string;
+  url: string;
+};
+
 export type OrganizationProfileData = {
   organizationName: string;
   description: string;
   specialization: string;
   territory: string;
   contacts: string;
+  phone: string;
+  email: string;
   vkUrl: string;
   telegramUrl: string;
   whatsappUrl: string;
+  extraSocialLinks: OrganizationSocialExtra[];
   admissionRules: string;
   currentNeeds: string;
   helpWays: string;
@@ -20,6 +29,15 @@ export type OrganizationProfileData = {
   adoptionQuestionnaire: string;
   adoptionRules: string;
   futureOwnerRequirements: string;
+  organizationHistory: string;
+  aboutMainTasks: string;
+  aboutGalleryCaption: string;
+  inn: string;
+  ogrn: string;
+  bankAccount: string;
+  coverDataUrl: string;
+  logoDataUrl: string;
+  galleryDataUrls: string[];
 };
 
 export type GreetingFromHome = {
@@ -99,9 +117,12 @@ const createDefaultProfile = (organizationName: string): OrganizationProfileData
   specialization: "",
   territory: "",
   contacts: "",
+  phone: "",
+  email: "",
   vkUrl: "",
   telegramUrl: "",
   whatsappUrl: "",
+  extraSocialLinks: [],
   admissionRules: "",
   currentNeeds: "",
   helpWays: "",
@@ -109,6 +130,15 @@ const createDefaultProfile = (organizationName: string): OrganizationProfileData
   adoptionQuestionnaire: "",
   adoptionRules: "",
   futureOwnerRequirements: "",
+  organizationHistory: "",
+  aboutMainTasks: "",
+  aboutGalleryCaption: "",
+  inn: "",
+  ogrn: "",
+  bankAccount: "",
+  coverDataUrl: "",
+  logoDataUrl: "",
+  galleryDataUrls: [],
 });
 
 const readStorage = (): OrganizationCabinetRecord[] => {
@@ -126,7 +156,9 @@ const readStorage = (): OrganizationCabinetRecord[] => {
 const writeStorage = (records: OrganizationCabinetRecord[]) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(ORGANIZATION_CABINET_STORAGE_KEY, JSON.stringify(records));
-  window.dispatchEvent(new Event(ORGANIZATION_CABINET_EVENT));
+  queueMicrotask(() => {
+    window.dispatchEvent(new Event(ORGANIZATION_CABINET_EVENT));
+  });
 };
 
 const getOrCreateRecord = (): OrganizationCabinetRecord => {
@@ -195,6 +227,8 @@ export const getOrganizationCabinetRecordByName = (
   );
   return byProfileName ?? null;
 };
+
+export const getOrganizationCabinetRecordForCurrentUser = (): OrganizationCabinetPublicRecord => getOrCreateRecord();
 
 export const getOrganizationProfile = (): OrganizationProfileData => {
   const record = getOrCreateRecord();

@@ -10,7 +10,9 @@ import { registerOrganization } from "@/features/auth/api/registerOrganization";
 import { fetchAuthMe, login, mapBackendRoleToApp } from "@/features/auth/api/login";
 import { registerUser } from "@/features/auth/api/registerUser";
 import { registerVolunteer } from "@/features/auth/api/registerVolunteer";
+import { verifyEmailWithToken, verifyPhoneWithToken } from "@/features/auth/api/verify";
 import { setAuthCookies } from "@/shared/lib/auth/cookies";
+import { USER_EMAIL_STORAGE_KEY } from "@/shared/lib/hooks/useUser";
 import { authHintKey, formatAuthCredential, isLikelyAuthContact } from "@/shared/lib/auth/contactCredential";
 
 type Role = "user" | "volunteer" | "org" | null;
@@ -73,6 +75,22 @@ const resolveNameHint = (contact: string): string | null => {
   if (!contact) return null;
   return localStorage.getItem(`auth_name_hint:${authHintKey(contact)}`);
 };
+
+async function consumeVerificationTokens(payload: {
+  email_verification_token?: string;
+  phone_verification_token?: string | null;
+}) {
+  try {
+    const e = payload.email_verification_token?.trim();
+    if (e) await verifyEmailWithToken(e);
+  } catch {
+  }
+  try {
+    const p = payload.phone_verification_token?.trim();
+    if (p) await verifyPhoneWithToken(p);
+  } catch {
+  }
+}
 
 const getRoleDisplayName = (params: {
   role: AppRole;
@@ -244,6 +262,8 @@ export function RegisterForm() {
           consent_personal_data: true,
         });
 
+        await consumeVerificationTokens(regUser);
+
         if (regUser.user) {
           saveRoleHint(userContact, mapBackendRoleToApp(regUser.user.role));
           saveNameHint(userContact, regUser.user.full_name);
@@ -276,6 +296,8 @@ export function RegisterForm() {
           availability,
           travel_radius_km: 5000,
         });
+
+        await consumeVerificationTokens(regVol);
 
         if (regVol.user) {
           saveRoleHint(volunteerContact, mapBackendRoleToApp(regVol.user.role));
@@ -332,6 +354,8 @@ export function RegisterForm() {
           },
         });
 
+        await consumeVerificationTokens(regOrg);
+
         if (regOrg.user) {
           saveRoleHint(orgContact, mapBackendRoleToApp(regOrg.user.role));
           saveNameHint(orgContact, regOrg.user.full_name);
@@ -374,6 +398,12 @@ export function RegisterForm() {
 
       const me = await fetchAuthMe(token);
       const roleToApply = me ? mapBackendRoleToApp(me.role) : resolveRoleHint(successContact) || roleFromRegistration;
+
+      if (me?.email?.trim()) {
+        localStorage.setItem(USER_EMAIL_STORAGE_KEY, me.email.trim());
+      } else {
+        localStorage.removeItem(USER_EMAIL_STORAGE_KEY);
+      }
 
       const nameFromRoleForm = getRoleDisplayName({
         role: roleToApply,

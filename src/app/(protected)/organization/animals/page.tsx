@@ -10,6 +10,8 @@ import {
   getOrganizationAnimalsEventName,
   updateOrganizationAnimal,
 } from "@/shared/lib/organizationAnimals";
+import { animalsApi } from "@/shared/api/endpoints/animals";
+import { getOrganizationCabinetEventName } from "@/shared/lib/organizationCabinet";
 import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
 import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 
@@ -118,6 +120,21 @@ export default function OrganizationAnimalsPage() {
   const handlePhotoSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    const editing = editingAnimalId;
+    if (editing !== null && apiAnimalIds.has(editing)) {
+      void animalsApi
+        .uploadImage(editing, file, true)
+        .then(() => {
+          window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+          window.dispatchEvent(new Event(getOrganizationAnimalsEventName()));
+        })
+        .catch(() => {})
+        .finally(() => {
+          event.target.value = "";
+        });
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {

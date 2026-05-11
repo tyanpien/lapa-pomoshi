@@ -208,6 +208,10 @@
   padding: 11px 18px 13px;
 }
 
+.statusRejected {
+  background: #952525;
+}
+
 @media (max-width: 940px) {
   .headerRow {
     flex-direction: column;

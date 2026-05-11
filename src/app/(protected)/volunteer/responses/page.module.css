@@ -90,16 +90,6 @@
   gap: 10px;
 }
 
-.typeTag {
-  border-radius: 8px;
-  background: #efe4d2;
-  color: #4f4237;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 5px 10px;
-}
-
 .organization {
   color: #333333;
   text-decoration: none;
@@ -133,6 +123,71 @@
   line-height: 1.8;
   margin-bottom: 26px;
   max-width: 100%;
+}
+
+.descArea {
+  margin-bottom: 26px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.descCollapsedRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+}
+
+.descPreview {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  color: #333333;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.descToggle {
+  flex-shrink: 0;
+  align-self: flex-end;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  color: #c49a4a;
+}
+
+.descToggle:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  text-decoration: none;
+}
+
+.formattedDesc {
+  width: 100%;
+  color: #333333;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.descBlock {
+  margin: 0 0 0.85em;
+  white-space: pre-line;
+}
+
+.descBlock:last-child {
+  margin-bottom: 0;
+}
+
+.descToggleRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 
 .timeRow {
@@ -228,6 +283,100 @@
 .statusArchive {
   color: #4c4c4c;
   background: #ebe8e1;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32, 39, 32, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 120px 16px;
+  z-index: 200;
+  overflow-y: auto;
+}
+
+.modal {
+  width: min(820px, 100%);
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px;
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  color: #8b5a3c;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.modalHint {
+  margin: 0 0 14px;
+  color: #33333399;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.modalLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #33333399;
+  font-size: 16px;
+}
+
+.modalTextarea {
+  border: 1px solid #33333399;
+  border-radius: 6px;
+  background: #fff;
+  min-height: 140px;
+  padding: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.modalError {
+  margin: 10px 0 0;
+  color: #952525;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.modalActions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modalPrimaryButton {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #8b5a3c;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modalSecondaryButton {
+  border: 1px solid #8b5a3c;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: transparent;
+  color: #8b5a3c;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modalPrimaryButton:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 @media (max-width: 980px) {

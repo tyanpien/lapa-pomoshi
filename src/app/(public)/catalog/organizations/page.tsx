@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { useUser } from "@/shared/lib/hooks/useUser";
 import styles from "./page.module.css";
 import {
   organizationsApi,
@@ -25,6 +28,8 @@ const needsMap: Record<string, string> = {
 type OrgPublicStats = { wards: number; adopted: number };
 
 export default function OrganizationsPage() {
+  const router = useRouter();
+  const { isAuth } = useUser();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [catalogs, setCatalogs] = useState<OrganizationCatalogs | null>(null);
   const [loading, setLoading] = useState(true);
@@ -348,7 +353,20 @@ export default function OrganizationsPage() {
                     </div>
                   </div>
                   <div className={styles.orgButtons}>
-                    <button className={styles.helpBtn}>Помочь</button>
+                    <button
+                      type="button"
+                      className={styles.helpBtn}
+                      onClick={() => {
+                        const target = `/catalog/organizations/${org.id}`;
+                        if (!isAuth) {
+                          router.push(getLoginHref(target));
+                          return;
+                        }
+                        router.push(target);
+                      }}
+                    >
+                      Помочь
+                    </button>
                     <Link href={`/catalog/organizations/${org.id}`} className={styles.detailsBtn}>
                       Подробнее
                     </Link>
