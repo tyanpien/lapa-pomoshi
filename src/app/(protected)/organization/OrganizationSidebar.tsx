@@ -16,7 +16,7 @@ const NAV: NavItem[] = [
   { id: "profile", href: "/organization/profile", label: "Профиль", aliases: ["/organization"] },
   { id: "my-requests", href: "/organization/requests", label: "Мои заявки" },
   { id: "my-animals", href: "/organization/animals", label: "Мои подопечные" },
-  { id: "incoming-requests", href: "/organization/requests", label: "Входящие заявки", skipActiveHighlight: true },
+  { id: "incoming-requests", href: "/organization/incoming", label: "Входящие заявки" },
   { id: "messages", href: "/messages", label: "Сообщения" },
   { id: "home", href: "/organization/home", label: "Привет из дома" },
   { id: "events", href: "/organization/events", label: "Мои мероприятия" },

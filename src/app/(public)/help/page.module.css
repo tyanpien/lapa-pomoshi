@@ -190,6 +190,108 @@
   background: #74482d;
 }
 
+.searchRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 250px;
+  margin-left: 200px;
+}
+
+.searchLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #5c4a3a;
+}
+
+.searchInput {
+  height: 35px;
+  border-radius: 8px;
+  border: 1px solid #8b5a3c;
+  padding: 0 14px;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(32, 39, 32, 0.55);
+}
+
+.modal {
+  background: #fdfaf6;
+  border-radius: 14px;
+  max-width: 520px;
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 24px 26px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.modalTitle {
+  margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #8b5a3c;
+}
+
+.modalStatus {
+  margin: 0 0 12px;
+  color: #5c4a3a;
+}
+
+.modalBlock {
+  margin-bottom: 18px;
+}
+
+.modalBlockTitle {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #3d2e24;
+}
+
+.modalPre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #4a4038;
+}
+
+.modalProblem {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #4a4038;
+  white-space: pre-wrap;
+}
+
+.modalCloseBtn {
+  margin-top: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #8b5a3c;
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.modalCloseBtn:hover {
+  background: #74482d;
+}
+
 @media (max-width: 1160px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

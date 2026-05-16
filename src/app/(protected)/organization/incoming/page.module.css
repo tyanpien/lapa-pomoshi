@@ -1,0 +1,133 @@
+.page {
+  padding: 24px 32px 48px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.header h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  color: #5c4a3a;
+}
+
+.header p {
+  margin: 0;
+  color: rgba(51, 51, 51, 0.65);
+  font-size: 15px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid rgba(141, 91, 61, 0.25);
+  border-radius: 10px;
+  padding: 20px 24px;
+}
+
+.cardTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 20px;
+  color: #5c4a3a;
+}
+
+.meta {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: rgba(51, 51, 51, 0.65);
+}
+
+.status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #f0ebe0;
+  color: #5c4a3a;
+}
+
+.statusPending {
+  background: #e8f0e6;
+  color: #3d4f3a;
+}
+
+.statusApproved {
+  background: #e6f0e8;
+  color: #2d5a3a;
+}
+
+.statusRejected {
+  background: #f5e8e8;
+  color: #8a3a3a;
+}
+
+.message {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #333;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.approveBtn,
+.rejectBtn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.approveBtn {
+  background: #3d4f3a;
+  color: #fff;
+}
+
+.rejectBtn {
+  background: transparent;
+  color: #8d5b3d;
+  border: 1px solid #8d5b3d;
+}
+
+.approveBtn:disabled,
+.rejectBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.empty {
+  color: rgba(51, 51, 51, 0.55);
+  font-size: 15px;
+}
+
+.error {
+  color: #a33;
+  font-size: 14px;
+}

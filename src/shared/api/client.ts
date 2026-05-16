@@ -94,6 +94,20 @@ export const getImageUrl = (photoUrl: string | null | undefined): string => {
   return `${API_BASE_URL}${photoUrl}`;
 };
 
+const ANIMAL_AVATAR_FALLBACK = "/cat.png";
+
+export function resolveAnimalAvatarSrc(
+  ...sources: (string | null | undefined)[]
+): string {
+  for (const raw of sources) {
+    if (typeof raw !== "string") continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    return getImageUrl(trimmed);
+  }
+  return ANIMAL_AVATAR_FALLBACK;
+}
+
 export const apiFetch = async (endpoint: string, options?: RequestInit) => {
   const token = (() => {
     if (typeof window === "undefined") return "";

@@ -366,6 +366,18 @@
   color: #fff;
 }
 
+.cardStatusSelect {
+  appearance: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  max-width: 220px;
+}
+
 .volunteerTitle {
   margin: 0 0 14px;
   font-size: 30px;
@@ -399,6 +411,29 @@
   line-height: 1.45;
   color: rgba(0, 0, 0, 0.72);
   white-space: pre-wrap;
+}
+
+.volunteerRouteList {
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+}
+
+.volunteerRouteItem {
+  position: relative;
+  margin: 0 0 6px;
+  padding-left: 18px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.volunteerRouteItem::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #333;
+  font-weight: 700;
 }
 
 .volunteerDeadlineRow {
@@ -455,7 +490,7 @@
   background: transparent;
   padding: 0;
   color: #8d5b3d;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;

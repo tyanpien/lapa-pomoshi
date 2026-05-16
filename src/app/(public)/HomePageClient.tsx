@@ -420,7 +420,8 @@ export default function HomePageClient({
         </div>
       </section>
 
-      <section className={styles.ctaSection}>
+      {!isAuth && (
+        <section className={styles.ctaSection}>
         <div className={styles.container}>
           <div className={styles.ctaBox}>
             <h2>Присоединяйтесь к помощи уже сегодня</h2>
@@ -437,7 +438,8 @@ export default function HomePageClient({
             </div>
           </div>
         </div>
-      </section>
+        </section>
+      )}
     </main>
   );
 }

@@ -21,8 +21,13 @@ import {
   getOrganizationCabinetRecordByName,
   getOrganizationCabinetRecordForCurrentUser,
 } from "@/shared/lib/organizationCabinet";
+import {
+  mapOrganizationPublicPageToProfileData,
+  mergeOrganizationProfilePreferApi,
+} from "@/shared/lib/organizationMeCabinet";
 import { emptyOrganizationCabinetApiPayload } from "@/shared/lib/organizationPublicCabinet";
 import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
+import { splitOrganizationAboutMainTasksFromPlainText } from "@/shared/lib/organizationAboutText";
 import type { OrganizationCabinetPayloadWithStatus } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import { getUrgentHelpTypeLabel } from "@/shared/lib/urgentHelpTypeLabels";
@@ -182,16 +187,27 @@ function cabinetPayloadOrEmpty(props: OrganizationCatalogViewProps): Organizatio
   return PUBLIC_VIEW_CABINET_STUB;
 }
 
+function toFiniteOrgId(id: unknown): number {
+  if (typeof id === "number" && Number.isFinite(id)) return id;
+  if (typeof id === "string" && /^\d+$/.test(id.trim())) {
+    const n = Number(id.trim());
+    return Number.isFinite(n) ? n : Number.NaN;
+  }
+  return Number.NaN;
+}
+
 export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
   const { role } = useUser();
   const cabinetPayload = cabinetPayloadOrEmpty(props);
 
+  const cabinetOrgId = toFiniteOrgId(cabinetPayload.organizationId);
+
   const resolvedOrganizationId =
-    props.variant === "public" ? props.organizationId : cabinetPayload.organizationId ?? NaN;
+    props.variant === "public" ? props.organizationId : cabinetOrgId;
 
   const cabinetFetching = props.variant === "cabinet" && cabinetPayload.isFetching;
   const cabinetUnresolved =
-    props.variant === "cabinet" && !cabinetPayload.isFetching && !Number.isFinite(cabinetPayload.organizationId);
+    props.variant === "cabinet" && !cabinetPayload.isFetching && !Number.isFinite(cabinetOrgId);
 
   const [activeTab, setActiveTab] = useState<TabKey>("wards");
   const [aboutGallerySlideIndex, setAboutGallerySlideIndex] = useState(0);
@@ -223,8 +239,15 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
   }, [props.variant]);
 
   useEffect(() => {
-    if (cabinetFetching || cabinetUnresolved) {
+    if (cabinetFetching) {
       setLoading(true);
+      return;
+    }
+    if (cabinetUnresolved) {
+      setListItem(null);
+      setPublicPage(null);
+      setLoading(false);
+      setNotFound(true);
       return;
     }
 
@@ -242,7 +265,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
       if (
         props.variant === "cabinet" &&
         cabinetPayload.publicPage &&
-        cabinetPayload.organizationId === resolvedOrganizationId
+        cabinetOrgId === resolvedOrganizationId
       ) {
         if (mounted) {
           setListItem(cabinetPayload.listItem);
@@ -298,7 +321,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
     cabinetFetching,
     cabinetUnresolved,
     cabinetPayload.publicPage,
-    cabinetPayload.organizationId,
+    cabinetOrgId,
     cabinetPayload.listItem,
   ]);
 
@@ -310,6 +333,15 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
     if (!organizationNameFromRecord) return null;
     return getOrganizationCabinetRecordByName(organizationNameFromRecord);
   }, [props.variant, organizationNameFromRecord, cabinetTick]);
+
+  const mergedCabinetProfile = useMemo(() => {
+    if (!publicPage) return null;
+    const hint = organizationNameFromRecord.trim() || publicPage.hero.name || "";
+    const fromApi = mapOrganizationPublicPageToProfileData(publicPage, listItem, hint);
+    return mergeOrganizationProfilePreferApi(fromApi, cabinetRecord?.profile);
+  }, [publicPage, listItem, organizationNameFromRecord, cabinetRecord?.profile, cabinetTick]);
+
+  const profileForUi = mergedCabinetProfile ?? cabinetRecord?.profile;
 
   const wardRows = useMemo((): WardRow[] => {
     if (props.variant === "cabinet" && role === "organization") {
@@ -373,7 +405,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
   }, [props.variant, role, cabinetPayload.apiAnimals, localAnimals, publicPage, organizationNameFromRecord, cabinetTick]);
 
   const orgName =
-    cabinetRecord?.profile.organizationName.trim() ||
+    profileForUi?.organizationName.trim() ||
     publicPage?.hero.name ||
     listItem?.name ||
     "Организация";
@@ -385,31 +417,39 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
     publicPage?.hero.city ||
     "Адрес не указан";
   const orgDescription =
-    cabinetRecord?.profile.description ||
-    cabinetRecord?.profile.helpWays ||
+    profileForUi?.description ||
+    profileForUi?.helpWays ||
     publicPage?.hero.description?.trim() ||
     publicPage?.about.about?.trim() ||
     "Описание пока не заполнено.";
   const logoPath = publicPage?.hero.logo_url ?? listItem?.logo_url ?? null;
-  const localLogo = props.variant === "cabinet" ? cabinetRecord?.profile.logoDataUrl?.trim() : "";
+  const localLogo = props.variant === "cabinet" ? profileForUi?.logoDataUrl?.trim() : "";
   const orgLogo = (localLogo || (logoPath ? getImageUrl(logoPath) : "")) || "/event.png";
   const coverPath = publicPage?.hero.cover_url ?? null;
   const coverUrlFromApi = coverPath ? getImageUrl(coverPath) : null;
-  const localCover = props.variant === "cabinet" ? cabinetRecord?.profile.coverDataUrl?.trim() : "";
+  const localCover = props.variant === "cabinet" ? profileForUi?.coverDataUrl?.trim() : "";
   const coverUrl = localCover || coverUrlFromApi;
 
   const contactsDisplay = useMemo(() => {
-    const p = cabinetRecord?.profile;
-    if (!p) return "Контакты не указаны.";
+    const p = profileForUi;
+    if (!p) {
+      if (publicPage?.hero.phone?.trim() || publicPage?.hero.email?.trim()) {
+        const lines: string[] = [];
+        if (publicPage.hero.phone?.trim()) lines.push(`Телефон ${publicPage.hero.phone.trim()}`);
+        if (publicPage.hero.email?.trim()) lines.push(`Email ${publicPage.hero.email.trim()}`);
+        return lines.join("\n");
+      }
+      return "Контакты не указаны.";
+    }
     const lines: string[] = [];
     if (p.phone?.trim()) lines.push(`Телефон ${p.phone.trim()}`);
     if (p.email?.trim()) lines.push(`Email ${p.email.trim()}`);
     if (p.contacts?.trim()) lines.push(p.contacts.trim());
     return lines.length > 0 ? lines.join("\n") : "Контакты не указаны.";
-  }, [cabinetRecord, cabinetTick]);
+  }, [profileForUi, publicPage, cabinetTick]);
 
   const extraSocialLinks = useMemo(() => {
-    const rows = cabinetRecord?.profile.extraSocialLinks ?? [];
+    const rows = profileForUi?.extraSocialLinks ?? [];
     return rows
       .map((row) => ({
         id: row.id,
@@ -417,7 +457,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
         url: (row.url || "").trim(),
       }))
       .filter((row) => row.url.length > 0);
-  }, [cabinetRecord, cabinetTick]);
+  }, [profileForUi, cabinetTick]);
 
   const organizationRequests = useMemo(() => {
     return mergeOrganizationHelpRequests(publicPage?.urgent_help ?? [], cabinetRecord?.requests ?? []);
@@ -454,50 +494,59 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
     0;
 
   const aboutGalleryUrls = useMemo(() => {
-    const local = (cabinetRecord?.profile.galleryDataUrls ?? []).filter((u) => u?.trim());
-    if (props.variant === "cabinet") {
-      return local;
-    }
+    const fromProfile = (profileForUi?.galleryDataUrls ?? []).filter((u) => u?.trim());
+    if (fromProfile.length > 0) return fromProfile;
     const api = (publicPage?.about.gallery_urls ?? [])
       .map((u) => (u ? getImageUrl(u) : ""))
       .filter((u) => u.length > 0);
-    if (local.length > 0) return local;
     return api;
-  }, [
-    props.variant,
-    cabinetRecord?.profile.galleryDataUrls,
-    publicPage?.about.gallery_urls,
-  ]);
+  }, [profileForUi?.galleryDataUrls, publicPage?.about.gallery_urls]);
 
-  const aboutIntroParagraph = useMemo(() => {
-    const cabinetHistory = cabinetRecord?.profile.organizationHistory?.trim();
+  const { aboutIntroParagraph, aboutMainTaskLines } = useMemo(() => {
+    const cabinetHistory = profileForUi?.organizationHistory?.trim();
+    let rawCombined = "";
     if (props.variant === "cabinet") {
-      return cabinetHistory || "";
+      rawCombined =
+        cabinetHistory ||
+        publicPage?.about.about?.trim() ||
+        profileForUi?.description?.trim() ||
+        publicPage?.hero.description?.trim() ||
+        "";
+    } else {
+      const apiAbout = publicPage?.about.about?.trim();
+      const cabinetDesc = profileForUi?.description?.trim();
+      const heroDesc = publicPage?.hero.description?.trim();
+      rawCombined =
+        cabinetHistory || apiAbout || cabinetDesc || heroDesc || orgDescription.trim() || "";
     }
-    const apiAbout = publicPage?.about.about?.trim();
-    const cabinetDesc = cabinetRecord?.profile.description?.trim();
-    const heroDesc = publicPage?.hero.description?.trim();
-    return cabinetHistory || apiAbout || cabinetDesc || heroDesc || orgDescription.trim() || "";
+
+    const profileLines = (profileForUi?.aboutMainTasks ?? "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const parsed = splitOrganizationAboutMainTasksFromPlainText(rawCombined);
+    const taskLines = profileLines.length > 0 ? profileLines : parsed.tasks;
+
+    let introParagraph = rawCombined;
+    if (taskLines.length > 0 && parsed.tasks.length > 0) {
+      introParagraph = parsed.intro.trim();
+    }
+
+    return { aboutIntroParagraph: introParagraph, aboutMainTaskLines: taskLines };
   }, [
     props.variant,
-    cabinetRecord?.profile.organizationHistory,
-    cabinetRecord?.profile.description,
+    profileForUi?.organizationHistory,
+    profileForUi?.description,
+    profileForUi?.aboutMainTasks,
     publicPage?.about.about,
     publicPage?.hero.description,
     orgDescription,
   ]);
 
-  const aboutMainTaskLines = useMemo(() => {
-    const raw = cabinetRecord?.profile.aboutMainTasks ?? "";
-    return raw
-      .split("\n")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-  }, [cabinetRecord?.profile.aboutMainTasks]);
-
   const aboutGalleryCaption = useMemo(
-    () => cabinetRecord?.profile.aboutGalleryCaption?.trim() ?? "",
-    [cabinetRecord?.profile.aboutGalleryCaption]
+    () => profileForUi?.aboutGalleryCaption?.trim() ?? "",
+    [profileForUi?.aboutGalleryCaption]
   );
 
   useEffect(() => {
@@ -520,16 +569,16 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
 
   const aboutInn =
     props.variant === "cabinet"
-      ? cabinetRecord?.profile.inn?.trim() || ""
-      : cabinetRecord?.profile.inn?.trim() || publicPage?.about.inn?.trim() || "";
+      ? profileForUi?.inn?.trim() || ""
+      : profileForUi?.inn?.trim() || publicPage?.about.inn?.trim() || "";
   const aboutOgrn =
     props.variant === "cabinet"
-      ? cabinetRecord?.profile.ogrn?.trim() || ""
-      : cabinetRecord?.profile.ogrn?.trim() || publicPage?.about.ogrn?.trim() || "";
+      ? profileForUi?.ogrn?.trim() || ""
+      : profileForUi?.ogrn?.trim() || publicPage?.about.ogrn?.trim() || "";
   const aboutBank =
     props.variant === "cabinet"
-      ? cabinetRecord?.profile.bankAccount?.trim() || ""
-      : cabinetRecord?.profile.bankAccount?.trim() || publicPage?.about.bank_account?.trim() || "";
+      ? profileForUi?.bankAccount?.trim() || ""
+      : profileForUi?.bankAccount?.trim() || publicPage?.about.bank_account?.trim() || "";
 
   const formatAge = (months: number) => {
     if (!months) return "Возраст не указан";
@@ -573,7 +622,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
           <div className={styles.aboutInner}>
             {aboutIntroParagraph ? (
               <p className={styles.aboutIntro}>{aboutIntroParagraph}</p>
-            ) : (
+            ) : aboutMainTaskLines.length > 0 ? null : (
               <p className={styles.aboutIntroMuted}>
                 Текст о команде миссии и ценностях появится здесь после заполнения раздела «О нас» в
                 редактировании страницы или с бэкенда.
@@ -976,7 +1025,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
             {orgName}
           </h1>
           <p className={styles.organizationSubtitle}>
-            {cabinetRecord?.profile.specialization || publicPage?.hero.tagline || "Организация помощи животным"}
+            {profileForUi?.specialization || publicPage?.hero.tagline || "Организация помощи животным"}
           </p>
         </div>
 
@@ -986,21 +1035,21 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
             <address className={styles.contacts}>
               <p className={styles.addressRow}>
                 <img src="/org.svg" alt="" aria-hidden="true" className={styles.inlineIcon} />
-                {cabinetRecord?.profile.territory || orgAddress}
+                {profileForUi?.territory || orgAddress}
               </p>
               <div className={styles.contact} style={{ whiteSpace: "pre-line" }}>
                 <p className={styles.contactTitle}>Контакты</p>
                 {contactsDisplay}
               </div>
               <div className={styles.socialLinks} aria-label="Социальные сети">
-                {cabinetRecord?.profile.vkUrl ? (
-                  <a href={cabinetRecord.profile.vkUrl} target="_blank" rel="noreferrer" className={styles.socialLink}>
+                {profileForUi?.vkUrl ? (
+                  <a href={profileForUi.vkUrl} target="_blank" rel="noreferrer" className={styles.socialLink}>
                     <img src="/vk.svg"  className={styles.socialIcon} />
                   </a>
                 ) : null}
-                {cabinetRecord?.profile.telegramUrl ? (
+                {profileForUi?.telegramUrl ? (
                   <a
-                    href={cabinetRecord.profile.telegramUrl}
+                    href={profileForUi.telegramUrl}
                     target="_blank"
                     rel="noreferrer"
                     className={styles.socialLink}
@@ -1008,9 +1057,9 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
                     <img src="/tg.svg" alt="Telegram" className={styles.socialIcon} />
                   </a>
                 ) : null}
-                {cabinetRecord?.profile.whatsappUrl ? (
+                {profileForUi?.whatsappUrl ? (
                   <a
-                    href={cabinetRecord.profile.whatsappUrl}
+                    href={profileForUi.whatsappUrl}
                     target="_blank"
                     rel="noreferrer"
                     className={styles.socialLink}
@@ -1039,11 +1088,6 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
                   </a>
                 ))}
               </div>
-              <p>
-                {cabinetRecord?.profile.adoptionScenario ||
-                  cabinetRecord?.profile.adoptionQuestionnaire ||
-                  "Сценарий пристроя не заполнен"}
-              </p>
             </address>
           </article>
 
@@ -1062,11 +1106,16 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
             <nav className={styles.infoLinks} aria-label="Полезные ссылки">
               <Link href="#" className={styles.infoLink}>
                 <img src="/info.svg" alt="" aria-hidden="true" className={styles.infoIcon} />
-                {cabinetRecord?.profile.admissionRules || "Правила приема животных"}
+                {profileForUi?.admissionRules ||
+                  publicPage?.hero.admission_rules ||
+                  "Правила приема животных"}
               </Link>
               <Link href="#" className={styles.infoLink}>
                 <img src="/info.svg" alt="" aria-hidden="true" className={styles.infoIcon} />
-                {cabinetRecord?.profile.adoptionRules || "Как забрать животное домой"}
+                {profileForUi?.adoptionRules ||
+                  profileForUi?.adoptionScenario ||
+                  publicPage?.hero.adoption_howto ||
+                  "Как забрать животное домой"}
               </Link>
             </nav>
           </div>

@@ -1,0 +1,78 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(32, 39, 32, 0.55);
+}
+
+.modal {
+  background: #fdfaf6;
+  border-radius: 14px;
+  max-width: 520px;
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 24px 26px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 22px;
+  color: #8b5a3c;
+  font-weight: 600;
+}
+
+.status {
+  margin: 0 0 12px;
+  color: #5c4a3a;
+}
+
+.block {
+  margin-bottom: 18px;
+}
+
+.blockTitle {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #3d2e24;
+}
+
+.pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #4a4038;
+}
+
+.problem {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #4a4038;
+  white-space: pre-wrap;
+}
+
+.closeBtn {
+  margin-top: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #8b5a3c;
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.closeBtn:hover {
+  background: #74482d;
+}

@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
+import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import {
   addOrganizationGreeting,
   deleteOrganizationGreeting,
@@ -62,6 +63,7 @@ export default function OrganizationHomeGreetingsPage() {
     () => mergeApiAndLocalAnimals(apiPayload.apiAnimals, localAnimals),
     [apiPayload.apiAnimals, localAnimals]
   );
+  const useMeCabinet = apiPayload.dataSource === "me" && apiPayload.organizationId != null;
 
   const visibleGreetings = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -88,6 +90,21 @@ export default function OrganizationHomeGreetingsPage() {
     return new Map(animals.map((animal) => [animal.id, animal]));
   }, [animals]);
 
+  const buildHomeStoryBody = () => {
+    const body: Record<string, unknown> = {
+      animal_name: form.petName.trim(),
+      story: form.text.trim(),
+    };
+    if (form.linkedAnimalId) {
+      const aid = Number(form.linkedAnimalId);
+      if (Number.isFinite(aid)) body.animal_id = aid;
+    }
+    if (form.photoUrl.trim() && !form.photoUrl.trim().startsWith("data:")) {
+      body.photo_url = form.photoUrl.trim();
+    }
+    return body;
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.petName.trim() || !form.text.trim()) return;
@@ -99,19 +116,44 @@ export default function OrganizationHomeGreetingsPage() {
       linkedAnimalId: form.linkedAnimalId ? Number(form.linkedAnimalId) : undefined,
     };
 
+    const finish = () => {
+      setForm(initialState);
+      setCreateModalOpen(false);
+      setEditingGreetingId(null);
+    };
+
+    if (useMeCabinet) {
+      if (editingGreetingId) {
+        void meOrganizationApi
+          .patchHomeStory(editingGreetingId, buildHomeStoryBody())
+          .then(() => {
+            window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+            finish();
+          })
+          .catch(() => {});
+      } else {
+        void meOrganizationApi
+          .createHomeStory(buildHomeStoryBody())
+          .then(() => {
+            window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+            finish();
+          })
+          .catch(() => {});
+      }
+      return;
+    }
+
     if (editingGreetingId) {
       updateOrganizationGreeting(editingGreetingId, payload);
     } else {
       addOrganizationGreeting(payload);
     }
 
-    setForm(initialState);
-    setCreateModalOpen(false);
-    setEditingGreetingId(null);
+    finish();
   };
 
   const openEditModal = (greetingId: number) => {
-    if (apiPayload.apiGreetingIds.has(greetingId)) return;
+    if (apiPayload.apiGreetingIds.has(greetingId) && !useMeCabinet) return;
     const greeting = greetings.find((item) => item.id === greetingId);
     if (!greeting) return;
 
@@ -127,11 +169,25 @@ export default function OrganizationHomeGreetingsPage() {
   };
 
   const handleDelete = (greetingId: number) => {
+    if (apiPayload.apiGreetingIds.has(greetingId) && useMeCabinet) {
+      const isConfirmed = window.confirm("Удалить публикацию?");
+      if (!isConfirmed) return;
+      void meOrganizationApi.deleteHomeStory(greetingId).then(() => {
+        window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+        setOpenMenuId(null);
+      });
+      return;
+    }
     if (apiPayload.apiGreetingIds.has(greetingId)) return;
     const isConfirmed = window.confirm("Удалить публикацию?");
     if (!isConfirmed) return;
     deleteOrganizationGreeting(greetingId);
     setOpenMenuId(null);
+  };
+
+  const showGreetingMenu = (id: number) => {
+    if (useMeCabinet) return true;
+    return !apiPayload.apiGreetingIds.has(id);
   };
 
   return (
@@ -175,7 +231,7 @@ export default function OrganizationHomeGreetingsPage() {
 
                 <div className={styles.requestBody}>
                   <div className={styles.cardActions}>
-                    {!apiPayload.apiGreetingIds.has(item.id) ? (
+                    {showGreetingMenu(item.id) ? (
                       <>
                         <button
                           className={styles.menuButton}

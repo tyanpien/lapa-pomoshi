@@ -310,13 +310,7 @@ export default function VolunteerPage() {
               {isOrganization && (
                 <div className={styles.actionsRow}>
                   <Link
-                    href={{
-                      pathname: "/messages",
-                      query: {
-                        recipientId: volunteer.user_id,
-                        recipientName: volunteer.full_name ?? "",
-                      },
-                    }}
+                    href={`/messages?recipientId=${encodeURIComponent(String(volunteer.user_id))}&recipientName=${encodeURIComponent((volunteer.full_name ?? "").trim())}`}
                     className={styles.writeBtn}
                   >
                     Написать

@@ -5,11 +5,11 @@ import { meProfileApi } from "@/shared/api/endpoints/meProfile";
 import { getImageUrl } from "@/shared/api/client";
 
 const AUTH_CHANGED_EVENT = "auth-changed";
+const ME_PROFILE_FETCH_MS = 22_000;
 
 export const USER_EMAIL_STORAGE_KEY = "userEmail";
 
-function readInitialRole(): UserRole {
-  if (typeof window === "undefined") return "guest";
+function readStoredRoleFromBrowser(): UserRole {
   const storedRole = localStorage.getItem("userRole") as UserRole;
   const token = (localStorage.getItem("token") || localStorage.getItem("access_token") || "").trim();
   if (token && storedRole && storedRole !== "guest") return storedRole;
@@ -17,11 +17,15 @@ function readInitialRole(): UserRole {
 }
 
 export function useUser() {
-  const [role, setRole] = useState<UserRole>(readInitialRole);
+  const [role, setRole] = useState<UserRole>("guest");
   const [isLoading, setIsLoading] = useState(true);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRole(readStoredRoleFromBrowser());
+  }, []);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -43,7 +47,13 @@ export function useUser() {
           setUserEmail(email?.trim() || null);
 
           try {
-            const profile = await meProfileApi.get();
+            const profile = await Promise.race([
+              meProfileApi.get(),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), ME_PROFILE_FETCH_MS)),
+            ]);
+            if (!profile) {
+              return;
+            }
             const apiName =
               profile.user.full_name?.trim() || profile.user.email?.trim() || null;
             const rawAvatar =

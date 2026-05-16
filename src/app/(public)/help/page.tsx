@@ -10,6 +10,7 @@ import {
   type HelpAnimalApiTab,
   type HelpAnimalItem,
 } from "@/shared/api/endpoints/help";
+import { HelpRequisitesModal } from "@/features/help-requisites/HelpRequisitesModal";
 
 type HelpFilter = "all" | "adopt" | "food" | "treatment" | "other";
 type NeedType = "adopt" | "food" | "treatment" | "other";
@@ -27,7 +28,10 @@ interface HelpCard {
   needIcon: string;
   needType: NeedType;
   amount: string | null;
+  primaryHelpRequestId: number | null;
 }
+
+type HelpCardRendered = HelpCard & { actionLabel: string };
 
 const FILTER_LABELS: Record<HelpFilter, string> = {
   all: "Все",
@@ -100,6 +104,10 @@ const mapItemToCard = (item: HelpAnimalItem): HelpCard => {
 
   const totalRub = (item.monetary ?? []).reduce((s, m) => s + (Number(m.amount_rub) || 0), 0);
   const amountStr = needType === "adopt" && !totalRub ? null : formatRub(totalRub);
+  const primaryHelpRequestId =
+    item.monetary?.length && typeof item.monetary[0].request_id === "number"
+      ? item.monetary[0].request_id
+      : null;
 
   return {
     id: item.animal_id,
@@ -114,6 +122,7 @@ const mapItemToCard = (item: HelpAnimalItem): HelpCard => {
     needIcon: needIconForType(needType),
     needType,
     amount: amountStr,
+    primaryHelpRequestId,
   };
 };
 
@@ -126,8 +135,10 @@ export default function HelpPage() {
   const [apiCards, setApiCards] = useState<HelpCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [helpSearch, setHelpSearch] = useState("");
+  const [helpModalCard, setHelpModalCard] = useState<HelpCardRendered | null>(null);
 
-  const handleCardAction = (animalId: number) => {
+  const handleAdoptNavigate = (animalId: number) => {
     if (!isAuth) {
       router.push(getLoginHref(pathname || "/help"));
       return;
@@ -154,12 +165,23 @@ export default function HelpPage() {
     void load(activeFilter);
   }, [activeFilter, load]);
 
+  const filteredCards = useMemo(() => {
+    const q = helpSearch.trim().toLowerCase();
+    if (!q) return apiCards;
+    return apiCards.filter((c) => {
+      const blob = [c.name, c.organization, c.species, c.age, c.statusTag, c.needText]
+        .join(" ")
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }, [apiCards, helpSearch]);
+
   const FALLBACK_AMOUNT_FOOD = "5 000 ₽";
   const FALLBACK_AMOUNT_TREATMENT = "15 000 ₽";
   const FALLBACK_AMOUNT_OTHER = "3 000 ₽";
 
   const renderData = useMemo(() => {
-    const mappedCards = apiCards.map((card) => {
+    const mappedCards = filteredCards.map((card) => {
       if (activeFilter === "adopt") {
         return {
           ...card,
@@ -222,13 +244,23 @@ export default function HelpPage() {
     }
 
     return mappedCards.sort((a, b) => Number(b.isUrgent) - Number(a.isUrgent));
-  }, [activeFilter, apiCards]);
+  }, [activeFilter, filteredCards]);
 
   return (
     <main className={styles.page}>
       <section className={styles.container}>
         <div className={styles.headerRow}>
           <h1 className={styles.title}>Помочь</h1>
+          <div className={styles.searchRow}>
+            <input
+              type="search"
+              className={styles.searchInput}
+              placeholder="Найти"
+              value={helpSearch}
+              onChange={(e) => setHelpSearch(e.target.value)}
+              aria-label="Поиск по животным"
+            />
+          </div>
           <div className={styles.filters}>
             {(["adopt", "food", "treatment", "other", "all"] as HelpFilter[]).map((filter) => (
               <button
@@ -245,6 +277,10 @@ export default function HelpPage() {
 
         {loading && <p className={styles.statusMessage}>Загрузка…</p>}
         {error && !loading && <p className={styles.statusMessage}>{error}</p>}
+
+        {!loading && !error && renderData.length === 0 ? (
+          <p className={styles.statusMessage}>Ничего не найдено. Измените запрос или фильтр.</p>
+        ) : null}
 
         <div className={styles.grid}>
           {!loading &&
@@ -283,7 +319,17 @@ export default function HelpPage() {
                   <button
                     type="button"
                     className={styles.actionButton}
-                    onClick={() => handleCardAction(card.id)}
+                    onClick={() => {
+                      if (card.actionLabel === "Помочь") {
+                        if (!isAuth) {
+                          router.push(getLoginHref(pathname || "/help"));
+                          return;
+                        }
+                        setHelpModalCard(card);
+                        return;
+                      }
+                      handleAdoptNavigate(card.id);
+                    }}
                   >
                     {card.actionLabel}
                   </button>
@@ -292,6 +338,17 @@ export default function HelpPage() {
             ))}
         </div>
       </section>
+
+      {helpModalCard ? (
+        <HelpRequisitesModal
+          animalId={helpModalCard.id}
+          animalName={helpModalCard.name}
+          organizationName={helpModalCard.organization}
+          needText={helpModalCard.needText}
+          primaryHelpRequestId={helpModalCard.primaryHelpRequestId}
+          onClose={() => setHelpModalCard(null)}
+        />
+      ) : null}
     </main>
   );
 }

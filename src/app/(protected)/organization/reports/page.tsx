@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "../organization.module.css";
+import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import {
   addOrganizationReport,
   getOrganizationCabinetEventName,
@@ -13,6 +14,7 @@ import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrgan
 
 export default function OrganizationReportsPage() {
   const apiPayload = useOrganizationPublicCabinetPayload();
+  const useMeCabinet = apiPayload.dataSource === "me" && apiPayload.organizationId != null;
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
@@ -34,6 +36,22 @@ export default function OrganizationReportsPage() {
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!title.trim() || !content.trim()) return;
+    if (useMeCabinet) {
+      void meOrganizationApi
+        .createReport({
+          title: title.trim(),
+          content: content.trim(),
+          is_urgent: isUrgent,
+        })
+        .then(() => {
+          window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+          setTitle("");
+          setContent("");
+          setIsUrgent(false);
+        })
+        .catch(() => {});
+      return;
+    }
     addOrganizationReport({
       title: title.trim(),
       content: content.trim(),
@@ -42,6 +60,15 @@ export default function OrganizationReportsPage() {
     setTitle("");
     setContent("");
     setIsUrgent(false);
+  };
+
+  const toggleReportRemote = (reportId: number, archived: boolean) => {
+    void meOrganizationApi
+      .patchReport(reportId, { archived: !archived })
+      .then(() => {
+        window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+      })
+      .catch(() => {});
   };
 
   return (
@@ -95,8 +122,17 @@ export default function OrganizationReportsPage() {
                       <span className={styles.badge}>{report.archived ? "Архив" : "Опубликовано"}</span>
                     </div>
                     <div className={styles.actions}>
-                      {!apiPayload.apiReportIds.has(report.id) ? (
+                      {useMeCabinet && apiPayload.apiReportIds.has(report.id) ? (
                         <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => toggleReportRemote(report.id, report.archived)}
+                        >
+                          {report.archived ? "Вернуть из архива" : "В архив"}
+                        </button>
+                      ) : !apiPayload.apiReportIds.has(report.id) ? (
+                        <button
+                          type="button"
                           className={styles.secondaryButton}
                           onClick={() => toggleOrganizationReportArchive(report.id)}
                         >

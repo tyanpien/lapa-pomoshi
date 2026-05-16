@@ -1,12 +1,31 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import styles from "../organization.module.css";
 import { eventsApi, type EventItem } from "@/shared/api/endpoints/events";
+import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
+import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
 import { useUser } from "@/shared/lib/hooks/useUser";
 
+function mapMeEventRow(row: Record<string, unknown>): EventItem {
+  const id = typeof row.id === "number" ? row.id : Number(row.id) || 0;
+  return {
+    id,
+    title: String(row.title ?? ""),
+    summary: row.summary != null ? String(row.summary) : null,
+    organization_name: row.organization_name != null ? String(row.organization_name) : null,
+    city: row.city != null ? String(row.city) : null,
+    address: row.address != null ? String(row.address) : null,
+    format: String(row.format ?? "offline"),
+    help_type: row.help_type != null ? String(row.help_type) : null,
+    starts_at: String(row.starts_at ?? ""),
+    ends_at: row.ends_at != null ? String(row.ends_at) : null,
+    description: row.description != null ? String(row.description) : null,
+  };
+}
+
 export default function OrganizationEventsPage() {
-  const { userName } = useUser();
+  const { userName, role } = useUser();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -21,10 +40,16 @@ export default function OrganizationEventsPage() {
   const [editStarts, setEditStarts] = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     setLoading(true);
     setErrorText("");
     try {
+      if (role === "organization") {
+        const raw = await meOrganizationApi.listEvents();
+        const rows = unwrapApiList<Record<string, unknown>>(raw);
+        setEvents(rows.map(mapMeEventRow).filter((e) => e.id > 0));
+        return;
+      }
       const data = await eventsApi.getList();
       const items = data.items ?? [];
       const orgNeedle = (userName ?? "").trim().toLowerCase();
@@ -38,11 +63,11 @@ export default function OrganizationEventsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [role, userName]);
 
   useEffect(() => {
     void reload();
-  }, [userName]);
+  }, [reload]);
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

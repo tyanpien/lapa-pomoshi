@@ -153,9 +153,12 @@ const readStorage = (): OrganizationCabinetRecord[] => {
   }
 };
 
-const writeStorage = (records: OrganizationCabinetRecord[]) => {
+type StorageWriteOptions = { skipNotify?: boolean };
+
+const writeStorage = (records: OrganizationCabinetRecord[], opts?: StorageWriteOptions) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(ORGANIZATION_CABINET_STORAGE_KEY, JSON.stringify(records));
+  if (opts?.skipNotify) return;
   queueMicrotask(() => {
     window.dispatchEvent(new Event(ORGANIZATION_CABINET_EVENT));
   });
@@ -181,7 +184,10 @@ const getOrCreateRecord = (): OrganizationCabinetRecord => {
   return created;
 };
 
-const updateRecord = (updater: (current: OrganizationCabinetRecord) => OrganizationCabinetRecord) => {
+const updateRecord = (
+  updater: (current: OrganizationCabinetRecord) => OrganizationCabinetRecord,
+  opts?: StorageWriteOptions
+) => {
   const ownerName = getCurrentOrganizationName();
   const records = readStorage();
   const index = records.findIndex((record) => record.ownerName === ownerName);
@@ -203,7 +209,7 @@ const updateRecord = (updater: (current: OrganizationCabinetRecord) => Organizat
   } else {
     records.push(updated);
   }
-  writeStorage(records);
+  writeStorage(records, opts);
 };
 
 const nextId = () => Date.now() + Math.floor(Math.random() * 1000);
@@ -238,16 +244,22 @@ export const getOrganizationProfile = (): OrganizationProfileData => {
   };
 };
 
-export const saveOrganizationProfile = (profile: OrganizationProfileData) => {
-  updateRecord((current) => ({
-    ...current,
-    profile: {
-      ...createDefaultProfile(current.ownerName),
-      ...current.profile,
-      ...profile,
-      organizationName: profile.organizationName.trim() || current.ownerName,
-    },
-  }));
+export const saveOrganizationProfile = (
+  profile: OrganizationProfileData,
+  opts?: StorageWriteOptions
+) => {
+  updateRecord(
+    (current) => ({
+      ...current,
+      profile: {
+        ...createDefaultProfile(current.ownerName),
+        ...current.profile,
+        ...profile,
+        organizationName: profile.organizationName.trim() || current.ownerName,
+      },
+    }),
+    opts
+  );
 };
 
 export const getOrganizationGreetings = (): GreetingFromHome[] => getOrCreateRecord().greetingsFromHome;

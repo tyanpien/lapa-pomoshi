@@ -139,6 +139,7 @@
 }
 
 .helpBtn {
+  display: inline-block;
   background: #8B5A3C;
   color: white;
   padding: 12px 28px;
@@ -147,6 +148,8 @@
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
   transition: background 0.2s;
 }
 
@@ -280,4 +283,95 @@
 .urgentTag {
   color:#ffffff !important;
   background: #9E1010 !important;
+}
+
+.helpRequestsSection {
+  scroll-margin-top: 96px;
+  margin-bottom: 40px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e5dcd0;
+}
+
+.helpRequestsSection h2 {
+  margin: 0 0 16px;
+  font-size: 22px;
+  color: #8b5a3c;
+}
+
+.helpRequestCard {
+  padding: 16px 0;
+  border-top: 1px solid #eee;
+}
+
+.helpRequestCard:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.helpRequestTitle {
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: #3d2e24;
+}
+
+.helpRequestMeta {
+  font-size: 13px;
+  color: #7a6a5e;
+  margin-bottom: 8px;
+}
+
+.helpRequestDesc {
+  margin: 0;
+  color: #4a4038;
+  line-height: 1.45;
+}
+
+.helpRequestLink {
+  display: inline-block;
+  margin-top: 10px;
+  color: #8b5a3c;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.helpRequestLink:hover {
+  text-decoration: underline;
+}
+
+.monetaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: #f8f4ed;
+  border-radius: 8px;
+}
+
+.monetaryLine {
+  margin: 0;
+  flex: 1;
+  color: #4a4038;
+}
+
+.needHelpBtn {
+  flex-shrink: 0;
+  background: #8b5a3c;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+
+.needHelpBtn:hover {
+  background: #794e34;
 }

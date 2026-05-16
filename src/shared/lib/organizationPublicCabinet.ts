@@ -178,6 +178,7 @@ export type OrganizationCabinetApiPayload = {
   organizationId: number | null;
   publicPage: OrganizationPublicPage | null;
   listItem: OrganizationListItem | null;
+  dataSource: "me" | "public";
 };
 
 export function emptyOrganizationCabinetApiPayload(): OrganizationCabinetApiPayload {
@@ -197,6 +198,7 @@ export function emptyOrganizationCabinetApiPayload(): OrganizationCabinetApiPayl
     organizationId: null,
     publicPage: null,
     listItem: null,
+    dataSource: "public",
   };
 }
 
@@ -232,5 +234,6 @@ export async function fetchOrganizationCabinetApiPayload(
     organizationId,
     publicPage: page,
     listItem,
+    dataSource: "public",
   };
 }

@@ -1,0 +1,265 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(32, 39, 32, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px 16px;
+  z-index: 200;
+}
+
+.shell {
+  width: 900px;
+  max-width: 100%;
+  height: 680px;
+  max-height: calc(100vh - 48px);
+  background: #fff;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #8d5b3d;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 40px 48px 0;
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #8d5b3d;
+  font-family: inherit;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  color: #333;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  padding: 20px 48px 0;
+  flex-shrink: 0;
+}
+
+.stepperNode {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #c5c5c5;
+  background: #fff;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepperNodeDone {
+  border-color: #3d4f3a;
+  background: #3d4f3a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stepperNodeActive {
+  border-color: #3d4f3a;
+  background: #fff;
+}
+
+.stepperNodeActive::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3d4f3a;
+}
+
+.stepperLine {
+  flex: 1;
+  height: 2px;
+  background: #d8d8d8;
+  min-width: 8px;
+}
+
+.stepperLineDone {
+  background: #3d4f3a;
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 48px 8px;
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.gridTwo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 32px;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: rgba(51, 51, 51, 0.75);
+  font-size: 16px;
+}
+
+.fieldInput,
+.fieldTextarea {
+  border: 1px solid rgba(51, 51, 51, 0.45);
+  border-radius: 6px;
+  background: #fff;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-family: inherit;
+  color: #333;
+  width: 100%;
+}
+
+.fieldTextarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.choiceRow {
+  display: flex;
+  gap: 10px;
+}
+
+.choiceBtn {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 6px;
+  background: #f0ebe0;
+  color: #333;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.choiceBtnActive {
+  background: #3d4f3a;
+  color: #fff;
+}
+
+.errorText {
+  margin: 0;
+  color: #a33;
+  font-size: 14px;
+}
+
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 48px 32px;
+}
+
+.footerEndOnly {
+  justify-content: flex-end;
+}
+
+.footerCenter {
+  justify-content: center;
+}
+
+.backBtn {
+  border: none;
+  background: transparent;
+  color: #8d5b3d;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 0;
+  font-family: inherit;
+}
+
+.primaryBtn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 32px;
+  background: #8d5b3d;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.successBody {
+  margin-top: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  gap: 20px;
+  text-align: center;
+}
+
+.pawIcon {
+  width: 300px;
+  height: 260px;
+  object-fit: contain;
+}
+
+.successTitle {
+  margin: 0;
+  color: #333333;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.successText {
+  margin: 0;
+  max-width: 800px;
+  color: #333333;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .header,
+  .stepper,
+  .body,
+  .footer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .gridTwo {
+    grid-template-columns: 1fr;
+  }
+}

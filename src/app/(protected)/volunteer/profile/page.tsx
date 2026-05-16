@@ -16,6 +16,7 @@ import {
 import { meApplicationsApi, type AdoptionApplicationListItem } from "@/shared/api/endpoints/meApplications";
 import {
   storedDetailsToVolunteerPatch,
+  syncCompetencyLabelsWithCatalog,
   volunteerApiToStoredDetails,
 } from "@/shared/lib/volunteerMeProfileMap";
 import {
@@ -32,7 +33,8 @@ import {
 import styles from "./page.module.css";
 import profileFormsStyles from "../../profile/page.module.css";
 import responseStyles from "../responses/page.module.css";
-import { statusClassMap, type ResponseCard } from "../responses/page";
+import { type ResponseCard } from "../responses/page";
+import { volunteerResponseStatusClassMap as statusClassMap } from "@/shared/lib/volunteerResponseStatusClassMap";
 import { ResponseCardDescription } from "../responses/responseCardDescription";
 import {
   WEEKDAY_EDIT_LABELS,
@@ -225,8 +227,13 @@ export default function VolunteerProfilePage() {
         const vp = prof.volunteer_profile;
         if (vp) {
           const mapped = volunteerApiToStoredDetails(vp, cats.experience_levels ?? []);
-          setDetails(mapped);
-          writeVolunteerDetailsToStorage(profileIdentity, mapped);
+          const catalog = cats.competencies ?? [];
+          const synced: StoredVolunteerDetails = {
+            ...mapped,
+            competencies: syncCompetencyLabelsWithCatalog(mapped.competencies, catalog),
+          };
+          setDetails(synced);
+          writeVolunteerDetailsToStorage(profileIdentity, synced);
           setVolunteerProfileMissing(false);
           setAvatarUrl(resolveMeAvatarUrl(prof));
         } else {
@@ -465,8 +472,12 @@ export default function VolunteerProfilePage() {
       const res = await meProfileApi.patch({ volunteer });
       if (res.volunteer_profile) {
         const mapped = volunteerApiToStoredDetails(res.volunteer_profile, experienceCatalogRows);
-        setDetails(mapped);
-        writeVolunteerDetailsToStorage(profileIdentity, mapped);
+        const synced: StoredVolunteerDetails = {
+          ...mapped,
+          competencies: syncCompetencyLabelsWithCatalog(mapped.competencies, competencyCatalogRows),
+        };
+        setDetails(synced);
+        writeVolunteerDetailsToStorage(profileIdentity, synced);
         setVolunteerProfileMissing(false);
       } else {
         writeVolunteerDetailsToStorage(profileIdentity, details);

@@ -11,6 +11,7 @@ import {
   updateOrganizationAnimal,
 } from "@/shared/lib/organizationAnimals";
 import { animalsApi } from "@/shared/api/endpoints/animals";
+import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import { getOrganizationCabinetEventName } from "@/shared/lib/organizationCabinet";
 import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
 import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
@@ -64,6 +65,7 @@ export default function OrganizationAnimalsPage() {
     [apiPayload.apiAnimals, localAnimals]
   );
   const apiAnimalIds = apiPayload.apiAnimalIds;
+  const useMeCabinet = apiPayload.dataSource === "me" && apiPayload.organizationId != null;
 
   const reloadAnimals = () => {
     setLocalAnimals(getCurrentOrganizationAnimals());
@@ -81,6 +83,24 @@ export default function OrganizationAnimalsPage() {
     window.addEventListener("click", closeMenu);
     return () => window.removeEventListener("click", closeMenu);
   }, []);
+
+  const buildAnimalApiBody = () => ({
+    name: form.name.trim(),
+    species: form.species.trim(),
+    breed: form.breed.trim() || null,
+    sex: form.sex,
+    age_months: Math.max(0, Number(form.ageMonths) || 0),
+    location_city: form.city.trim() || null,
+    full_description: form.description.trim(),
+    health_features: form.healthFeatures.trim() || null,
+    treatment_required: form.treatmentRequired.trim() || null,
+    character_tags: form.characterTags
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+    status: form.status,
+    is_urgent: form.isUrgent,
+  });
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -105,16 +125,57 @@ export default function OrganizationAnimalsPage() {
       photoUrl: form.photoUrl,
     };
 
+    const doneLocal = () => {
+      setForm(initialForm);
+      setCreateModalOpen(false);
+      setEditingAnimalId(null);
+      reloadAnimals();
+    };
+
+    if (useMeCabinet) {
+      const uploadDataUrlIfNeeded = async (animalId: number) => {
+        if (!form.photoUrl?.startsWith("data:")) return;
+        try {
+          const r = await fetch(form.photoUrl);
+          const blob = await r.blob();
+          const file = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
+          await animalsApi.uploadImage(animalId, file, true);
+        } catch {
+        }
+      };
+
+      if (editingAnimalId) {
+        void meOrganizationApi
+          .patchAnimal(editingAnimalId, buildAnimalApiBody())
+          .then(async () => {
+            await uploadDataUrlIfNeeded(editingAnimalId);
+            window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+            doneLocal();
+          })
+          .catch(() => {});
+        return;
+      }
+
+      void meOrganizationApi
+        .createAnimal(buildAnimalApiBody())
+        .then(async (created) => {
+          const row = created as { id?: unknown };
+          const cid = typeof row?.id === "number" ? row.id : null;
+          if (cid != null) await uploadDataUrlIfNeeded(cid);
+          window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+          doneLocal();
+        })
+        .catch(() => {});
+      return;
+    }
+
     if (editingAnimalId) {
       updateOrganizationAnimal(editingAnimalId, payload);
     } else {
       addOrganizationAnimal(payload);
     }
 
-    setForm(initialForm);
-    setCreateModalOpen(false);
-    setEditingAnimalId(null);
-    reloadAnimals();
+    doneLocal();
   };
 
   const handlePhotoSelect = (event: ChangeEvent<HTMLInputElement>) => {
@@ -192,7 +253,6 @@ export default function OrganizationAnimalsPage() {
   };
 
   const openEditModal = (animalId: number) => {
-    if (apiAnimalIds.has(animalId)) return;
     const animal = animals.find((item) => item.id === animalId);
     if (!animal) return;
 
@@ -220,6 +280,16 @@ export default function OrganizationAnimalsPage() {
   };
 
   const handleDelete = (animalId: number) => {
+    if (useMeCabinet && apiAnimalIds.has(animalId)) {
+      const ok = window.confirm("Отправить анкету в архив?");
+      if (!ok) return;
+      void meOrganizationApi.archiveAnimal(animalId).then(() => {
+        window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+        setOpenMenuId(null);
+        reloadAnimals();
+      });
+      return;
+    }
     if (apiAnimalIds.has(animalId)) return;
     const isConfirmed = window.confirm("Удалить карточку животного?");
     if (!isConfirmed) return;
@@ -227,6 +297,11 @@ export default function OrganizationAnimalsPage() {
     deleteOrganizationAnimal(animalId);
     setOpenMenuId(null);
     reloadAnimals();
+  };
+
+  const showAnimalCardMenu = (animalId: number) => {
+    if (useMeCabinet) return true;
+    return !apiAnimalIds.has(animalId);
   };
 
   return (
@@ -304,7 +379,7 @@ export default function OrganizationAnimalsPage() {
                 </div>
                 <div className={styles.animalBody}>
                   <div className={styles.cardActions}>
-                    {!apiAnimalIds.has(animal.id) ? (
+                    {showAnimalCardMenu(animal.id) ? (
                       <>
                         <button
                           className={styles.menuButton}
@@ -322,7 +397,7 @@ export default function OrganizationAnimalsPage() {
                               Редактировать
                             </button>
                             <button type="button" onClick={() => handleDelete(animal.id)}>
-                              Удалить анкету
+                              {useMeCabinet && apiAnimalIds.has(animal.id) ? "В архив" : "Удалить анкету"}
                             </button>
                           </div>
                         ) : null}

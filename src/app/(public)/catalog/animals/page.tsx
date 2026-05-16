@@ -11,6 +11,7 @@ import {
 } from "@/shared/lib/organizationAnimals";
 import { getLoginHref } from "@/shared/lib/auth/loginHref";
 import { useUser } from "@/shared/lib/hooks/useUser";
+import { fetchAnimalIdsWithPublishedOpenRequests } from "@/shared/lib/animalPublishedHelpRequests";
 
 interface AgeGroup {
   id: string;
@@ -52,10 +53,15 @@ export default function Page() {
   const [openFeatures, setOpenFeatures] = useState(false);
   const [openStatus, setOpenStatus] = useState(false);
   const [openOrg, setOpenOrg] = useState(false);
+  const [animalIdsWithHelpRequests, setAnimalIdsWithHelpRequests] = useState<Set<number> | null>(null);
 
   const orgRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void fetchAnimalIdsWithPublishedOpenRequests().then((ids) => setAnimalIdsWithHelpRequests(ids));
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -426,16 +432,29 @@ export default function Page() {
                       {animal.organization_name || "Без организации"}
                     </p>
                     <div style={{ display: "flex", justifyContent: "left" }}>
-                      <Link
-                        href={
-                          isAuth
-                            ? `/catalog/animals/${animal.id}`
-                            : getLoginHref(`/catalog/animals/${animal.id}`)
-                        }
-                        className={styles.action}
-                      >
-                        {mappedStatus === "home" ? "Забрать домой" : "Помочь"}
-                      </Link>
+                      {mappedStatus === "home" ? (
+                        <Link
+                          href={
+                            isAuth
+                              ? `/catalog/animals/${animal.id}`
+                              : getLoginHref(`/catalog/animals/${animal.id}`)
+                          }
+                          className={styles.action}
+                        >
+                          Забрать домой
+                        </Link>
+                      ) : animalIdsWithHelpRequests?.has(animal.id) ? (
+                        <Link
+                          href={
+                            isAuth
+                              ? `/catalog/animals/${animal.id}#animal-help-requests`
+                              : getLoginHref(`/catalog/animals/${animal.id}#animal-help-requests`)
+                          }
+                          className={styles.action}
+                        >
+                          Помочь
+                        </Link>
+                      ) : null}
                     </div>
                   </div>
                 </div>

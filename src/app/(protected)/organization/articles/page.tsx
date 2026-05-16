@@ -3,10 +3,28 @@
 import { FormEvent, useEffect, useState } from "react";
 import styles from "../organization.module.css";
 import { knowledgeApi, type KnowledgeItem } from "@/shared/api/endpoints/knowledge";
+import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
+import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
 import { useUser } from "@/shared/lib/hooks/useUser";
 
+function mapMeArticleRow(row: Record<string, unknown>): KnowledgeItem {
+  const id = typeof row.id === "number" ? row.id : Number(row.id) || 0;
+  const content = row.content != null ? String(row.content) : "";
+  return {
+    id,
+    title: String(row.title ?? ""),
+    summary: String(row.summary ?? content).slice(0, 500),
+    content: content || undefined,
+    category: String(row.category ?? "care"),
+    category_label: String(row.category_label ?? ""),
+    read_minutes: typeof row.read_minutes === "number" ? row.read_minutes : 0,
+    is_context_tip: Boolean(row.is_context_tip),
+    created_at: String(row.created_at ?? new Date().toISOString()),
+  };
+}
+
 export default function OrganizationArticlesPage() {
-  const { userName } = useUser();
+  const { userName, role } = useUser();
   const [title, setTitle] = useState("");
   const [articleType, setArticleType] = useState("care");
   const [content, setContent] = useState("");
@@ -24,10 +42,21 @@ export default function OrganizationArticlesPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setErrorText("");
-    Promise.all([knowledgeApi.getList(), knowledgeApi.getCatalogs()])
-      .then(([list, cats]) => {
+    const load = () => {
+      if (role === "organization") {
+        return Promise.all([meOrganizationApi.listArticles(), knowledgeApi.getCatalogs()]).then(([raw, cats]) => {
+          if (cancelled) return;
+          const rows = unwrapApiList<Record<string, unknown>>(raw);
+          setArticles(rows.map(mapMeArticleRow).filter((a) => a.id > 0));
+          const c = cats.categories ?? [];
+          setCatalogs(c);
+          const first = c[0]?.id;
+          if (first) {
+            setArticleType((prev) => (c.some((x) => x.id === prev) ? prev : first));
+          }
+        });
+      }
+      return Promise.all([knowledgeApi.getList(), knowledgeApi.getCatalogs()]).then(([list, cats]) => {
         if (cancelled) return;
         const items = list.items ?? [];
         setArticles(items);
@@ -37,19 +66,26 @@ export default function OrganizationArticlesPage() {
         if (first) {
           setArticleType((prev) => (c.some((x) => x.id === prev) ? prev : first));
         }
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setArticles([]);
-        setErrorText(e instanceof Error ? e.message : "Не удалось загрузить статьи.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
+    };
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setErrorText("");
+      void load()
+        .catch((e) => {
+          if (cancelled) return;
+          setArticles([]);
+          setErrorText(e instanceof Error ? e.message : "Не удалось загрузить статьи.");
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    });
     return () => {
       cancelled = true;
     };
-  }, [userName]);
+  }, [userName, role]);
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

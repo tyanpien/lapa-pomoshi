@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import Sidebar from "@/widgets/sidebar/Sidebar";
 import styles from "./Header.module.css";
 
 export default function Header() {
   const { isAuth, userAvatar, userName, role } = useUser();
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const burgerIcon = (open || isHovered) ? "/burger_hover.svg" : "/burger.svg";
 
@@ -21,6 +26,8 @@ export default function Header() {
     if (role === "organization") return "/organization/profile";
     return "/profile";
   };
+
+  const showAuthedUi = mounted && isAuth;
 
   return (
     <header className={styles.header}>
@@ -71,7 +78,7 @@ export default function Header() {
         </nav>
 
         <div className={styles.right}>
-          {!isAuth ? (
+          {!showAuthedUi ? (
             <Link href="/login" className={styles.login}>
               <img src="/user.svg" alt="user" />
               Войти

@@ -9,6 +9,17 @@
   margin: 0 auto;
 }
 
+.recipientResolveBanner {
+  margin: 0 16px 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fff4e5;
+  border: 1px solid #e8c48a;
+  color: #5c3d10;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .chatLayout {
   display: grid;
   grid-template-columns: 260px 1fr;

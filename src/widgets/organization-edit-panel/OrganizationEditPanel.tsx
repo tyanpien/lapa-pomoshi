@@ -2,10 +2,15 @@
 
 import type { ChangeEvent, Dispatch, FormEvent, SetStateAction } from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./OrganizationEditPanel.module.css";
+import { getImageUrl } from "@/shared/api/client";
+import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import type { OrganizationProfileData, OrganizationSocialExtra } from "@/shared/lib/organizationCabinet";
+import { buildOrganizationCabinetProfilePatch } from "@/shared/lib/organizationMeCabinet";
+import { useUser } from "@/shared/lib/hooks/useUser";
 
 const MESSENGER_OPTIONS = ["VK", "Telegram", "WhatsApp", "Одноклассники", "Другое"];
 
@@ -13,7 +18,7 @@ const MAIN_NAV: { href: string; label: string; matchPrefix?: string; skipActiveH
   { href: "/organization/profile", label: "Профиль", matchPrefix: "/organization/profile" },
   { href: "/organization/requests", label: "Мои заявки", matchPrefix: "/organization/requests" },
   { href: "/organization/animals", label: "Мои подопечные", matchPrefix: "/organization/animals" },
-  { href: "/organization/requests", label: "Входящие заявки", matchPrefix: "/organization/requests", skipActiveHighlight: true },
+  { href: "/organization/incoming", label: "Входящие заявки", matchPrefix: "/organization/incoming" },
   { href: "/messages", label: "Сообщения", matchPrefix: "/messages" },
   { href: "/organization/home", label: "Привет из дома", matchPrefix: "/organization/home" },
   { href: "/organization/events", label: "Мои мероприятия", matchPrefix: "/organization/events" },
@@ -22,6 +27,19 @@ const MAIN_NAV: { href: string; label: string; matchPrefix?: string; skipActiveH
 ];
 
 type EditSection = "profile" | "contacts" | "about" | "instructions";
+
+function pickMediaUploadUrl(res: unknown): string {
+  if (!res || typeof res !== "object") return "";
+  const o = res as Record<string, unknown>;
+  return (
+    (typeof o.logo_url === "string" && o.logo_url) ||
+    (typeof o.cover_url === "string" && o.cover_url) ||
+    (typeof o.gallery_url === "string" && o.gallery_url) ||
+    (typeof o.url === "string" && o.url) ||
+    (typeof o.image_url === "string" && o.image_url) ||
+    ""
+  );
+}
 
 const PHONE_MASK = "+7 (___) ___-__-__";
 const PHONE_POSITIONS = [4, 5, 6, 9, 10, 11, 13, 14, 16, 17] as const;
@@ -64,24 +82,6 @@ function prevEditablePos(from: number) {
   return null;
 }
 
-function RichTextToolbar() {
-  return (
-    <div className={styles.richToolbar} aria-hidden="true">
-      <span className={styles.richToolBtn}>Aa</span>
-      <span className={styles.richToolBtn}>•</span>
-      <span className={styles.richToolBtn}>1.</span>
-      <span className={styles.richToolBtn}>B</span>
-      <span className={styles.richToolBtn}>I</span>
-      <span className={styles.richToolBtn}>U</span>
-      <span className={styles.richToolBtn}>S</span>
-      <span className={styles.richToolBtn}>≡</span>
-      <span className={styles.richToolBtn}>🔗</span>
-      <span className={styles.richToolBtn}>❝</span>
-      <span className={styles.richToolBtn}>—</span>
-    </div>
-  );
-}
-
 type OrganizationEditPanelProps = {
   open: boolean;
   onClose: () => void;
@@ -101,6 +101,7 @@ export function OrganizationEditPanel({
   saved,
   variant = "overlay",
 }: OrganizationEditPanelProps) {
+  const { role } = useUser();
   const pathname = usePathname();
   const [section, setSection] = useState<EditSection>("profile");
   const [openSelectId, setOpenSelectId] = useState<string | null>(null);
@@ -166,7 +167,7 @@ export function OrganizationEditPanel({
       document.body.classList.remove("no-scroll");
       window.scrollTo(0, savedScrollYRef.current);
     };
-  }, [open]);
+  }, [open, variant]);
 
   const readFileAsDataUrl = useCallback((file: File) => {
     return new Promise<string>((resolve, reject) => {
@@ -184,6 +185,17 @@ export function OrganizationEditPanel({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !file.type.startsWith("image/")) return;
+    if (role === "organization") {
+      try {
+        const res = await meOrganizationApi.uploadCover(file);
+        const u = pickMediaUploadUrl(res);
+        if (u) {
+          setProfile((prev) => ({ ...prev, coverDataUrl: getImageUrl(u) }));
+          return;
+        }
+      } catch {
+      }
+    }
     try {
       const dataUrl = await readFileAsDataUrl(file);
       setProfile((prev) => ({ ...prev, coverDataUrl: dataUrl }));
@@ -195,6 +207,17 @@ export function OrganizationEditPanel({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !file.type.startsWith("image/")) return;
+    if (role === "organization") {
+      try {
+        const res = await meOrganizationApi.uploadLogo(file);
+        const u = pickMediaUploadUrl(res);
+        if (u) {
+          setProfile((prev) => ({ ...prev, logoDataUrl: getImageUrl(u) }));
+          return;
+        }
+      } catch {
+      }
+    }
     try {
       const dataUrl = await readFileAsDataUrl(file);
       setProfile((prev) => ({ ...prev, logoDataUrl: dataUrl }));
@@ -207,6 +230,17 @@ export function OrganizationEditPanel({
     const urls: string[] = [];
     for (const file of images) {
       if (urls.length >= 5) break;
+      if (role === "organization") {
+        try {
+          const res = await meOrganizationApi.uploadGalleryImage(file);
+          const u = pickMediaUploadUrl(res);
+          if (u) {
+            urls.push(getImageUrl(u));
+            continue;
+          }
+        } catch {
+        }
+      }
       try {
         urls.push(await readFileAsDataUrl(file));
       } catch {
@@ -227,10 +261,18 @@ export function OrganizationEditPanel({
   };
 
   const removeGalleryAt = (index: number) => {
-    setProfile((prev) => ({
-      ...prev,
-      galleryDataUrls: prev.galleryDataUrls.filter((_, i) => i !== index),
-    }));
+    let nextProfile: OrganizationProfileData | null = null;
+    flushSync(() => {
+      setProfile((prev) => {
+        nextProfile = { ...prev, galleryDataUrls: prev.galleryDataUrls.filter((_, i) => i !== index) };
+        return nextProfile;
+      });
+    });
+    if (role === "organization" && nextProfile) {
+      void meOrganizationApi
+        .patchProfileCabinet(buildOrganizationCabinetProfilePatch(nextProfile))
+        .catch(() => {});
+    }
   };
 
   const addSocialRow = () => {
@@ -502,6 +544,39 @@ export function OrganizationEditPanel({
                 </label>
                 <div className={styles.field}>
                   <span className={styles.fieldLabel}>Социальные сети</span>
+                  <label className={styles.field} style={{ marginBottom: 12 }}>
+                    <span className={styles.fieldLabel}>ВКонтакте</span>
+                    <input
+                      className={styles.fieldInput}
+                      type="url"
+                      inputMode="url"
+                      value={profile.vkUrl}
+                      onChange={(e) => setProfile((p) => ({ ...p, vkUrl: e.target.value }))}
+                      placeholder="https://vk.com/…"
+                    />
+                  </label>
+                  <label className={styles.field} style={{ marginBottom: 12 }}>
+                    <span className={styles.fieldLabel}>Telegram</span>
+                    <input
+                      className={styles.fieldInput}
+                      type="url"
+                      inputMode="url"
+                      value={profile.telegramUrl}
+                      onChange={(e) => setProfile((p) => ({ ...p, telegramUrl: e.target.value }))}
+                      placeholder="https://t.me/…"
+                    />
+                  </label>
+                  <label className={styles.field} style={{ marginBottom: 12 }}>
+                    <span className={styles.fieldLabel}>WhatsApp</span>
+                    <input
+                      className={styles.fieldInput}
+                      type="url"
+                      inputMode="url"
+                      value={profile.whatsappUrl}
+                      onChange={(e) => setProfile((p) => ({ ...p, whatsappUrl: e.target.value }))}
+                      placeholder="https://wa.me/…"
+                    />
+                  </label>
                   {profile.extraSocialLinks.map((row) => (
                     <div key={row.id} className={styles.socialBlock}>
                       <div className={styles.socialRow}>
@@ -563,15 +638,6 @@ export function OrganizationEditPanel({
                     placeholder="Расскажите, как появилась ваша организация"
                   />
                 </div>
-                <div className={styles.richBlock}>
-                  <span className={styles.fieldLabel}>Основные задачи</span>
-                  <textarea
-                    className={`${styles.fieldTextarea} ${styles.richTextarea}`}
-                    value={profile.aboutMainTasks}
-                    onChange={(e) => setProfile((p) => ({ ...p, aboutMainTasks: e.target.value }))}
-                    placeholder="Каждая строка — отдельный пункт списка на странице «О нас»"
-                  />
-                </div>
                 <div className={styles.field}>
                   <span className={styles.fieldLabel}>Изображения</span>
                   <input
@@ -610,7 +676,15 @@ export function OrganizationEditPanel({
                       {profile.galleryDataUrls.map((src, i) => (
                         <div key={`${i}-${src.slice(0, 32)}`} className={styles.galleryThumb}>
                           <img src={src} alt="" />
-                          <button type="button" className={styles.galleryRemove} onClick={() => removeGalleryAt(i)}>
+                          <button
+                            type="button"
+                            className={styles.galleryRemove}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeGalleryAt(i);
+                            }}
+                          >
                             ×
                           </button>
                         </div>
@@ -618,15 +692,6 @@ export function OrganizationEditPanel({
                     </div>
                   ) : null}
                 </div>
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Подпись к фото на странице «О нас»</span>
-                  <input
-                    className={styles.fieldInput}
-                    value={profile.aboutGalleryCaption}
-                    onChange={(e) => setProfile((p) => ({ ...p, aboutGalleryCaption: e.target.value }))}
-                    placeholder="Например: Собаки в приюте"
-                  />
-                </label>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>ИНН</span>
                   <input

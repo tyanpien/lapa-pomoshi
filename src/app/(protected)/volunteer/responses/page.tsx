@@ -11,6 +11,7 @@ import {
   type VolunteerResponseDetailDto,
 } from "@/shared/api/endpoints/meVolunteerResponses";
 import { ResponseCardDescription } from "./responseCardDescription";
+import { volunteerResponseStatusClassMap } from "@/shared/lib/volunteerResponseStatusClassMap";
 
 export type ResponseStatus = "На рассмотрении" | "В работе" | "Завершено" | "Отменено" | "Отклонено";
 
@@ -37,13 +38,7 @@ const filterOptions: { label: string; value: ResponseFilter }[] = [
   { label: "Все", value: "Все" },
 ];
 
-export const statusClassMap: Record<ResponseStatus, string> = {
-  "На рассмотрении": "statusPending",
-  "В работе": "statusActive",
-  Завершено: "statusDone",
-  Отменено: "statusCancelled",
-  Отклонено: "statusArchive",
-};
+const statusClassMap: Record<ResponseStatus, string> = volunteerResponseStatusClassMap;
 
 function ResponseScrollFromQuery({ onTargetId }: { onTargetId: (id: number | null) => void }) {
   const searchParams = useSearchParams();

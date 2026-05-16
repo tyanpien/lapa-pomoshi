@@ -8,8 +8,12 @@ import { animalsApi, Animal } from "@/shared/api/endpoints/animals";
 import { getImageUrl } from "@/shared/api/client";
 import { getOrganizationAnimalById } from "@/shared/lib/organizationAnimals";
 import { useUser } from "@/shared/lib/hooks/useUser";
-import { meApplicationsApi } from "@/shared/api/endpoints/meApplications";
+import { AdoptionQuestionnaireModal } from "@/features/adoption-questionnaire/AdoptionQuestionnaireModal";
+import { meProfileApi } from "@/shared/api/endpoints/meProfile";
 import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { urgentApi, type UrgentItem } from "@/shared/api/endpoints/urgent";
+import { helpApi, type HelpAnimalMonetary } from "@/shared/api/endpoints/help";
+import { AnimalHelpModal } from "@/features/animal-help/AnimalHelpModal";
 
 export default function AnimalPage() {
   const params = useParams();
@@ -23,9 +27,15 @@ export default function AnimalPage() {
   const [mainImage, setMainImage] = useState("/cat-placeholder.jpg");
   const [loading, setLoading] = useState(true);
   const [adoptOpen, setAdoptOpen] = useState(false);
-  const [adoptMessage, setAdoptMessage] = useState("");
-  const [adoptError, setAdoptError] = useState("");
-  const [adoptSending, setAdoptSending] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [linkedHelpRows, setLinkedHelpRows] = useState<UrgentItem[]>([]);
+  const [monetaryNeeds, setMonetaryNeeds] = useState<HelpAnimalMonetary[]>([]);
+  const [helpBlockLoading, setHelpBlockLoading] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
+
+  const hasPublishedHelpRequests = linkedHelpRows.length > 0 || monetaryNeeds.length > 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +73,57 @@ export default function AnimalPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!Number.isFinite(id)) return;
+    let cancelled = false;
+    setHelpBlockLoading(true);
+    Promise.all([
+      urgentApi.getList({ limit: 400 }).catch(() => ({ items: [] as UrgentItem[] })),
+      helpApi.getAnimalHelp("all").catch(() => ({ items: [] })),
+    ])
+      .then(([urgent, help]) => {
+        if (cancelled) return;
+        const st = (s: string | undefined) => String(s ?? "").toLowerCase();
+        const open = (urgent.items ?? []).filter(
+          (r) => r.animal_id === id && st(r.status) !== "closed" && st(r.status) !== "cancelled"
+        );
+        setLinkedHelpRows(open);
+        const hi = (help.items ?? []).find((i) => i.animal_id === id);
+        setMonetaryNeeds(hi?.monetary ?? []);
+      })
+      .finally(() => {
+        if (!cancelled) setHelpBlockLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!canApplyAdoption) return;
+    let cancelled = false;
+    void meProfileApi
+      .get()
+      .then((profile) => {
+        if (cancelled) return;
+        setProfileName(profile.user.full_name?.trim() ?? "");
+        setProfileEmail(profile.user.email?.trim() ?? "");
+        setProfilePhone(profile.user.phone?.trim() ?? "");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [canApplyAdoption]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || loading || !animal) return;
+    if (window.location.hash !== "#animal-help-requests") return;
+    if (!isAuth) return;
+    const timer = window.setTimeout(() => setHelpModalOpen(true), 150);
+    return () => window.clearTimeout(timer);
+  }, [animal, isAuth, loading]);
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     e.currentTarget.src = "/cat-placeholder.jpg";
@@ -169,24 +230,33 @@ export default function AnimalPage() {
             </div>
 
             <div className={styles.actionButtons}>
-              <Link
-                href={isAuth ? "/help" : getLoginHref("/help")}
-                className={styles.helpBtn}
-              >
-                Помочь
-              </Link>
+              {hasPublishedHelpRequests ? (
+                isAuth ? (
+                  <button type="button" className={styles.helpBtn} onClick={() => setHelpModalOpen(true)}>
+                    Помочь
+                  </button>
+                ) : (
+                  <Link
+                    href={getLoginHref(`${pathname || `/catalog/animals/${id}`}#animal-help-requests`)}
+                    className={styles.helpBtn}
+                  >
+                    Помочь
+                  </Link>
+                )
+              ) : null}
               {canApplyAdoption ? (
                 <button type="button" className={styles.adoptBtn} onClick={() => setAdoptOpen(true)}>
                   {animal.status === "looking_for_home" ? "Забрать домой" : "Забрать на передержку"}
                 </button>
-              ) : (
+              ) : !isAuth ? (
                 <Link href={getLoginHref(pathname || `/catalog/animals/${id}`)} className={styles.adoptBtn}>
                   Войти, чтобы подать анкету
                 </Link>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
+
 
         <div className={styles.section}>
           <h2>Здоровье и уход</h2>
@@ -239,61 +309,26 @@ export default function AnimalPage() {
       </div>
 
       {adoptOpen && animal ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-          }}
-          role="presentation"
-          onClick={() => !adoptSending && setAdoptOpen(false)}
-        >
-          <div
-            style={{ background: "#fff", padding: 24, maxWidth: 480, width: "90%" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2>Заявка на животное</h2>
-            <p>Сообщение для организации (необязательно):</p>
-            <textarea
-              rows={6}
-              style={{ width: "100%", marginTop: 8 }}
-              value={adoptMessage}
-              onChange={(e) => setAdoptMessage(e.target.value)}
-              disabled={adoptSending}
-            />
-            {adoptError ? <p style={{ color: "#a33" }}>{adoptError}</p> : null}
-            <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-              <button type="button" disabled={adoptSending} onClick={() => setAdoptOpen(false)}>
-                Отмена
-              </button>
-              <button
-                type="button"
-                disabled={adoptSending}
-                onClick={() => {
-                  setAdoptSending(true);
-                  setAdoptError("");
-                  void meApplicationsApi
-                    .create({ animal_id: animal.id, message: adoptMessage.trim() || null })
-                    .then(() => {
-                      setAdoptOpen(false);
-                      setAdoptMessage("");
-                      window.location.href = "/profile/applications";
-                    })
-                    .catch((e) =>
-                      setAdoptError(e instanceof Error ? e.message : "Не удалось отправить заявку.")
-                    )
-                    .finally(() => setAdoptSending(false));
-                }}
-              >
-                {adoptSending ? "Отправка…" : "Отправить"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdoptionQuestionnaireModal
+          animalId={animal.id}
+          animalName={animal.name}
+          initialName={profileName}
+          initialEmail={profileEmail}
+          initialPhone={profilePhone}
+          onClose={() => setAdoptOpen(false)}
+        />
+      ) : null}
+
+      {helpModalOpen && animal ? (
+        <AnimalHelpModal
+          animalId={animal.id}
+          animalName={animal.name}
+          organizationName={animal.organization?.name || "Организация"}
+          monetaryNeeds={monetaryNeeds}
+          linkedHelpRows={linkedHelpRows}
+          needsLoading={helpBlockLoading}
+          onClose={() => setHelpModalOpen(false)}
+        />
       ) : null}
     </main>
   );

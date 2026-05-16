@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import { urgentApi, type UrgentItem } from "@/shared/api/endpoints/urgent";
-import { normalizeUrgentFeedItems } from "@/shared/lib/urgentFeedNormalize";
+import { fetchUrgentItemsAllPages, type UrgentItem, type UrgentRequestDetail } from "@/shared/api/endpoints/urgent";
 import { getUrgentHelpTypeLabel } from "@/shared/lib/urgentHelpTypeLabels";
 import { meVolunteerResponsesApi } from "@/shared/api/endpoints/meVolunteerResponses";
+import { meProfileApi } from "@/shared/api/endpoints/meProfile";
+import { filterVolunteerPersonalizedFeed } from "@/shared/lib/volunteerTaskFeed";
+import { VOLUNTEER_PROFILE_UPDATED_EVENT } from "@/shared/lib/volunteerProfileStorage";
 
 type TaskFilter = "all" | "shelter" | "photo" | "walkcare" | "new" | "nearby" | "transport";
 
@@ -58,7 +60,7 @@ function deriveTaskLane(task: UrgentItem): TaskLane {
   return "other";
 }
 
-type LocatedTask = UrgentItem & { lat: number; lon: number };
+type LocatedTask = UrgentItem & { lat: number; lon: number; address?: string | null };
 
 type YMapBounds = [[number, number], [number, number]];
 
@@ -112,11 +114,17 @@ function pseudoOffsetForId(id: number): [number, number] {
 
 function locateTasks(items: UrgentItem[], center: [number, number]): LocatedTask[] {
   return items.map((item) => {
+    const itemWithCoords = item as Partial<UrgentRequestDetail>;
+    const latRaw = itemWithCoords.latitude;
+    const lonRaw = itemWithCoords.longitude;
+    const hasRealCoords = typeof latRaw === "number" && Number.isFinite(latRaw) && typeof lonRaw === "number" && Number.isFinite(lonRaw);
+
     const [dx, dy] = pseudoOffsetForId(item.id);
     return {
       ...item,
-      lat: center[0] + dx,
-      lon: center[1] + dy,
+      address: typeof itemWithCoords.address === "string" ? itemWithCoords.address : null,
+      lat: hasRealCoords ? (latRaw as number) : center[0] + dx,
+      lon: hasRealCoords ? (lonRaw as number) : center[1] + dy,
     };
   });
 }
@@ -129,7 +137,7 @@ export default function VolunteerTasksPage() {
   const cardsRef = useRef<Record<number, HTMLElement | null>>({});
 
   const [scriptReady, setScriptReady] = useState(false);
-  const [userCenter] = useState<[number, number]>(yekaterinburgCenter);
+  const [userCenter, setUserCenter] = useState<[number, number]>(yekaterinburgCenter);
   const [bounds, setBounds] = useState<YMapBounds | null>(null);
   const [activeFilter, setActiveFilter] = useState<TaskFilter>("all");
   const [search, setSearch] = useState("");
@@ -141,19 +149,49 @@ export default function VolunteerTasksPage() {
   const [tasksError, setTasksError] = useState("");
   const [tasksLoading, setTasksLoading] = useState(true);
   const [applyBusyId, setApplyBusyId] = useState<number | null>(null);
+  const [volunteerCity, setVolunteerCity] = useState<string | null>(null);
+  const [volunteerCompetencySlugs, setVolunteerCompetencySlugs] = useState<string[]>([]);
+  const [profileReloadTick, setProfileReloadTick] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setProfileReloadTick((n) => n + 1);
+    window.addEventListener(VOLUNTEER_PROFILE_UPDATED_EVENT, bump);
+    return () => window.removeEventListener(VOLUNTEER_PROFILE_UPDATED_EVENT, bump);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    setTasksLoading(true);
+    queueMicrotask(() => {
+      if (!cancelled) setTasksLoading(true);
+    });
     Promise.all([
-      urgentApi.getList({ limit: 100 }),
+      meProfileApi.get().catch(() => null),
       meVolunteerResponsesApi.getList({ tab: "all", limit: 100, offset: 0 }).catch(() => ({ total: 0, items: [] })),
     ])
-      .then(([urgent, responses]) => {
+      .then(async ([profile, responses]) => {
         if (cancelled) return;
-        const rows = normalizeUrgentFeedItems(urgent.items ?? []);
+        const city = profile?.volunteer_profile?.location_city?.trim() || null;
+        const comp = profile?.volunteer_profile?.competency_slugs ?? [];
+        setVolunteerCity(city);
+        setVolunteerCompetencySlugs(comp);
+        const plat = profile?.volunteer_profile?.latitude;
+        const plon = profile?.volunteer_profile?.longitude;
+        if (typeof plat === "number" && typeof plon === "number" && Number.isFinite(plat) && Number.isFinite(plon)) {
+          setUserCenter([plat, plon]);
+        }
+
+        const allRows = await fetchUrgentItemsAllPages().catch(() => [] as UrgentItem[]);
+
+        if (cancelled) return;
+        const rows = allRows.filter((r, i, self) => self.findIndex((x) => x.id === r.id) === i);
         const filtered = rows.filter((r) => r.volunteer_needed && String(r.status).toLowerCase() !== "closed");
-        setTasks(filtered);
+
+         const personalized = filterVolunteerPersonalizedFeed(filtered, {
+          volunteerCity: city,
+          volunteerCompetencySlugs: comp,
+        });
+
+        setTasks(personalized);
         const helpIds = new Set<number>();
         for (const it of responses.items ?? []) {
           const hid = (it as { help_request_id?: number }).help_request_id;
@@ -174,7 +212,7 @@ export default function VolunteerTasksPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [profileReloadTick]);
 
   const locatedTasks = useMemo<LocatedTask[]>(() => locateTasks(tasks, userCenter), [tasks, userCenter]);
 

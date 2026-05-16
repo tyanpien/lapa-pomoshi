@@ -11,6 +11,7 @@ export type ChatThread = {
   preview: string;
   time: string;
   unread?: number;
+  participantUserId?: number;
   messages: ChatMessage[];
 };
 

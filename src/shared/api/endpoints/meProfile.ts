@@ -91,7 +91,10 @@ export interface AvatarUploadResponse {
 }
 
 export const meProfileApi = {
-  get: () => apiFetch("/api/v1/me/profile") as Promise<MeProfileResponse>,
+  get: () =>
+    apiFetch("/api/v1/me/profile", {
+      cache: "no-store",
+    }) as Promise<MeProfileResponse>,
 
   patch: (payload: MeProfilePatchRequest) =>
     apiFetch("/api/v1/me/profile", {

@@ -242,6 +242,20 @@ export function buildCompetencySlugsFromLabels(
   return slugs;
 }
 
+export function syncCompetencyLabelsWithCatalog(selected: string[], catalog: CatalogOption[]): string[] {
+  if (!catalog.length) return selected;
+  const hasOther = selected.some((x) => x.trim() === "Другое");
+  const sansOther = selected.filter((x) => x.trim() !== "Другое");
+  const slugs = buildCompetencySlugsFromLabels(sansOther, "", catalog);
+  const labels: string[] = [];
+  for (const slug of slugs) {
+    const row = catalog.find((c) => c.id === slug);
+    if (row?.label) labels.push(row.label);
+  }
+  if (hasOther) labels.push("Другое");
+  return labels;
+}
+
 function parseTravelRadiusKm(raw: string): number | null {
   const s = raw.trim();
   if (!s) return null;
