@@ -1,3 +1,4 @@
+import type { AdoptionApplicationApiBody } from "@/features/adoption-questionnaire/formatMessage";
 import { apiFetch, getImageUrl } from "../client";
 
 export interface AdoptionApplicationListItem {
@@ -15,9 +16,15 @@ export interface AdoptionApplicationListItem {
   updated_at: string;
 }
 
-export interface AdoptionApplicationDetail extends AdoptionApplicationListItem {
+export interface AdoptionApplicationDetail extends AdoptionApplicationListItem, Partial<AdoptionApplicationApiBody> {
   message: string | null;
 }
+
+export type AdoptionApplicationCreatePayload = AdoptionApplicationApiBody & {
+  animal_id: number;
+};
+
+export type AdoptionApplicationPatchPayload = Partial<AdoptionApplicationApiBody>;
 
 export interface AdoptionApplicationListResponse {
   total: number;
@@ -39,7 +46,7 @@ export const meApplicationsApi = {
   list: (params?: { q?: string; limit?: number; offset?: number }) =>
     apiFetch(`/api/v1/me/applications${applicationsQuery(params)}`) as Promise<AdoptionApplicationListResponse>,
 
-  create: (payload: { animal_id: number; message?: string | null }) =>
+  create: (payload: AdoptionApplicationCreatePayload) =>
     apiFetch("/api/v1/me/applications", {
       method: "POST",
       body: JSON.stringify(payload ?? {}),
@@ -48,7 +55,7 @@ export const meApplicationsApi = {
   getById: (applicationId: number) =>
     apiFetch(`/api/v1/me/applications/${applicationId}`) as Promise<AdoptionApplicationDetail>,
 
-  patch: (applicationId: number, payload: { message?: string | null }) =>
+  patch: (applicationId: number, payload: AdoptionApplicationPatchPayload) =>
     apiFetch(`/api/v1/me/applications/${applicationId}`, {
       method: "PATCH",
       body: JSON.stringify(payload ?? {}),

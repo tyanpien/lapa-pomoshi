@@ -1,6 +1,7 @@
 export type ChatMessage = {
   id: number;
   text: string;
+  photoUrl?: string;
   time: string;
   from: "me" | "other";
 };
@@ -12,6 +13,7 @@ export type ChatThread = {
   time: string;
   unread?: number;
   participantUserId?: number;
+  avatarUrl?: string;
   messages: ChatMessage[];
 };
 

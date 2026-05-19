@@ -236,6 +236,24 @@
   box-sizing: border-box;
 }
 
+.chatBtnMuted {
+  border: none;
+  background: #8b5a3c;
+  color: #fff4e6;
+  border-radius: 8px;
+  height: 40px;
+  min-width: 70px;
+  padding: 0 20px;
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.45;
+  cursor: not-allowed;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
 .secondaryBtn {
   border: none;
   background: transparent;

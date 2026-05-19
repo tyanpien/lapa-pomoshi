@@ -7,6 +7,27 @@ function normalizeApiOrigin(url: string | undefined): string {
 
 export const API_BASE_URL = normalizeApiOrigin(process.env.NEXT_PUBLIC_API_URL);
 
+const SERVER_FETCH_TIMEOUT_MS = (() => {
+  const raw = process.env.NEXT_PUBLIC_SERVER_FETCH_TIMEOUT_MS;
+  const n = raw ? Number(raw) : 8_000;
+  return Number.isFinite(n) && n > 0 ? n : 8_000;
+})();
+
+function mergeAbortSignals(a: AbortSignal, b: AbortSignal): AbortSignal {
+  if (typeof AbortSignal.any === "function") {
+    return AbortSignal.any([a, b]);
+  }
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (a.aborted || b.aborted) {
+    abort();
+    return controller.signal;
+  }
+  a.addEventListener("abort", abort, { once: true });
+  b.addEventListener("abort", abort, { once: true });
+  return controller.signal;
+}
+
 function readCookie(name: string): string {
   if (typeof document === "undefined") return "";
   const cookies = document.cookie ? document.cookie.split(";") : [];
@@ -128,7 +149,22 @@ export const apiFetch = async (endpoint: string, options?: RequestInit) => {
   }
 
   const url = toRequestUrl(endpoint);
-  const response = await fetch(url, { ...options, headers });
+  const isServer = typeof window === "undefined";
+  let signal = options?.signal;
+  if (isServer && SERVER_FETCH_TIMEOUT_MS > 0) {
+    const timeoutSignal = AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS);
+    signal = signal ? mergeAbortSignals(signal, timeoutSignal) : timeoutSignal;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, { ...options, headers, signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new Error(`API timeout (${SERVER_FETCH_TIMEOUT_MS}ms): ${endpoint}`);
+    }
+    throw error;
+  }
 
   if (response.status === 401) {
     const nextToken = await refreshAccessToken();

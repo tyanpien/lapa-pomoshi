@@ -9,16 +9,69 @@ function fdSingle(file: File, fieldName: string) {
 }
 
 export const meOrganizationApi = {
-  listDialogs: () => apiFetch(`${BASE}/communications/dialogs`),
-  openVolunteerDialog: (participantUserId: number) =>
+  listDialogs: (params?: { limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    const limit = Math.min(100, Math.max(1, params?.limit ?? 100));
+    q.set("limit", String(limit));
+    q.set("offset", String(params?.offset ?? 0));
+    return apiFetch(`${BASE}/communications/dialogs?${q.toString()}`);
+  },
+  openDialog: (payload: {
+    participant_user_id: number;
+    context_type?: string | null;
+    context_entity_id?: number | null;
+    context_title?: string | null;
+  }) =>
     apiFetch(`${BASE}/communications/dialogs`, {
       method: "POST",
-      body: JSON.stringify({ participant_user_id: participantUserId }),
+      body: JSON.stringify(payload),
+    }),
+  openVolunteerDialog: (
+    participantUserId: number,
+    context?: { context_title?: string; participant_name?: string }
+  ) =>
+    apiFetch(`${BASE}/communications/dialogs`, {
+      method: "POST",
+      body: JSON.stringify({
+        participant_user_id: participantUserId,
+        context_type: "volunteer_direct",
+        context_title:
+          context?.context_title?.trim() ||
+          (context?.participant_name?.trim()
+            ? `Переписка: ${context.participant_name.trim()}`
+            : "Переписка с волонтёром"),
+      }),
+    }),
+  openUserDialog: (
+    participantUserId: number,
+    context?: { context_title?: string; participant_name?: string; context_entity_id?: number }
+  ) =>
+    apiFetch(`${BASE}/communications/dialogs`, {
+      method: "POST",
+      body: JSON.stringify({
+        participant_user_id: participantUserId,
+        context_type: "user_direct",
+        context_title:
+          context?.context_title?.trim() ||
+          (context?.participant_name?.trim()
+            ? `Переписка: ${context.participant_name.trim()}`
+            : "Переписка с пользователем"),
+        ...(context?.context_entity_id != null ? { context_entity_id: context.context_entity_id } : {}),
+      }),
+    }),
+  openIncomingAdoptionDialog: (applicationId: number) =>
+    apiFetch(`${BASE}/incoming/adoptions/${applicationId}/dialog`, {
+      method: "POST",
+    }),
+  openIncomingVolunteerResponseDialog: (responseId: number) =>
+    apiFetch(`${BASE}/incoming/volunteer-responses/${responseId}/dialog`, {
+      method: "POST",
     }),
   getDialog: (dialogId: number) => apiFetch(`${BASE}/communications/dialogs/${dialogId}`),
-  postDialogMessage: (dialogId: number, text: string) => {
+  postDialogMessage: (dialogId: number, text: string, image?: File | null) => {
     const fd = new FormData();
     fd.append("body", text);
+    if (image) fd.append("image", image);
     return apiFetch(`${BASE}/communications/dialogs/${dialogId}/messages`, {
       method: "POST",
       body: fd,
@@ -106,6 +159,11 @@ export const meOrganizationApi = {
     apiFetch(`${BASE}/home-stories`, { method: "POST", body: JSON.stringify(body ?? {}) }),
   patchHomeStory: (storyId: number, body: Record<string, unknown>) =>
     apiFetch(`${BASE}/home-stories/${storyId}`, { method: "PATCH", body: JSON.stringify(body ?? {}) }),
+  uploadHomeStoryPhoto: (storyId: number, file: File) =>
+    apiFetch(`${BASE}/home-stories/${storyId}/photo`, {
+      method: "POST",
+      body: fdSingle(file, "file"),
+    }),
   deleteHomeStory: (storyId: number) => apiFetch(`${BASE}/home-stories/${storyId}`, { method: "DELETE" }),
 
   listEvents: () => apiFetch(`${BASE}/events`),

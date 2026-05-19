@@ -1,0 +1,128 @@
+.card {
+  background: transparent;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.imageWrapper {
+  position: relative;
+  height: 250px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.urgentBadge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 4px 8px;
+  color: #fff;
+  background: #c49a4a;
+}
+
+.cardBody {
+  border: 1px solid #c49a4a;
+  border-radius: 7px;
+  padding: 14px 14px 16px;
+  min-height: 250px;
+}
+
+.cardName {
+  font-size: 28px;
+  color: #8b5a3c;
+  font-weight: 700;
+  margin: 0 0 14px 4px;
+}
+
+.metaTags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.metaTag {
+  font-size: 14px;
+  padding: 10px;
+  color: #333333;
+  border-radius: 8px;
+  background: #efe4d2;
+  margin: 0 0 14px 4px;
+}
+
+.statusTag {
+  color: #f5f6ef;
+  background: #7a8c6e;
+}
+
+.lineWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 5px 4px;
+  color: #00000099;
+  font-size: 14px;
+}
+
+.lineWithIcon img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.need {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 5px 4px;
+  color: #333333;
+  font-size: 16px;
+}
+
+.need img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.amount {
+  margin: 4px 0 14px 34px;
+  color: #333333;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.amountPlaceholder {
+  height: 16px;
+  margin: 4px 0 14px 34px;
+}
+
+.actionButton {
+  border: none;
+  border-radius: 8px;
+  background: #8b5a3c;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 14px 24px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.actionButton:hover {
+  background: #74482d;
+}

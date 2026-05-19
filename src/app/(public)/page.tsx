@@ -11,18 +11,37 @@ import HomePageClient from "./HomePageClient";
 
 export const revalidate = 120;
 
+const HOME_DATA_TIMEOUT_MS = 10_000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("home-data-timeout")), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function loadHomePageData(): Promise<{
   urgentList: UrgentItem[];
   animals: Animal[];
   organizations: Organization[];
   homeEvents: EventItem[];
 }> {
-  const settled = await Promise.allSettled([
-    urgentApi.getList({ limit: 100 }),
-    animalsApi.getList(),
-    organizationsApi.getList(),
-    eventsApi.getList(),
-  ]);
+  const settled = await withTimeout(
+    Promise.allSettled([
+      urgentApi.getList({ limit: 100 }),
+      animalsApi.getList(),
+      organizationsApi.getList(),
+      eventsApi.getList(),
+    ]),
+    HOME_DATA_TIMEOUT_MS
+  ).catch(() => [{ status: "rejected" as const, reason: null }, { status: "rejected" as const, reason: null }, { status: "rejected" as const, reason: null }, { status: "rejected" as const, reason: null }]);
 
   let urgentList: UrgentItem[] = [];
   if (settled[0].status === "fulfilled") {

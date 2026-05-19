@@ -19,6 +19,11 @@ export type NewOrganizationAnimalInput = {
   healthFeatures?: string;
   treatmentRequired?: string;
   characterTags?: string[];
+  healthChecklist?: string[];
+  healthCareSlugs?: string[];
+  healthCareOther?: string;
+  characterSlugs?: string[];
+  characterOther?: string;
   status: "looking_for_home" | "on_treatment" | "in_shelter";
   isUrgent: boolean;
   photoUrl?: string;
@@ -113,7 +118,11 @@ export const addOrganizationAnimal = (input: NewOrganizationAnimalInput): Animal
     health_features: input.healthFeatures?.trim() || "",
     treatment_required: input.treatmentRequired?.trim() || "",
     character_tags: input.characterTags ?? [],
-    health_checklist: [],
+    health_checklist: input.healthChecklist ?? [],
+    health_care_slugs: input.healthCareSlugs ?? [],
+    health_care_other: input.healthCareOther?.trim() || null,
+    character_slugs: input.characterSlugs ?? [],
+    character_other: input.characterOther?.trim() || null,
     catalog_features: [],
   };
 
@@ -152,6 +161,11 @@ export const updateOrganizationAnimal = (id: number, input: NewOrganizationAnima
     health_features: input.healthFeatures?.trim() || "",
     treatment_required: input.treatmentRequired?.trim() || "",
     character_tags: input.characterTags ?? [],
+    health_checklist: input.healthChecklist ?? records[recordIndex].animal.health_checklist ?? [],
+    health_care_slugs: input.healthCareSlugs ?? records[recordIndex].animal.health_care_slugs ?? [],
+    health_care_other: input.healthCareOther?.trim() || records[recordIndex].animal.health_care_other || null,
+    character_slugs: input.characterSlugs ?? records[recordIndex].animal.character_slugs ?? [],
+    character_other: input.characterOther?.trim() || records[recordIndex].animal.character_other || null,
   };
 
   records[recordIndex] = {

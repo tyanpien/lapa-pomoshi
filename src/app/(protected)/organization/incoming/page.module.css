@@ -7,15 +7,39 @@
 }
 
 .header h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  color: #5c4a3a;
+  margin: 16px 0 8px;
+  font-size: 32px;
+  font-weight: 700;
+  color: #8B5A3C;
 }
 
 .header p {
   margin: 0;
   color: rgba(51, 51, 51, 0.65);
   font-size: 15px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 40px;
+}
+
+.tab,
+.tabActive {
+  border: 1px solid #8B5A3C;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tabActive {
+  background: #8B5A3C;
+  color: #fff;
 }
 
 .list {
@@ -27,7 +51,7 @@
 .card {
   background: #fff;
   border: 1px solid rgba(141, 91, 61, 0.25);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 20px 24px;
 }
 
@@ -43,7 +67,8 @@
 .cardTitle {
   margin: 0;
   font-size: 20px;
-  color: #5c4a3a;
+  color: #8B5A3C;
+  font-weight: 600;
 }
 
 .meta {
@@ -55,7 +80,7 @@
 .status {
   display: inline-block;
   padding: 4px 12px;
-  border-radius: 20px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   background: #f0ebe0;
@@ -112,14 +137,34 @@
 
 .rejectBtn {
   background: transparent;
-  color: #8d5b3d;
-  border: 1px solid #8d5b3d;
+  color: #fff;
+  background: #952525;
 }
 
 .approveBtn:disabled,
 .rejectBtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.contactBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  background: transparent;
+  color: #8B5A3C;
+  border: 1px solid #8B5A3C;
+}
+
+.contactBtn:hover {
+  background: #f4f6f3;
 }
 
 .empty {

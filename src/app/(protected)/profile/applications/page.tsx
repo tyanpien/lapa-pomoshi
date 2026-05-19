@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { AdoptionQuestionnaireModal } from "@/features/adoption-questionnaire/AdoptionQuestionnaireModal";
+import { mapAdoptionApiBodyToQuestionnaireForm } from "@/features/adoption-questionnaire/formatMessage";
 import styles from "./page.module.css";
 import { meApplicationsApi, type AdoptionApplicationListItem } from "@/shared/api/endpoints/meApplications";
 
@@ -11,8 +13,12 @@ export default function UserApplicationsPage() {
   const [items, setItems] = useState<AdoptionApplicationListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
-  const [editId, setEditId] = useState<number | null>(null);
-  const [draftMessage, setDraftMessage] = useState("");
+  const [editTarget, setEditTarget] = useState<{
+    applicationId: number;
+    animalId: number;
+    animalName: string;
+    initialForm: ReturnType<typeof mapAdoptionApiBodyToQuestionnaireForm>;
+  } | null>(null);
   const [deleteBusyId, setDeleteBusyId] = useState<number | null>(null);
 
   const reload = () => {
@@ -53,10 +59,13 @@ export default function UserApplicationsPage() {
   }, [openedMenuId]);
 
   const openEdit = (row: AdoptionApplicationListItem) => {
-    setEditId(row.id);
-    setDraftMessage("");
     void meApplicationsApi.getById(row.id).then((detail) => {
-      setDraftMessage(detail.message ?? "");
+      setEditTarget({
+        applicationId: row.id,
+        animalId: row.animal_id,
+        animalName: row.animal_name,
+        initialForm: mapAdoptionApiBodyToQuestionnaireForm(detail),
+      });
     });
   };
 
@@ -118,6 +127,18 @@ export default function UserApplicationsPage() {
                         <Link href={`/catalog/animals/${item.animal_id}`} className={styles.menuLink}>
                           Подробнее
                         </Link>
+                        {item.status === "pending_review" ? (
+                          <button
+                            type="button"
+                            className={styles.menuLink}
+                            onClick={() => {
+                              setOpenedMenuId(null);
+                              openEdit(item);
+                            }}
+                          >
+                            Редактировать
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className={styles.menuDelete}
@@ -157,6 +178,20 @@ export default function UserApplicationsPage() {
           ))}
         </section>
       </div>
+
+      {editTarget ? (
+        <AdoptionQuestionnaireModal
+          animalId={editTarget.animalId}
+          animalName={editTarget.animalName}
+          applicationId={editTarget.applicationId}
+          initialForm={editTarget.initialForm}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => {
+            setEditTarget(null);
+            reload();
+          }}
+        />
+      ) : null}
     </main>
   );
 }

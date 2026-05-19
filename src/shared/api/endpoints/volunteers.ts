@@ -12,6 +12,8 @@ export interface Volunteer {
   is_available?: boolean;
   competency_tags: string[];
   animal_types: string[];
+  help_format?: string | null;
+  help_format_label?: string | null;
   travel_radius_km: number | null;
   availability: string | null;
 }

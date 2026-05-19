@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import { fetchUrgentItemsAllPages, type UrgentItem, type UrgentRequestDetail } from "@/shared/api/endpoints/urgent";
+import { fetchVolunteerTasksAllPages, type UrgentItem, type UrgentRequestDetail } from "@/shared/api/endpoints/urgent";
 import { getUrgentHelpTypeLabel } from "@/shared/lib/urgentHelpTypeLabels";
 import { meVolunteerResponsesApi } from "@/shared/api/endpoints/meVolunteerResponses";
 import { meProfileApi } from "@/shared/api/endpoints/meProfile";
@@ -180,13 +180,12 @@ export default function VolunteerTasksPage() {
           setUserCenter([plat, plon]);
         }
 
-        const allRows = await fetchUrgentItemsAllPages().catch(() => [] as UrgentItem[]);
+        const allRows = await fetchVolunteerTasksAllPages().catch(() => [] as UrgentItem[]);
 
         if (cancelled) return;
         const rows = allRows.filter((r, i, self) => self.findIndex((x) => x.id === r.id) === i);
-        const filtered = rows.filter((r) => r.volunteer_needed && String(r.status).toLowerCase() !== "closed");
 
-         const personalized = filterVolunteerPersonalizedFeed(filtered, {
+        const personalized = filterVolunteerPersonalizedFeed(rows, {
           volunteerCity: city,
           volunteerCompetencySlugs: comp,
         });

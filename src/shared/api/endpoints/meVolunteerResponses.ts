@@ -25,6 +25,7 @@ export type VolunteerResponseCardDto = {
   can_cancel_response?: boolean;
   can_send_report?: boolean;
   can_view_report?: boolean;
+  chat_thread_id?: string | null;
 };
 
 export type VolunteerResponseDetailDto = VolunteerResponseCardDto & {

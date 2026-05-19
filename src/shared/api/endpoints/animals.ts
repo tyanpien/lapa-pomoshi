@@ -19,9 +19,13 @@ export interface Animal {
     city: string;
   } | null;
   health_checklist?: string[];
+  health_care_slugs?: string[];
+  health_care_other?: string | null;
   health_features?: string;
   treatment_required?: string;
   character_tags?: string[];
+  character_slugs?: string[];
+  character_other?: string | null;
   organization_name?: string;
   catalog_features?: string[];
   created_at?: string;

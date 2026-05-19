@@ -1,5 +1,6 @@
 import type { Volunteer } from "@/shared/api/endpoints/volunteers";
 import { VOLUNTEER_ANIMAL_KIND_OPTIONS, type StoredVolunteerDetails } from "./volunteerProfileStorage";
+import { resolveVolunteerHelpFormatLabel } from "./volunteerMeProfileMap";
 
 function dedupeCaseInsensitivePreserveFirst(items: string[]): string[] {
   const seen = new Set<string>();
@@ -65,7 +66,10 @@ export function buildVolunteerCatalogCardChips(
     chips.push({ label: t, variant });
   };
 
-  if (enrichment?.helpFrequency?.trim()) {
+  const apiHelpFormat = resolveVolunteerHelpFormatLabel(v.help_format, v.help_format_label);
+  if (apiHelpFormat) {
+    push(apiHelpFormat, "format");
+  } else if (enrichment?.helpFrequency?.trim()) {
     push(enrichment.helpFrequency.trim(), "format");
   }
 
@@ -76,7 +80,7 @@ export function buildVolunteerCatalogCardChips(
   }
 
   const mergedSkills = mergeVolunteerFilterCompetencyTags(v, enrichment);
-  const hfLow = enrichment?.helpFrequency?.trim().toLowerCase() ?? "";
+  const hfLow = (apiHelpFormat ?? enrichment?.helpFrequency?.trim() ?? "").toLowerCase();
 
   for (const t of mergedSkills) {
     const low = t.toLowerCase();

@@ -146,15 +146,19 @@
 
 .choiceRow {
   display: flex;
-  gap: 10px;
+  gap: 0;
+  padding: 4px;
+  border-radius: 8px;
+  background: #f5f1e9;
+  max-width: 210px; 
 }
 
 .choiceBtn {
   flex: 1;
-  min-height: 40px;
+  min-height: 36px;
   border: none;
-  border-radius: 6px;
-  background: #f0ebe0;
+  border-radius: 8px;
+  background: transparent;
   color: #333;
   font-size: 15px;
   font-weight: 500;

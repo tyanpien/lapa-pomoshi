@@ -3,7 +3,6 @@
     overflow-x: hidden;
   }
 
-  /* главная */
   .hero {
     background: #3D4F3A;
     width: 100vw;
@@ -78,7 +77,6 @@
   }
 
 
-  /* срочно нужна помощь */
   .urgent {
     background: #F5F0E8;
     width: 100vw;
@@ -321,7 +319,6 @@
   }
 
 
-  /* как вы можете помочь */
   .helpSection {
     background: #F5F0E8;
     width: 100vw;
@@ -427,7 +424,6 @@
   }
 
 
-  /* ищут дом*/
   .homeSection {
     background: #F5F0E8;
     width: 100vw;
@@ -565,7 +561,6 @@
   }
 
 
-  /* организации на платформе */
   .orgSection {
     background: #F5F0E8;
     width: 100vw;
@@ -647,7 +642,6 @@
   }
 
 
-  /* ближайшие мероприятия */
   .eventsSection {
     background: #F5F0E8;
     width: 100vw;
@@ -709,7 +703,6 @@
   }
 
 
-  /* регистрация */
   .ctaSection {
     background: #F5F0E8;
     width: 100vw;

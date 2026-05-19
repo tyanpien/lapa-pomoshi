@@ -14,6 +14,10 @@ import {
   type VolunteerResponseDetailDto,
 } from "@/shared/api/endpoints/meVolunteerResponses";
 import { meApplicationsApi, type AdoptionApplicationListItem } from "@/shared/api/endpoints/meApplications";
+import { meVolunteerCommunicationsApi } from "@/shared/api/endpoints/meVolunteerCommunications";
+import type { ChatThread } from "@/shared/lib/messages";
+import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
+import { mapVolDialogListRow } from "@/shared/lib/volunteerOrgDialogs";
 import {
   storedDetailsToVolunteerPatch,
   syncCompetencyLabelsWithCatalog,
@@ -93,6 +97,8 @@ export default function VolunteerProfilePage() {
   const [adoptionLoadError, setAdoptionLoadError] = useState("");
   const [adoptionOpenedMenuId, setAdoptionOpenedMenuId] = useState<number | null>(null);
   const [adoptionDeleteBusyId, setAdoptionDeleteBusyId] = useState<number | null>(null);
+  const [messageThreads, setMessageThreads] = useState<ChatThread[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [competencyOptions, setCompetencyOptions] = useState<string[]>(defaultCompetencyOptions);
@@ -123,6 +129,32 @@ export default function VolunteerProfilePage() {
         setPreviewResponses(mapped);
       })
       .catch(() => setPreviewResponses([]));
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== "volunteer") {
+      setMessageThreads([]);
+      setMessagesLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setMessagesLoading(true);
+    void meVolunteerCommunicationsApi
+      .listDialogs()
+      .then((raw) => {
+        if (cancelled) return;
+        const rows = unwrapApiList<Record<string, unknown>>(raw);
+        setMessageThreads(rows.map((row) => mapVolDialogListRow(row)));
+      })
+      .catch(() => {
+        if (!cancelled) setMessageThreads([]);
+      })
+      .finally(() => {
+        if (!cancelled) setMessagesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [role]);
 
   const reloadAdoptionApplications = useCallback(() => {
@@ -599,13 +631,43 @@ export default function VolunteerProfilePage() {
 
         <section className={styles.section}>
           <div className={styles.sectionTop}>
-            <h2>Мои сообщения</h2>
+            <h2>Сообщения</h2>
             <Link href="/messages" className={styles.viewAll}>
-              Перейти в раздел
+              Смотреть все
             </Link>
           </div>
 
-          <p className={styles.responsesPreviewEmpty}>Список сообщений</p>
+          {messagesLoading ? (
+            <p className={styles.responsesPreviewEmpty}>Загрузка…</p>
+          ) : messageThreads.length === 0 ? (
+            <p className={styles.responsesPreviewEmpty}>Диалогов пока нет.</p>
+          ) : (
+            <div className={styles.messageList}>
+              {messageThreads.map((thread) => (
+                <div key={thread.id} className={styles.messageItem}>
+                  <Link
+                    href={`/messages?thread=${thread.id}`}
+                    className={styles.messageItemLink}
+                    aria-label={`Диалог с «${thread.title}»${thread.unread ? `, непрочитанных: ${thread.unread}` : ""}`}
+                  >
+                    <div className={styles.smallAvatar} aria-hidden="true">
+                      {thread.avatarUrl ? (
+                        <img src={thread.avatarUrl} alt="" className={styles.smallAvatarImg} />
+                      ) : null}
+                    </div>
+                    {thread.unread && thread.unread > 0 ? (
+                      <span className={styles.unread} aria-hidden="true">
+                        {thread.unread > 99 ? "99+" : thread.unread}
+                      </span>
+                    ) : null}
+                    <div className={styles.messageMeta}>
+                      <p>{thread.title}</p>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className={styles.section}>

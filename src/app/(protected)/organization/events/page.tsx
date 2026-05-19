@@ -1,14 +1,35 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import styles from "../organization.module.css";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import styles from "./page.module.css";
 import { eventsApi, type EventItem } from "@/shared/api/endpoints/events";
 import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
+import { getOrganizationCabinetEventName } from "@/shared/lib/organizationCabinet";
 import { useUser } from "@/shared/lib/hooks/useUser";
 
-function mapMeEventRow(row: Record<string, unknown>): EventItem {
+function notifyCabinetUpdated() {
+  window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+}
+
+type VisibilityFilter = "all" | "archive";
+
+type OrgEventRow = EventItem & {
+  is_archived: boolean;
+  is_published: boolean;
+};
+
+const emptyForm = {
+  title: "",
+  description: "",
+  location: "",
+  dateLabel: "",
+  format: "offline" as "online" | "offline",
+};
+
+function mapMeEventRow(row: Record<string, unknown>): OrgEventRow {
   const id = typeof row.id === "number" ? row.id : Number(row.id) || 0;
+  const format = String(row.format ?? "offline");
   return {
     id,
     title: String(row.title ?? ""),
@@ -16,29 +37,116 @@ function mapMeEventRow(row: Record<string, unknown>): EventItem {
     organization_name: row.organization_name != null ? String(row.organization_name) : null,
     city: row.city != null ? String(row.city) : null,
     address: row.address != null ? String(row.address) : null,
-    format: String(row.format ?? "offline"),
+    format,
     help_type: row.help_type != null ? String(row.help_type) : null,
     starts_at: String(row.starts_at ?? ""),
     ends_at: row.ends_at != null ? String(row.ends_at) : null,
     description: row.description != null ? String(row.description) : null,
+    is_archived: Boolean(row.is_archived),
+    is_published: row.is_published !== false,
+  };
+}
+
+function mapPublicEventItem(item: EventItem): OrgEventRow {
+  return {
+    ...item,
+    is_archived: false,
+    is_published: true,
+  };
+}
+
+function normalizeVenueText(value: string | null | undefined): string {
+  return (value ?? "")
+    .trim()
+    .replace(/^онлайн\s*,?\s*/i, "")
+    .trim();
+}
+
+function locationFromEvent(item: Pick<OrgEventRow, "format" | "city" | "address">): string {
+  const city = normalizeVenueText(item.city);
+  const address = normalizeVenueText(item.address);
+  if (item.format === "online") {
+    if (address) return address;
+    if (city && city.toLowerCase() !== "онлайн") return city;
+    return "";
+  }
+  if (city && address && city !== address) return `${city}, ${address}`;
+  return city || address;
+}
+
+function formatEventPlace(item: OrgEventRow): string {
+  const venue = locationFromEvent(item);
+  if (item.format === "online") {
+    return venue ? `Онлайн, ${venue}` : "Онлайн";
+  }
+  return venue || "Не указано";
+}
+
+function formatEventWhen(startsAt: string): string {
+  if (!startsAt.trim()) return "Не указано";
+  const date = new Date(startsAt);
+  if (Number.isNaN(date.getTime())) return startsAt;
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function datetimeLocalToApiValue(localValue: string): string {
+  const trimmed = localValue.trim();
+  if (!trimmed) return new Date().toISOString();
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return new Date().toISOString();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const offsetMin = -date.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMin);
+  const oh = pad(Math.floor(abs / 60));
+  const om = pad(abs % 60);
+  const base = trimmed.length === 16 ? trimmed : trimmed.slice(0, 16);
+  return `${base}:00${sign}${oh}:${om}`;
+}
+
+function isoToDatetimeLocalValue(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function buildEventPayload(form: typeof emptyForm) {
+  const starts = datetimeLocalToApiValue(form.dateLabel);
+  const venue = normalizeVenueText(form.location);
+  return {
+    title: form.title.trim(),
+    description: form.description.trim(),
+    summary: form.description.trim().slice(0, 180),
+    city: form.format === "online" ? (venue ? null : "Онлайн") : venue || null,
+    address: form.format === "online" ? venue || null : null,
+    starts_at: starts,
+    ends_at: null,
+    format: form.format,
+    help_type: null,
+    is_published: true,
   };
 }
 
 export default function OrganizationEventsPage() {
   const { userName, role } = useUser();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [dateLabel, setDateLabel] = useState("");
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const [events, setEvents] = useState<OrgEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
+  const [search, setSearch] = useState("");
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
+  const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(emptyForm);
   const [editId, setEditId] = useState<number | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editCity, setEditCity] = useState("");
-  const [editStarts, setEditStarts] = useState("");
+  const [editForm, setEditForm] = useState(emptyForm);
   const [editLoading, setEditLoading] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -56,7 +164,7 @@ export default function OrganizationEventsPage() {
       const filtered = orgNeedle
         ? items.filter((e) => (e.organization_name ?? "").trim().toLowerCase() === orgNeedle)
         : items;
-      setEvents(filtered);
+      setEvents(filtered.map(mapPublicEventItem));
     } catch (e) {
       setEvents([]);
       setErrorText(e instanceof Error ? e.message : "Не удалось загрузить мероприятия.");
@@ -69,219 +177,289 @@ export default function OrganizationEventsPage() {
     void reload();
   }, [reload]);
 
+  const visibleEvents = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return events
+      .filter((item) => (visibilityFilter === "archive" ? item.is_archived : !item.is_archived))
+      .filter((item) => {
+        if (!query) return true;
+        const haystack = [
+          item.title,
+          item.description ?? "",
+          item.summary ?? "",
+          item.city ?? "",
+          item.address ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(query);
+      });
+  }, [events, search, visibilityFilter]);
+
+  const openCreateModal = () => {
+    setCreateForm(emptyForm);
+    setCreateModalOpen(true);
+  };
+
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!title.trim() || description.trim().length < 10) return;
-    const starts = dateLabel.trim() ? new Date(dateLabel).toISOString() : new Date().toISOString();
+    if (!createForm.title.trim() || createForm.description.trim().length < 10) return;
     void eventsApi
-      .create({
-        title: title.trim(),
-        description: description.trim(),
-        summary: description.trim().slice(0, 180),
-        city: location.trim() || null,
-        address: location.trim() || null,
-        starts_at: starts,
-        ends_at: null,
-        format: "offline",
-        help_type: null,
-      })
+      .create(buildEventPayload(createForm))
       .then(() => {
-        setTitle("");
-        setDescription("");
-        setLocation("");
-        setDateLabel("");
+        setCreateModalOpen(false);
+        setCreateForm(emptyForm);
+        notifyCabinetUpdated();
         return reload();
       })
       .catch((e) => setErrorText(e instanceof Error ? e.message : "Не удалось создать мероприятие."));
   };
 
+  const openEditModal = (eventItem: OrgEventRow) => {
+    setEditId(eventItem.id);
+    setEditLoading(true);
+    void eventsApi
+      .getById(eventItem.id)
+      .then((d) => {
+        setEditForm({
+          title: d.title,
+          description: d.description ?? "",
+          location: locationFromEvent({
+            format: d.format,
+            city: d.city,
+            address: d.address,
+          } as OrgEventRow),
+          dateLabel: d.starts_at ? isoToDatetimeLocalValue(d.starts_at) : "",
+          format: d.format === "online" ? "online" : "offline",
+        });
+      })
+      .catch(() => setErrorText("Не удалось загрузить мероприятие."))
+      .finally(() => setEditLoading(false));
+  };
+
+  const handleEdit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (editId === null || editForm.description.trim().length < 10) return;
+    void eventsApi
+      .patch(editId, buildEventPayload(editForm))
+      .then(() => {
+        notifyCabinetUpdated();
+        return reload();
+      })
+      .then(() => setEditId(null))
+      .catch(() => setErrorText("Не удалось сохранить мероприятие."));
+  };
+
+  const handleArchive = (id: number) => {
+    setBusyId(id);
+    void eventsApi
+      .archive(id)
+      .then(() => {
+        notifyCabinetUpdated();
+        return reload();
+      })
+      .catch(() => setErrorText("Не удалось отправить мероприятие в архив."))
+      .finally(() => setBusyId(null));
+  };
+
+  const handleDelete = (id: number) => {
+    const ok = window.confirm("Удалить мероприятие безвозвратно?");
+    if (!ok) return;
+    setBusyId(id);
+    void eventsApi
+      .delete(id)
+      .then(() => {
+        notifyCabinetUpdated();
+        return reload();
+      })
+      .catch(() => setErrorText("Не удалось удалить мероприятие."))
+      .finally(() => setBusyId(null));
+  };
+
+  const renderEventForm = (
+    form: typeof emptyForm,
+    setForm: (next: typeof emptyForm) => void,
+    onSubmit: (e: FormEvent<HTMLFormElement>) => void,
+    submitLabel: string,
+    onCancel: () => void
+  ) => (
+    <form className={styles.form} onSubmit={onSubmit}>
+      <div className={styles.formGrid}>
+        <label className={styles.label}>
+          Название
+          <input
+            className={styles.input}
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            required
+          />
+        </label>
+        <label className={styles.label}>
+          Формат
+          <select
+            className={styles.select}
+            value={form.format}
+            onChange={(e) => setForm({ ...form, format: e.target.value as "online" | "offline" })}
+          >
+            <option value="offline">Офлайн</option>
+            <option value="online">Онлайн</option>
+          </select>
+        </label>
+        <label className={styles.label}>
+          Место
+          <input
+            className={styles.input}
+            value={form.location}
+            onChange={(e) => setForm({ ...form, location: e.target.value })}
+            placeholder={form.format === "online" ? "Видеоконференция" : "Адрес"}
+          />
+        </label>
+        <label className={styles.label}>
+          Дата и время
+          <input
+            type="datetime-local"
+            className={styles.input}
+            value={form.dateLabel}
+            onChange={(e) => setForm({ ...form, dateLabel: e.target.value })}
+          />
+        </label>
+        <label className={styles.labelFull}>
+          Описание
+          <textarea
+            className={styles.textarea}
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            minLength={10}
+            required
+          />
+        </label>
+      </div>
+      <div className={styles.modalActions}>
+        <button type="button" className={styles.secondaryButton} onClick={onCancel}>
+          Отмена
+        </button>
+        <button type="submit" className={styles.primaryButton}>
+          {submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <main className={styles.page}>
       <div className={styles.container}>
-        <h1 className={styles.title}>Мои мероприятия</h1>
-        <p className={styles.subtitle}>
-          Планируйте и публикуйте мероприятия организации для волонтеров и пользователей.
-        </p>
-
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>Новое мероприятие</h2>
-          <form onSubmit={handleCreate}>
-            <div className={styles.grid}>
-              <label className={styles.label}>
-                Название
-                <input className={styles.input} value={title} onChange={(e) => setTitle(e.target.value)} />
-              </label>
-              <label className={styles.label}>
-                Локация
-                <input className={styles.input} value={location} onChange={(e) => setLocation(e.target.value)} />
-              </label>
-              <label className={styles.label}>
-                Дата и время начала (локально)
-                <input
-                  type="datetime-local"
-                  className={styles.input}
-                  value={dateLabel}
-                  onChange={(e) => setDateLabel(e.target.value)}
-                />
-              </label>
+        <div className={styles.pageTop}>
+          <div className={styles.topRow}>
+            <div className={styles.titleBlock}>
+              <h1 className={styles.title}>Мероприятия</h1>
+              <p className={styles.subtitle}>
+                Планируйте и публикуйте мероприятия организации для волонтёров и пользователей.
+              </p>
             </div>
-            <label className={styles.label}>
-              Описание
-              <textarea className={styles.textarea} value={description} onChange={(e) => setDescription(e.target.value)} minLength={10} required />
-            </label>
-            <div className={styles.actions}>
-              <button className={styles.primaryButton} type="submit">
-                Опубликовать мероприятие
-              </button>
-            </div>
-          </form>
-        </section>
+            <button type="button" className={styles.addBtn} onClick={openCreateModal}>
+              + Добавить мероприятие
+            </button>
+          </div>
 
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>Календарь событий</h2>
-          {loading ? (
-            <p className={styles.empty}>Загрузка...</p>
-          ) : errorText ? (
-            <p className={styles.empty}>{errorText}</p>
-          ) : events.length === 0 ? (
-            <p className={styles.empty}>Мероприятия пока не добавлены.</p>
-          ) : (
-            <div className={styles.list}>
-              {events.map((eventItem) => (
-                <article className={styles.animalCard} key={eventItem.id}>
-                  <div className={styles.animalInfo}>
-                    <h3 className={styles.animalName}>{eventItem.title}</h3>
-                    <p className={styles.animalMeta}>{eventItem.description ?? eventItem.summary ?? ""}</p>
-                    <p className={styles.metaLine}>
-                      Место: {[eventItem.city, eventItem.address].filter(Boolean).join(", ") || "Не указано"}
-                    </p>
-                    <p className={styles.metaLine}>Когда: {eventItem.starts_at || "Не указано"}</p>
-                    <div className={styles.badgeRow}>
-                      <span className={styles.badge}>Опубликовано</span>
-                    </div>
-                    <div className={styles.actions}>
-                      <button
-                        type="button"
-                        className={styles.secondaryButton}
-                        onClick={() => {
-                          setEditId(eventItem.id);
-                          setEditLoading(true);
-                          void eventsApi
-                            .getById(eventItem.id)
-                            .then((d) => {
-                              setEditTitle(d.title);
-                              setEditDescription(d.description ?? "");
-                              setEditCity(d.city ?? d.address ?? "");
-                              const st = d.starts_at ? new Date(d.starts_at) : new Date();
-                              const pad = (n: number) => String(n).padStart(2, "0");
-                              setEditStarts(
-                                `${st.getFullYear()}-${pad(st.getMonth() + 1)}-${pad(st.getDate())}T${pad(st.getHours())}:${pad(st.getMinutes())}`
-                              );
-                            })
-                            .catch(() => setErrorText("Не удалось загрузить событие."))
-                            .finally(() => setEditLoading(false));
-                        }}
-                      >
-                        Изменить
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.secondaryButton}
-                        onClick={() => void eventsApi.archive(eventItem.id).then(reload).catch(() => {})}
-                      >
-                        В архив
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        onClick={() => void eventsApi.delete(eventItem.id).then(reload).catch(() => {})}
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+          <div className={styles.toolbar}>
+            <input
+              className={styles.searchInput}
+              placeholder="Найти"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select
+              className={styles.filterSelect}
+              value={visibilityFilter}
+              onChange={(e) => setVisibilityFilter(e.target.value as VisibilityFilter)}
+              aria-label="Фильтр мероприятий"
+            >
+              <option value="all">Все</option>
+              <option value="archive">Архив</option>
+            </select>
+          </div>
+        </div>
 
-      {editId !== null ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 50,
-          }}
-          role="presentation"
-          onClick={() => setEditId(null)}
-        >
-          <div className={styles.card} style={{ maxWidth: 520, width: "92%" }} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.cardTitle}>Редактирование события</h2>
-            {editLoading ? (
-              <p>Загрузка…</p>
-            ) : (
-              <form
-                className={styles.grid}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (editDescription.trim().length < 10) return;
-                  const starts_iso = editStarts.trim() ? new Date(editStarts).toISOString() : new Date().toISOString();
-                  void eventsApi
-                    .patch(editId, {
-                      title: editTitle.trim(),
-                      description: editDescription.trim(),
-                      summary: editDescription.trim().slice(0, 180),
-                      city: editCity.trim() || null,
-                      address: editCity.trim() || null,
-                      starts_at: starts_iso,
-                    })
-                    .then(() => reload())
-                    .then(() => setEditId(null))
-                    .catch(() => setErrorText("Не удалось сохранить событие."));
-                }}
-              >
-                <label className={styles.label}>
-                  Название
-                  <input className={styles.input} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required />
-                </label>
-                <label className={styles.label}>
-                  Город / адрес
-                  <input className={styles.input} value={editCity} onChange={(e) => setEditCity(e.target.value)} />
-                </label>
-                <label className={styles.label}>
-                  Начало
-                  <input
-                    type="datetime-local"
-                    className={styles.input}
-                    value={editStarts}
-                    onChange={(e) => setEditStarts(e.target.value)}
-                  />
-                </label>
-                <label className={styles.label}>
-                  Описание
-                  <textarea
-                    className={styles.textarea}
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    minLength={10}
-                    required
-                  />
-                </label>
-                <div className={styles.actions}>
-                  <button type="submit" className={styles.primaryButton}>
-                    Сохранить
+        {errorText ? <p className={styles.error}>{errorText}</p> : null}
+        {loading ? <p className={styles.empty}>Загрузка…</p> : null}
+
+        {!loading && visibleEvents.length === 0 ? (
+          <p className={styles.empty}>
+            {visibilityFilter === "archive"
+              ? "В архиве пока нет мероприятий."
+              : "Мероприятия пока не добавлены."}
+          </p>
+        ) : null}
+
+        {!loading && visibleEvents.length > 0 ? (
+          <section className={styles.list}>
+            {visibleEvents.map((eventItem) => (
+              <article key={eventItem.id} className={styles.eventCard}>
+                <h2 className={styles.eventTitle}>{eventItem.title}</h2>
+                <p className={styles.metaLine}>Место: {formatEventPlace(eventItem)}</p>
+                <p className={styles.metaLine}>Когда: {formatEventWhen(eventItem.starts_at)}</p>
+                <span
+                  className={`${styles.badge} ${eventItem.is_archived ? styles.badgeArchived : ""}`.trim()}
+                >
+                  {eventItem.is_archived ? "Архив" : "Опубликовано"}
+                </span>
+                <div className={styles.cardActions}>
+                  <button
+                    type="button"
+                    className={styles.editBtn}
+                    disabled={busyId === eventItem.id}
+                    onClick={() => openEditModal(eventItem)}
+                  >
+                    Изменить
                   </button>
-                  <button type="button" className={styles.secondaryButton} onClick={() => setEditId(null)}>
-                    Отмена
+                  {!eventItem.is_archived ? (
+                    <button
+                      type="button"
+                      className={styles.archiveBtn}
+                      disabled={busyId === eventItem.id}
+                      onClick={() => handleArchive(eventItem.id)}
+                    >
+                      В архив
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.deleteBtn}
+                    disabled={busyId === eventItem.id}
+                    onClick={() => handleDelete(eventItem.id)}
+                  >
+                    Удалить
                   </button>
                 </div>
-              </form>
+              </article>
+            ))}
+          </section>
+        ) : null}
+      </div>
+
+      {isCreateModalOpen ? (
+        <div className={styles.modalOverlay} role="presentation" onClick={() => setCreateModalOpen(false)}>
+          <div className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Добавить мероприятие</h2>
+            {renderEventForm(
+              createForm,
+              setCreateForm,
+              handleCreate,
+              "Опубликовать",
+              () => setCreateModalOpen(false)
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {editId !== null ? (
+        <div className={styles.modalOverlay} role="presentation" onClick={() => setEditId(null)}>
+          <div className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Редактировать мероприятие</h2>
+            {editLoading ? (
+              <p className={styles.empty}>Загрузка…</p>
+            ) : (
+              renderEventForm(editForm, setEditForm, handleEdit, "Сохранить", () => setEditId(null))
             )}
           </div>
         </div>

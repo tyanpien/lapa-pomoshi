@@ -1,3 +1,4 @@
+import { getImageUrl } from "@/shared/api/client";
 import type { ChatMessage, ChatThread } from "@/shared/lib/messages";
 
 function pickStr(v: unknown): string {
@@ -22,6 +23,73 @@ function pickUserId(v: unknown): number | undefined {
     return Number.isFinite(n) ? n : undefined;
   }
   return undefined;
+}
+
+export function normalizePersonName(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function volunteerNamesMatch(storedTitle: string, guess: string): boolean {
+  const a = normalizePersonName(storedTitle);
+  const b = normalizePersonName(guess);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  const aParts = a.split(" ").filter(Boolean);
+  const bParts = b.split(" ").filter(Boolean);
+  if (aParts.length >= 2 && bParts.length >= 2) {
+    return aParts[0] === bParts[0] && aParts[aParts.length - 1] === bParts[bParts.length - 1];
+  }
+  return false;
+}
+
+export function pickOrgDialogId(raw: unknown): number | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const nested = o.dialog;
+  const candidates = [o, nested && typeof nested === "object" ? (nested as Record<string, unknown>) : null];
+  for (const c of candidates) {
+    if (!c) continue;
+    const id = pickUserId(c.id);
+    if (id != null && id > 0) return id;
+  }
+  return undefined;
+}
+
+export function mapOpenedOrgDialog(raw: unknown): ChatThread | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (o.dialog && typeof o.dialog === "object") {
+    return mapOrgDialogListRow(o.dialog as Record<string, unknown>);
+  }
+  if (o.id != null) {
+    return mapOrgDialogListRow(o);
+  }
+  return null;
+}
+
+export function findOrgThreadForPeer(
+  threads: ChatThread[],
+  peerId: number,
+  nameGuess?: string
+): ChatThread | undefined {
+  const byId = threads.find(
+    (t) => t.participantUserId != null && Number(t.participantUserId) === peerId
+  );
+  if (byId) return byId;
+  const name = (nameGuess ?? "").trim();
+  if (name.length < 2) return undefined;
+  return threads.find((t) => volunteerNamesMatch(t.title, name));
+}
+
+export function mergeOrgThreadList(prev: ChatThread[], thread: ChatThread): ChatThread[] {
+  const idx = prev.findIndex((t) => t.id === thread.id);
+  if (idx >= 0) {
+    const next = [...prev];
+    next[idx] = { ...next[idx], ...thread };
+    return next;
+  }
+  return [thread, ...prev];
 }
 
 export function mapOrgDialogListRow(row: Record<string, unknown>): ChatThread {
@@ -55,7 +123,35 @@ export function mapOrgDialogListRow(row: Record<string, unknown>): ChatThread {
   };
 }
 
-export function mapOrgDialogMessages(raw: unknown): ChatMessage[] {
+export function mapOrgDialogDetailMeta(raw: unknown): { contextHint: string } {
+  if (!raw || typeof raw !== "object") return { contextHint: "" };
+  const o = raw as Record<string, unknown>;
+  return { contextHint: pickStr(o.context_hint) };
+}
+
+export type DialogMessagePerspective = "organization" | "volunteer" | "user";
+
+function resolveDialogMessageIsMine(
+  r: Record<string, unknown>,
+  perspective: DialogMessagePerspective
+): boolean {
+  if (r.is_outgoing === true || r.is_mine === true) return true;
+  if (r.is_outgoing === false || r.is_mine === false) return false;
+
+  const side = pickStr(r.sender_side ?? r.sender_role ?? r.role ?? r.from).toLowerCase();
+  if (perspective === "organization") {
+    return side === "me" || side === "organization" || side === "org";
+  }
+  if (perspective === "user") {
+    return side === "me" || side === "user";
+  }
+  return side === "me" || side === "volunteer" || side === "vol";
+}
+
+export function mapOrgDialogMessages(
+  raw: unknown,
+  perspective: DialogMessagePerspective = "organization"
+): ChatMessage[] {
   if (!raw || typeof raw !== "object") return [];
   const o = raw as Record<string, unknown>;
   const rawList = Array.isArray(o.messages)
@@ -65,17 +161,15 @@ export function mapOrgDialogMessages(raw: unknown): ChatMessage[] {
       : [];
   const msgs = rawList as Record<string, unknown>[];
   return msgs.map((r, i) => {
-    const side = pickStr(r.sender_side ?? r.role ?? r.from).toLowerCase();
-    const isMine =
-      r.is_outgoing === true ||
-      r.is_mine === true ||
-      side === "me" ||
-      side === "organization" ||
-      side === "org" ||
-      side === "sender";
+    const isMine = resolveDialogMessageIsMine(r, perspective);
+    const body = pickStr(r.text ?? r.body ?? r.content ?? r.message);
+    const photoRaw = pickStr(r.photo_url);
+    const photoUrl = photoRaw ? getImageUrl(photoRaw) : "";
+    const text = body || (photoUrl ? "📷 Фото" : "");
     return {
       id: typeof r.id === "number" && Number.isFinite(r.id) ? r.id : i + 1,
-      text: pickStr(r.text ?? r.body ?? r.content ?? r.message),
+      text,
+      photoUrl: photoUrl || undefined,
       time: formatShortTime(r.created_at ?? r.sent_at),
       from: isMine ? "me" : "other",
     };

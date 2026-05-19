@@ -27,8 +27,10 @@ export default function OrganizationProfileEditPage() {
   const [profile, setProfile] = useState(() => getOrganizationProfile());
   const [saved, setSaved] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [remoteReady, setRemoteReady] = useState(false);
   const patchTimer = useRef<number | null>(null);
+  const skipAutoSaveAfterHydrate = useRef(true);
 
   useEffect(() => {
     if (isLoading) return;
@@ -88,7 +90,10 @@ export default function OrganizationProfileEditPage() {
         if (!cancelled) setLoadError("Не удалось загрузить профиль с сервера.");
         setProfile(getOrganizationProfile());
       } finally {
-        if (!cancelled) setRemoteReady(true);
+        if (!cancelled) {
+          skipAutoSaveAfterHydrate.current = true;
+          setRemoteReady(true);
+        }
       }
     })();
     return () => {
@@ -96,17 +101,46 @@ export default function OrganizationProfileEditPage() {
     };
   }, [role, isLoading]);
 
+  const persistToServer = async (nextProfile: typeof profile) => {
+    saveOrganizationProfile(nextProfile);
+    window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+    if (role !== "organization") return true;
+    try {
+      const raw = await meOrganizationApi.patchProfileCabinet(
+        buildOrganizationCabinetProfilePatch(nextProfile)
+      );
+      if (isOrgCabinetProfileResponse(raw)) {
+        const hint =
+          nextProfile.organizationName.trim() ||
+          (typeof window !== "undefined" ? localStorage.getItem("userName")?.trim() : "") ||
+          "";
+        const mapped = mapOrgCabinetProfileResponseToProfileData(
+          raw as Record<string, unknown>,
+          null,
+          hint
+        );
+        setProfile(mapped);
+        saveOrganizationProfile(mapped, { skipNotify: true });
+      }
+      setSaveError("");
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Не удалось сохранить профиль на сервере.";
+      setSaveError(message);
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (!remoteReady) return;
+    if (skipAutoSaveAfterHydrate.current) {
+      skipAutoSaveAfterHydrate.current = false;
+      return;
+    }
     if (patchTimer.current != null) window.clearTimeout(patchTimer.current);
     patchTimer.current = window.setTimeout(() => {
-      saveOrganizationProfile(profile);
-      window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
-      if (role === "organization") {
-        void meOrganizationApi
-          .patchProfileCabinet(buildOrganizationCabinetProfilePatch(profile))
-          .catch(() => {});
-      }
+      void persistToServer(profile);
     }, 550);
     return () => {
       if (patchTimer.current != null) window.clearTimeout(patchTimer.current);
@@ -114,32 +148,28 @@ export default function OrganizationProfileEditPage() {
   }, [profile, remoteReady, role]);
 
   const handleSave = () => {
-    saveOrganizationProfile(profile);
-    if (role === "organization") {
-      void meOrganizationApi
-        .patchProfileCabinet(buildOrganizationCabinetProfilePatch(profile))
-        .catch(() => {});
-    }
-    window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
+    void (async () => {
+      const ok = await persistToServer(profile);
+      if (!ok) return;
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+    })();
   };
 
   const handleClose = () => {
-    saveOrganizationProfile(profile);
-    if (role === "organization") {
-      void meOrganizationApi
-        .patchProfileCabinet(buildOrganizationCabinetProfilePatch(profile))
-        .catch(() => {});
-    }
-    window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
-    router.push("/organization/profile");
+    void (async () => {
+      await persistToServer(profile);
+      router.push("/organization/profile");
+    })();
   };
 
   return (
     <>
       {loadError ? (
         <p style={{ maxWidth: 720, margin: "16px auto", color: "#a33", fontSize: 14 }}>{loadError}</p>
+      ) : null}
+      {saveError ? (
+        <p style={{ maxWidth: 720, margin: "8px auto 0", color: "#a33", fontSize: 14 }}>{saveError}</p>
       ) : null}
       <OrganizationEditPanel
         open

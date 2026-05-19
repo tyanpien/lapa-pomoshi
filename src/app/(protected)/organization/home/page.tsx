@@ -1,7 +1,8 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
+import { getImageUrl } from "@/shared/api/client";
 import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import {
   addOrganizationGreeting,
@@ -31,6 +32,7 @@ export default function OrganizationHomeGreetingsPage() {
   const [editingGreetingId, setEditingGreetingId] = useState<number | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const pendingPhotoFileRef = useRef<File | null>(null);
 
   useEffect(() => {
     const cabinetEventName = getOrganizationCabinetEventName();
@@ -77,6 +79,7 @@ export default function OrganizationHomeGreetingsPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    pendingPhotoFileRef.current = file;
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result;
@@ -84,6 +87,27 @@ export default function OrganizationHomeGreetingsPage() {
       setForm((prev) => ({ ...prev, photoUrl: result }));
     };
     reader.readAsDataURL(file);
+  };
+
+  const uploadHomeStoryPhotoIfNeeded = async (storyId: number) => {
+    const file = pendingPhotoFileRef.current;
+    if (file) {
+      await meOrganizationApi.uploadHomeStoryPhoto(storyId, file);
+      pendingPhotoFileRef.current = null;
+      return;
+    }
+    if (!form.photoUrl.startsWith("data:")) return;
+    const response = await fetch(form.photoUrl);
+    const blob = await response.blob();
+    const dataFile = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
+    await meOrganizationApi.uploadHomeStoryPhoto(storyId, dataFile);
+  };
+
+  const resetFormState = () => {
+    pendingPhotoFileRef.current = null;
+    setForm(initialState);
+    setCreateModalOpen(false);
+    setEditingGreetingId(null);
   };
 
   const animalsById = useMemo(() => {
@@ -94,13 +118,12 @@ export default function OrganizationHomeGreetingsPage() {
     const body: Record<string, unknown> = {
       animal_name: form.petName.trim(),
       story: form.text.trim(),
+      adopted_at: new Date().toISOString().slice(0, 10),
     };
-    if (form.linkedAnimalId) {
-      const aid = Number(form.linkedAnimalId);
-      if (Number.isFinite(aid)) body.animal_id = aid;
-    }
-    if (form.photoUrl.trim() && !form.photoUrl.trim().startsWith("data:")) {
-      body.photo_url = form.photoUrl.trim();
+    const photo = form.photoUrl.trim();
+    if (photo && !photo.startsWith("data:")) {
+      const path = photo.replace(/^\/media\//, "");
+      body.photo_path = path.startsWith("http") ? photo : path;
     }
     return body;
   };
@@ -117,16 +140,17 @@ export default function OrganizationHomeGreetingsPage() {
     };
 
     const finish = () => {
-      setForm(initialState);
-      setCreateModalOpen(false);
-      setEditingGreetingId(null);
+      resetFormState();
     };
+
+    const hasPhotoToUpload = Boolean(pendingPhotoFileRef.current || form.photoUrl.trim().startsWith("data:"));
 
     if (useMeCabinet) {
       if (editingGreetingId) {
         void meOrganizationApi
           .patchHomeStory(editingGreetingId, buildHomeStoryBody())
-          .then(() => {
+          .then(async () => {
+            if (hasPhotoToUpload) await uploadHomeStoryPhotoIfNeeded(editingGreetingId);
             window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
             finish();
           })
@@ -134,7 +158,10 @@ export default function OrganizationHomeGreetingsPage() {
       } else {
         void meOrganizationApi
           .createHomeStory(buildHomeStoryBody())
-          .then(() => {
+          .then(async (created) => {
+            const row = created as { id?: unknown };
+            const storyId = typeof row?.id === "number" ? row.id : null;
+            if (storyId != null && hasPhotoToUpload) await uploadHomeStoryPhotoIfNeeded(storyId);
             window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
             finish();
           })
@@ -157,6 +184,7 @@ export default function OrganizationHomeGreetingsPage() {
     const greeting = greetings.find((item) => item.id === greetingId);
     if (!greeting) return;
 
+    pendingPhotoFileRef.current = null;
     setForm({
       petName: greeting.petName || "",
       text: greeting.text || "",
@@ -193,11 +221,11 @@ export default function OrganizationHomeGreetingsPage() {
   return (
     <main className={styles.page}>
       <div className={styles.container}>
-        <div className={styles.header}>
-          <div>
+        <div className={styles.pageTop}>
+          <div className={styles.topRow}>
             <h1 className={styles.title}>Привет из дома</h1>
             <button
-              className={styles.addLink}
+              className={styles.addBtn}
               type="button"
               onClick={() => {
                 setForm(initialState);
@@ -205,10 +233,9 @@ export default function OrganizationHomeGreetingsPage() {
                 setCreateModalOpen(true);
               }}
             >
-              Добавить публикацию
+              + Добавить публикацию
             </button>
           </div>
-
           <div className={styles.filters}>
             <input
               className={styles.searchInput}
@@ -226,7 +253,10 @@ export default function OrganizationHomeGreetingsPage() {
             {visibleGreetings.map((item) => (
               <article key={item.id} className={styles.requestCard}>
                 <div className={styles.cover}>
-                  <img src={item.photoUrl?.trim() || "/cat-placeholder.jpg"} alt={item.petName} />
+                  <img
+                    src={item.photoUrl?.trim() ? getImageUrl(item.photoUrl) : "/cat-placeholder.jpg"}
+                    alt={item.petName}
+                  />
                 </div>
 
                 <div className={styles.requestBody}>
@@ -257,12 +287,11 @@ export default function OrganizationHomeGreetingsPage() {
                     ) : null}
                   </div>
                   <h3 className={styles.requestName}>{item.petName}</h3>
-                  <div className={styles.tags}>
-                    <span>Привет из дома</span>
-                    {item.linkedAnimalId && animalsById.get(item.linkedAnimalId) ? (
+                  {item.linkedAnimalId && animalsById.get(item.linkedAnimalId) ? (
+                    <div className={styles.tags}>
                       <span>Животное: {animalsById.get(item.linkedAnimalId)?.name}</span>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                   <p className={styles.organizationLine}>{item.text}</p>
                   <p className={styles.metaLine}>
                     {new Date(item.createdAt).toLocaleDateString("ru-RU", {
@@ -331,7 +360,14 @@ export default function OrganizationHomeGreetingsPage() {
                 <button type="submit" className={styles.primaryButton}>
                   {editingGreetingId ? "Сохранить" : "Опубликовать"}
                 </button>
-                <button type="button" className={styles.secondaryButton} onClick={() => setForm(initialState)}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => {
+                    pendingPhotoFileRef.current = null;
+                    setForm(initialState);
+                  }}
+                >
                   Очистить форму
                 </button>
               </div>

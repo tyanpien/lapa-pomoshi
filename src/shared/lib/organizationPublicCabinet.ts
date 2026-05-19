@@ -1,5 +1,6 @@
 import type { Animal } from "@/shared/api/endpoints/animals";
 import { getImageUrl } from "@/shared/api/client";
+import { formatAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
 import type {
   OrgPublicArticle,
   OrgPublicEvent,
@@ -46,8 +47,8 @@ export function mapOrgPublicWardToAnimal(w: OrgPublicWardCard, orgTitle: string,
   return {
     id: w.id,
     name: w.name,
-    species: w.species,
-    breed: w.species,
+    species: formatAnimalSpeciesLabel(w.species),
+    breed: w.breed?.trim() || "Метис",
     sex: "unknown",
     age_months: w.age_months,
     location_city: null,

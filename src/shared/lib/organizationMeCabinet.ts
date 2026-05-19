@@ -1,4 +1,5 @@
 import type { Animal } from "@/shared/api/endpoints/animals";
+import { formatAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
 import { getImageUrl } from "@/shared/api/client";
 import {
   fetchOrgAnimalsAllPages,
@@ -40,6 +41,24 @@ export function tryParseOrganizationPublicPage(data: unknown): OrganizationPubli
   const o = data as Record<string, unknown>;
   if (typeof o.hero === "object" && o.hero !== null) return data as OrganizationPublicPage;
   return null;
+}
+
+export function applyInstructionsToPublicPage(
+  page: OrganizationPublicPage,
+  instructions: Record<string, unknown> | null | undefined
+): OrganizationPublicPage {
+  if (!instructions || typeof instructions !== "object") return page;
+  const adoptionHowto = pickStr(instructions.adoption_howto).trim();
+  const admissionRules = pickStr(instructions.admission_rules).trim();
+  if (!adoptionHowto && !admissionRules) return page;
+  return {
+    ...page,
+    hero: {
+      ...page.hero,
+      adoption_howto: adoptionHowto || page.hero.adoption_howto,
+      admission_rules: admissionRules || page.hero.admission_rules,
+    },
+  };
 }
 
 function parseOrganizationId(v: unknown): number | null {
@@ -208,6 +227,8 @@ export function mergeOrganizationProfilePreferApi(
   };
 }
 
+export const ORGANIZATION_ID_STORAGE_KEY = "organizationId";
+
 export function extractOrganizationIdFromCabinetPayload(data: unknown): number | null {
   if (!data || typeof data !== "object") return null;
   const o = data as Record<string, unknown>;
@@ -219,6 +240,46 @@ export function extractOrganizationIdFromCabinetPayload(data: unknown): number |
     const h = hero as Record<string, unknown>;
     const fromHero = parseOrganizationId(h.organization_id) ?? parseOrganizationId(h.organizationId);
     if (fromHero != null) return fromHero;
+  }
+  return null;
+}
+
+export async function resolveOrganizationIdForMeCabinet(
+  profileRaw: unknown,
+  publicPage: OrganizationPublicPage | null,
+  nameHints: readonly string[]
+): Promise<number | null> {
+  const fromPayload = extractOrganizationIdFromCabinetPayload(profileRaw);
+  if (fromPayload != null) return fromPayload;
+
+  if (typeof window !== "undefined") {
+    const cached = parseOrganizationId(localStorage.getItem(ORGANIZATION_ID_STORAGE_KEY));
+    if (cached != null) return cached;
+  }
+
+  const names = new Set<string>();
+  if (isOrgCabinetProfileResponse(profileRaw)) {
+    const profile = (profileRaw as Record<string, unknown>).profile;
+    if (profile && typeof profile === "object") {
+      const n = pickStr((profile as Record<string, unknown>).name).trim();
+      if (n) names.add(n.toLowerCase());
+    }
+  }
+  if (publicPage?.hero?.name?.trim()) {
+    names.add(publicPage.hero.name.trim().toLowerCase());
+  }
+  for (const hint of nameHints) {
+    const t = hint.trim();
+    if (t) names.add(t.toLowerCase());
+  }
+  if (!names.size) return null;
+
+  try {
+    const { items } = await organizationsApi.getList();
+    for (const item of items ?? []) {
+      if (names.has(item.name.trim().toLowerCase())) return item.id;
+    }
+  } catch {
   }
   return null;
 }
@@ -292,8 +353,6 @@ export function buildOrganizationCabinetProfilePatch(profile: OrganizationProfil
   }
 
   const trimmedGallerySlots = profile.galleryDataUrls.map((u) => u.trim()).filter(Boolean);
-  const hasOnlyPendingDataUrls =
-    trimmedGallerySlots.length > 0 && trimmedGallerySlots.every((u) => u.startsWith("data:"));
 
   const gallery = trimmedGallerySlots
     .filter((u) => !u.startsWith("data:"))
@@ -308,10 +367,6 @@ export function buildOrganizationCabinetProfilePatch(profile: OrganizationProfil
   };
   if (gallery.length > 0) {
     about.gallery = gallery;
-  } else if (!hasOnlyPendingDataUrls) {
-    // Пустой массив явно сбрасывает галерею на бэке; пропуск поля оставило бы старые фото.
-    // Если в форме только data: (ещё не залитые файлы) — не трогаем gallery в PATCH.
-    about.gallery = [];
   }
 
   return {
@@ -357,12 +412,14 @@ export function mapMeOrganizationAnimalRow(
     : primary
       ? [primary]
       : [];
+  const sex = pickStr(row.sex) || "unknown";
+  const speciesRaw = pickStr(row.species);
   return {
     id,
     name: pickStr(row.name) || "Без имени",
-    species: pickStr(row.species) || "—",
+    species: speciesRaw ? formatAnimalSpeciesLabel(speciesRaw, sex) : "—",
     breed: pickStr(row.breed) || null,
-    sex: pickStr(row.sex) || "unknown",
+    sex,
     age_months: pickNum(row.age_months) ?? 0,
     location_city: pickStr(row.location_city) || null,
     is_urgent: pickBool(row.is_urgent),
@@ -374,10 +431,20 @@ export function mapMeOrganizationAnimalRow(
     organization_name: orgTitle,
     health_features: pickStr(row.health_features) || undefined,
     treatment_required: pickStr(row.treatment_required) || undefined,
+    health_care_other: pickStr(row.health_care_other) || undefined,
+    character_other: pickStr(row.character_other) || undefined,
     character_tags: Array.isArray(row.character_tags)
       ? (row.character_tags as unknown[]).map((x) => pickStr(x)).filter(Boolean)
       : [],
-    health_checklist: [],
+    character_slugs: Array.isArray(row.character_slugs)
+      ? (row.character_slugs as unknown[]).map((x) => pickStr(x)).filter(Boolean)
+      : [],
+    health_checklist: Array.isArray(row.health_checklist)
+      ? (row.health_checklist as unknown[]).map((x) => pickStr(x)).filter(Boolean)
+      : [],
+    health_care_slugs: Array.isArray(row.health_care_slugs)
+      ? (row.health_care_slugs as unknown[]).map((x) => pickStr(x)).filter(Boolean)
+      : [],
     catalog_features: [],
   };
 }
@@ -457,17 +524,19 @@ export function mapMeHomeStoryRow(row: Record<string, unknown>): GreetingFromHom
 
 export function mapMeReportRow(row: Record<string, unknown>): OrganizationReport {
   const id = pickNum(row.id) ?? 0;
+  const isPublished = row.is_published !== false;
   const archived =
+    !isPublished ||
     pickBool(row.archived) ||
     String(pickStr(row.status)).toLowerCase() === "archived" ||
     String(pickStr(row.visibility)).toLowerCase() === "archived";
   return {
     id,
     title: pickStr(row.title) || "Отчёт",
-    content: pickStr(row.content) || pickStr(row.summary) || pickStr(row.body) || "",
+    content: pickStr(row.body) || pickStr(row.summary) || pickStr(row.content) || "",
     isUrgent: pickBool(row.is_urgent),
     archived,
-    createdAt: pickStr(row.created_at) || pickStr(row.published_at) || new Date().toISOString(),
+    createdAt: pickStr(row.published_at) || pickStr(row.created_at) || new Date().toISOString(),
   };
 }
 
@@ -481,9 +550,30 @@ export async function fetchOrganizationMeCabinetApiPayload(
     return null;
   }
 
-  const organizationId = extractOrganizationIdFromCabinetPayload(profileRaw);
   let publicPage: OrganizationPublicPage | null = tryParseOrganizationPublicPage(profileRaw);
 
+  if (isOrgCabinetProfileResponse(profileRaw)) {
+    const instructions = (profileRaw as Record<string, unknown>).instructions;
+    try {
+      const preview = await meOrganizationApi.getProfilePreview();
+      const previewPage = tryParseOrganizationPublicPage(preview);
+      if (previewPage) {
+        publicPage = applyInstructionsToPublicPage(
+          previewPage,
+          instructions as Record<string, unknown> | undefined
+        );
+      }
+    } catch {
+    }
+    if (publicPage) {
+      publicPage = applyInstructionsToPublicPage(
+        publicPage,
+        instructions as Record<string, unknown> | undefined
+      );
+    }
+  }
+
+  const organizationId = await resolveOrganizationIdForMeCabinet(profileRaw, publicPage, nameHints);
   if (!publicPage && organizationId != null) {
     try {
       publicPage = await organizationsApi.getById(organizationId);
@@ -494,6 +584,13 @@ export async function fetchOrganizationMeCabinetApiPayload(
 
   if (!publicPage || organizationId == null) {
     return null;
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(ORGANIZATION_ID_STORAGE_KEY, String(organizationId));
+    } catch {
+    }
   }
 
   let listItem: OrganizationListItem | null = null;

@@ -6,6 +6,7 @@ const ARTICLE_CATEGORY_LABELS: Record<string, string> = {
   training: "Воспитание",
   treatment: "Лечение",
   legal: "Юридические вопросы",
+  education: "Обучение",
   other: "Другое",
 };
 

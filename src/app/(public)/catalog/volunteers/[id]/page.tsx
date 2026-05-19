@@ -15,6 +15,8 @@ import {
   travelRadiusFootnoteKm,
 } from "@/shared/lib/volunteerAvailability";
 import { VOLUNTEER_ANIMAL_KIND_OPTIONS, type VolunteerAnimalKindTag } from "@/shared/lib/volunteerProfileStorage";
+import { resolveVolunteerHelpFormatLabel } from "@/shared/lib/volunteerMeProfileMap";
+import { getArticleCategoryLabel } from "@/shared/lib/articleCategoryLabels";
 
 const COMPETENCY_HIGHLIGHT_HINTS = /^(регулярн|разов)/i;
 
@@ -46,10 +48,13 @@ function buildCompetencyChips(volunteer: VolunteerDetail | null): CompetencyChip
   };
   const has = (label: string) => seen.has(label.trim().toLowerCase());
 
-  if (volunteer.help_format_label?.trim()) {
-    const lab = volunteer.help_format_label.trim();
-    chips.push({ key: "hf", label: lab, variant: "frequency" });
-    mark(lab);
+  const helpFormatLabel = resolveVolunteerHelpFormatLabel(
+    volunteer.help_format,
+    volunteer.help_format_label
+  );
+  if (helpFormatLabel) {
+    chips.push({ key: "hf", label: helpFormatLabel, variant: "frequency" });
+    mark(helpFormatLabel);
   }
 
   const pushPetKind = (canonical: VolunteerAnimalKindTag, keySource: string) => {
@@ -160,7 +165,7 @@ export default function VolunteerPage() {
         title: a.title,
         summary: a.summary ?? "",
         category: a.category,
-        category_label: a.category_label,
+        category_label: getArticleCategoryLabel(a.category || a.category_label),
         read_minutes: a.read_minutes,
         is_context_tip: false,
         created_at: new Date().toISOString(),
@@ -179,7 +184,10 @@ export default function VolunteerPage() {
         for (const item of [...fromProfile, ...authored]) {
           if (seen.has(item.id)) continue;
           seen.add(item.id);
-          merged.push(item);
+          merged.push({
+            ...item,
+            category_label: getArticleCategoryLabel(item.category || item.category_label),
+          });
         }
         setArticles(merged.slice(0, 8));
       })
@@ -267,6 +275,10 @@ export default function VolunteerPage() {
   const avatarSrc = volunteer.avatar_url ? getImageUrl(volunteer.avatar_url) : null;
   const isAvailable = volunteer.readiness_status === "available";
   const experienceLabel = experienceBadgeFromVolunteer(volunteer);
+  const helpFormatLabel = resolveVolunteerHelpFormatLabel(
+    volunteer.help_format,
+    volunteer.help_format_label
+  );
 
   return (
     <main className={styles.page}>
@@ -310,7 +322,7 @@ export default function VolunteerPage() {
               {isOrganization && (
                 <div className={styles.actionsRow}>
                   <Link
-                    href={`/messages?recipientId=${encodeURIComponent(String(volunteer.user_id))}&recipientName=${encodeURIComponent((volunteer.full_name ?? "").trim())}`}
+                    href={`/messages?recipientId=${encodeURIComponent(String(Number.isFinite(id) && id > 0 ? id : volunteer.user_id))}&recipientName=${encodeURIComponent((volunteer.full_name ?? "").trim())}`}
                     className={styles.writeBtn}
                   >
                     Написать
@@ -425,7 +437,9 @@ export default function VolunteerPage() {
                         <img src="/clock.svg" alt="" className={styles.articleMetaIcon} />
                         {article.read_minutes} мин
                       </span>
-                      <span className={styles.articleCategory}>{article.category_label}</span>
+                      <span className={styles.articleCategory}>
+                        {getArticleCategoryLabel(article.category || article.category_label)}
+                      </span>
                     </div>
                   </div>
                 </Link>

@@ -1,4 +1,5 @@
 import { apiFetch, getImageUrl } from "../client";
+import type { HelpAnimalItem } from "./help";
 
 export interface OrganizationListItem {
   id: number;
@@ -44,6 +45,7 @@ export interface OrgPublicWardCard {
   id: number;
   name: string;
   species: string;
+  breed?: string | null;
   age_months: number;
   status: string;
   status_label: string;
@@ -100,6 +102,7 @@ export interface OrgPublicArticle {
   title: string;
   category: string;
   read_minutes: number;
+  cover_url?: string | null;
 }
 
 export interface OrgPublicHomeStory {
@@ -116,6 +119,7 @@ export interface OrganizationPublicPage {
   about: OrgPublicAbout;
   help_sections: OrgPublicHelpSection[];
   urgent_help: OrgPublicUrgentNeed[];
+  help_animals?: HelpAnimalItem[];
   events: OrgPublicEvent[];
   reports: OrgPublicReport[];
   articles: OrgPublicArticle[];

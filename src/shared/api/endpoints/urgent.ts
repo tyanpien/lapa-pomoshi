@@ -1,4 +1,4 @@
-import { apiFetch } from "../client";
+﻿import { apiFetch } from "../client";
 
 export interface UrgentItem {
   id: number;
@@ -142,6 +142,27 @@ export const urgentApi = {
     sort_by?: string | null;
   }) => apiFetch(`/api/v1/urgent${urgentListQuery(filters ?? undefined)}`) as Promise<UrgentResponse>,
 
+  getVolunteerTasksList: (filters?: {
+    q?: string | null;
+    city?: string | null;
+    animal_species?: string | null;
+    help_types?: string[];
+    limit?: number;
+    offset?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (filters?.q?.trim()) q.set("q", filters.q.trim());
+    if (filters?.city?.trim()) q.set("city", filters.city.trim());
+    if (filters?.animal_species?.trim()) q.set("animal_species", filters.animal_species.trim());
+    if (filters?.help_types && filters.help_types.length > 0) {
+      q.set("help_types", filters.help_types.join(","));
+    }
+    if (filters?.limit != null) q.set("limit", String(filters.limit));
+    if (filters?.offset != null) q.set("offset", String(filters.offset));
+    const s = q.toString();
+    return apiFetch(`/api/v1/urgent/volunteer-tasks${s ? `?${s}` : ""}`) as Promise<UrgentResponse>;
+  },
+
   getCatalogs: () => apiFetch("/api/v1/urgent/catalogs") as Promise<UrgentCatalogs>,
 
   getById: (id: number) => apiFetch(`/api/v1/urgent/${id}`) as Promise<UrgentRequestDetail>,
@@ -174,6 +195,27 @@ export async function fetchUrgentItemsAllPages(filters?: {
   const limit = 100;
   for (;;) {
     const res = await urgentApi.getList({ ...(filters ?? {}), limit, offset });
+    const batch = res.items ?? [];
+    acc.push(...batch);
+    if (batch.length < limit) break;
+    if (typeof res.total === "number" && acc.length >= res.total) break;
+    offset += limit;
+    if (offset > 5000) break;
+  }
+  return acc;
+}
+
+export async function fetchVolunteerTasksAllPages(filters?: {
+  q?: string | null;
+  city?: string | null;
+  animal_species?: string | null;
+  help_types?: string[];
+}): Promise<UrgentItem[]> {
+  const acc: UrgentItem[] = [];
+  let offset = 0;
+  const limit = 100;
+  for (;;) {
+    const res = await urgentApi.getVolunteerTasksList({ ...(filters ?? {}), limit, offset });
     const batch = res.items ?? [];
     acc.push(...batch);
     if (batch.length < limit) break;

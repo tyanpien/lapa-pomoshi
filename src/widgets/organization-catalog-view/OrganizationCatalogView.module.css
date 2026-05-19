@@ -261,6 +261,12 @@
   gap: 6px;
   font-weight: 700;
   width: fit-content;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
 }
 
 .infoIcon {
@@ -281,6 +287,60 @@
   outline: 2px solid #8a5a39;
   outline-offset: 2px;
   border-radius: 2px;
+}
+
+.instructionOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(32, 39, 32, 0.55);
+}
+
+.instructionModal {
+  background: #fdfaf6;
+  border-radius: 14px;
+  max-width: 520px;
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 24px 26px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.instructionModalTitle {
+  margin: 0 0 16px;
+  font-size: 22px;
+  color: #8b5a3c;
+  font-weight: 600;
+}
+
+.instructionModalText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #4a4038;
+  white-space: pre-wrap;
+}
+
+.instructionModalClose {
+  margin-top: 20px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #8b5a3c;
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.instructionModalClose:hover {
+  background: #74482d;
 }
 
 .tabs {
@@ -723,6 +783,28 @@
   gap: 18px;
 }
 
+.homeRequestCardLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.homeRequestCardLink:hover {
+  transform: translateY(-2px);
+}
+
+.homeRequestCardLink:hover .homeRequestName,
+.homeRequestCardLink:focus-visible .homeRequestName {
+  color: #6d4932;
+}
+
+.homeRequestCardLink:focus-visible {
+  outline: 2px solid rgba(141, 91, 61, 0.45);
+  outline-offset: 4px;
+}
+
 .homeRequestCard {
   background: transparent;
 }
@@ -737,6 +819,14 @@
   width: 100%;
   height: 240px;
   object-fit: cover;
+  display: block;
+}
+
+.articleCoverPlaceholder {
+  width: 100%;
+  height: 240px;
+  border-radius: 8px;
+  background: #d8d3c8;
   display: block;
 }
 
@@ -802,6 +892,13 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: pre-wrap;
+}
+
+.articleMoreLink {
+  margin: auto 4px 0 auto;
+  color: #8b5a3c;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .progressTrack {

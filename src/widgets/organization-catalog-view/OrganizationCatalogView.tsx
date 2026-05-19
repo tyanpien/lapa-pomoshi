@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { ModalPortal } from "@/shared/ui/ModalPortal";
 import styles from "./OrganizationCatalogView.module.css";
 import type { Animal } from "@/shared/api/endpoints/animals";
 import {
   organizationsApi,
   type OrganizationListItem,
   type OrganizationPublicPage,
-  type OrgPublicUrgentNeed,
   type OrgPublicEvent,
   type OrgPublicHomeStory,
   type OrgPublicArticle,
@@ -30,10 +31,21 @@ import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
 import { splitOrganizationAboutMainTasksFromPlainText } from "@/shared/lib/organizationAboutText";
 import type { OrganizationCabinetPayloadWithStatus } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 import { useUser } from "@/shared/lib/hooks/useUser";
-import { getUrgentHelpTypeLabel } from "@/shared/lib/urgentHelpTypeLabels";
+import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { HelpRequisitesModal } from "@/features/help-requisites/HelpRequisitesModal";
+import {
+  HelpAnimalCardView,
+} from "@/features/help-animal-card/HelpAnimalCardView";
+import {
+  mapHelpAnimalItemToCard,
+  withHelpActionLabel,
+  type HelpAnimalCardRendered,
+} from "@/features/help-animal-card/helpAnimalCardModel";
+import { helpApi } from "@/shared/api/endpoints/help";
 import { getArticleCategoryLabel } from "@/shared/lib/articleCategoryLabels";
+import { formatAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
+import { formatInstructionDisplayText } from "@/shared/lib/formatInstructionText";
 import type {
-  OrganizationRequest,
   OrganizationEvent,
   GreetingFromHome,
   OrganizationArticle,
@@ -71,6 +83,8 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number]["key"];
 
+type InstructionModalKind = "admission" | "adoption";
+
 type WardRow = {
   id: number;
   name: string;
@@ -83,45 +97,6 @@ type WardRow = {
   location_city: string | null;
   is_urgent: boolean;
 };
-
-function mapUrgentToRequest(u: OrgPublicUrgentNeed): OrganizationRequest {
-  return {
-    id: u.id,
-    title: u.title,
-    location: "",
-    problemDescription: u.description,
-    helpType: u.help_type,
-    urgency: u.is_urgent ? "urgent" : "normal",
-    linkedAnimalId: u.animal_id ?? undefined,
-    needVolunteer: u.volunteer_needed,
-    volunteerCompetencies: "",
-    status: "published",
-    createdAt: new Date().toISOString(),
-  };
-}
-
-function mergeOrganizationHelpRequests(
-  apiRows: OrgPublicUrgentNeed[],
-  locals: OrganizationRequest[]
-): OrganizationRequest[] {
-  const fromApi = apiRows.map(mapUrgentToRequest);
-  const byId = new Map<number, OrganizationRequest>();
-  for (const r of fromApi) byId.set(r.id, r);
-  for (const r of locals) {
-    if (!byId.has(r.id)) byId.set(r.id, r);
-  }
-  const sorted = [...byId.values()].sort((a, b) => a.id - b.id);
-  const seenAnimalIds = new Set<number>();
-  const out: OrganizationRequest[] = [];
-  for (const r of sorted) {
-    if (typeof r.linkedAnimalId === "number" && Number.isFinite(r.linkedAnimalId)) {
-      if (seenAnimalIds.has(r.linkedAnimalId)) continue;
-      seenAnimalIds.add(r.linkedAnimalId);
-    }
-    out.push(r);
-  }
-  return out;
-}
 
 function mapOrgEvent(e: OrgPublicEvent): OrganizationEvent {
   return {
@@ -157,6 +132,7 @@ function mapOrgArticle(a: OrgPublicArticle): OrganizationArticle {
     articleType: a.category,
     author: "",
     content: "",
+    coverUrl: a.cover_url ?? undefined,
     archived: false,
     createdAt: new Date().toISOString(),
   };
@@ -197,7 +173,9 @@ function toFiniteOrgId(id: unknown): number {
 }
 
 export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
-  const { role } = useUser();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { role, isAuth } = useUser();
   const cabinetPayload = cabinetPayloadOrEmpty(props);
 
   const cabinetOrgId = toFiniteOrgId(cabinetPayload.organizationId);
@@ -221,6 +199,9 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
   const [localAnimals, setLocalAnimals] = useState<Animal[]>(() =>
     typeof window !== "undefined" ? getCurrentOrganizationAnimals() : []
   );
+  const [instructionModal, setInstructionModal] = useState<InstructionModalKind | null>(null);
+  const [helpModalCard, setHelpModalCard] = useState<HelpAnimalCardRendered | null>(null);
+  const [fallbackHelpCards, setFallbackHelpCards] = useState<HelpAnimalCardRendered[]>([]);
 
   useEffect(() => {
     const eventName = getOrganizationCabinetEventName();
@@ -338,10 +319,31 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
     if (!publicPage) return null;
     const hint = organizationNameFromRecord.trim() || publicPage.hero.name || "";
     const fromApi = mapOrganizationPublicPageToProfileData(publicPage, listItem, hint);
+    if (props.variant === "public") return fromApi;
     return mergeOrganizationProfilePreferApi(fromApi, cabinetRecord?.profile);
-  }, [publicPage, listItem, organizationNameFromRecord, cabinetRecord?.profile, cabinetTick]);
+  }, [publicPage, listItem, organizationNameFromRecord, cabinetRecord?.profile, cabinetTick, props.variant]);
 
   const profileForUi = mergedCabinetProfile ?? cabinetRecord?.profile;
+
+  const admissionRulesText = useMemo(() => {
+    const fromHero = publicPage?.hero.admission_rules?.trim() || "";
+    const fromProfile = profileForUi?.admissionRules?.trim() || "";
+    const raw = props.variant === "public" ? fromHero : fromProfile || fromHero;
+    return formatInstructionDisplayText(raw);
+  }, [props.variant, profileForUi?.admissionRules, publicPage?.hero.admission_rules]);
+
+  const adoptionHowtoText = useMemo(() => {
+    const fromHero = publicPage?.hero.adoption_howto?.trim() || "";
+    const fromProfile =
+      profileForUi?.adoptionScenario?.trim() || profileForUi?.adoptionRules?.trim() || "";
+    const raw = props.variant === "public" ? fromHero : fromProfile || fromHero;
+    return formatInstructionDisplayText(raw);
+  }, [
+    props.variant,
+    profileForUi?.adoptionScenario,
+    profileForUi?.adoptionRules,
+    publicPage?.hero.adoption_howto,
+  ]);
 
   const wardRows = useMemo((): WardRow[] => {
     if (props.variant === "cabinet" && role === "organization") {
@@ -367,7 +369,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
       name: w.name,
       primary_photo_url: w.photo_url ? getImageUrl(w.photo_url) : null,
       species: w.species,
-      breed: "Метис",
+      breed: w.breed?.trim() || "Метис",
       age_months: w.age_months,
       status: w.status,
       status_label: w.status_label,
@@ -459,9 +461,57 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
       .filter((row) => row.url.length > 0);
   }, [profileForUi, cabinetTick]);
 
-  const organizationRequests = useMemo(() => {
-    return mergeOrganizationHelpRequests(publicPage?.urgent_help ?? [], cabinetRecord?.requests ?? []);
-  }, [cabinetRecord, publicPage]);
+  useEffect(() => {
+    const fromApi = publicPage?.help_animals ?? [];
+    if (fromApi.length > 0) {
+      setFallbackHelpCards([]);
+      return;
+    }
+    const norm = orgName.trim().toLowerCase();
+    if (!norm || norm === "организация") return;
+
+    let cancelled = false;
+    void helpApi
+      .getAnimalHelp("all")
+      .then((res) => {
+        if (cancelled) return;
+        const filtered = (res.items ?? []).filter(
+          (item) => (item.organization_name?.trim().toLowerCase() ?? "") === norm
+        );
+        setFallbackHelpCards(filtered.map((item) => withHelpActionLabel(mapHelpAnimalItemToCard(item))));
+      })
+      .catch(() => {
+        if (!cancelled) setFallbackHelpCards([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [publicPage?.help_animals, orgName]);
+
+  const organizationHelpCards = useMemo((): HelpAnimalCardRendered[] => {
+    const items = publicPage?.help_animals ?? [];
+    if (items.length > 0) {
+      return items.map((item) => withHelpActionLabel(mapHelpAnimalItemToCard(item)));
+    }
+    return fallbackHelpCards;
+  }, [publicPage?.help_animals, fallbackHelpCards]);
+
+  const handleHelpCardAction = (card: HelpAnimalCardRendered) => {
+    if (card.actionLabel === "Помочь") {
+      if (!isAuth) {
+        router.push(getLoginHref(pathname || "/"));
+        return;
+      }
+      setHelpModalCard(card);
+      return;
+    }
+    if (!isAuth) {
+      router.push(getLoginHref(pathname || "/"));
+      return;
+    }
+    router.push(`/catalog/animals/${card.id}`);
+  };
 
   const organizationEvents = useMemo(() => {
     const c = cabinetRecord?.events ?? [];
@@ -594,13 +644,6 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
   };
 
   const wardStatusLabel = (animal: WardRow) => animal.status_label?.trim() || getAnimalStatus(animal.status);
-
-  const getRequestStatusLabel = (status: string) => {
-    if (status === "published") return "опубликована";
-    if (status === "in_progress") return "в работе";
-    if (status === "closed") return "закрыта";
-    return "черновик";
-  };
 
   const publicCatalogHref =
     props.variant === "cabinet" && Number.isFinite(resolvedOrganizationId)
@@ -770,37 +813,23 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
     if (activeTab === "help") {
       return (
         <section className={styles.helpList} aria-label="Чем помочь">
-          {organizationRequests.length === 0 ? (
+          {organizationHelpCards.length === 0 ? (
             <article className={styles.helpEmptyCard}>
               <p>Заявок на помощь пока нет.</p>
             </article>
           ) : (
-            organizationRequests.map((request) => {
-              const linkedAnimal = request.linkedAnimalId
-                ? wardRows.find((animal) => animal.id === request.linkedAnimalId)
-                : null;
-              const imageSrc = request.mediaUrl?.trim() || linkedAnimal?.primary_photo_url || "/cat-placeholder.jpg";
+            organizationHelpCards.map((card) => (
+              <HelpAnimalCardView
+                key={card.id}
+                card={{
+                  ...card,
+                  organization: card.organization || orgName,
+                }}
+                showOrganization
+                onAction={handleHelpCardAction}
+              />
+            ))
 
-              return (
-                <article key={request.id} className={styles.helpRequestCard}>
-                  <div className={styles.helpCover}>
-                    <img src={imageSrc} alt={request.title} />
-                    {request.urgency === "urgent" ? <span className={styles.helpUrgentBadge}>срочно</span> : null}
-                  </div>
-
-                  <div className={styles.helpRequestBody}>
-                    <h3 className={styles.helpRequestName}>{request.title}</h3>
-                    <div className={styles.helpTags}>
-                      <span>{getUrgentHelpTypeLabel(request.helpType)}</span>
-                      {request.needVolunteer ? <span>Нужен волонтер</span> : null}
-                      <span>{request.location || "Локация не указана"}</span>
-                    </div>
-                    <p className={styles.helpOrganizationLine}>{request.problemDescription}</p>
-                    <p className={styles.helpMetaLine}>Статус: {getRequestStatusLabel(request.status)}</p>
-                  </div>
-                </article>
-              );
-            })
           )}
         </section>
       );
@@ -842,14 +871,13 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
                 </div>
                 <div className={styles.homeRequestBody}>
                   <h3 className={styles.homeRequestName}>{story.petName}</h3>
-                  <div className={styles.homeTags}>
-                    <span>Привет из дома</span>
-                    {story.linkedAnimalId ? (
+                  {story.linkedAnimalId ? (
+                    <div className={styles.homeTags}>
                       <span>
                         Животное: {wardRows.find((animal) => animal.id === story.linkedAnimalId)?.name || "не указано"}
                       </span>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                   <p className={styles.homeOrganizationLine}>{story.text}</p>
                   <p className={styles.homeMetaLine}>
                     {new Date(story.createdAt).toLocaleDateString("ru-RU", {
@@ -875,20 +903,19 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
             </article>
           ) : (
             organizationArticles.map((article) => {
-              const coverSrc = article.coverUrl?.trim()
-                ? getImageUrl(article.coverUrl)
-                : "/cat-placeholder.jpg";
-
               return (
-                <article className={styles.homeRequestCard} key={article.id}>
-                  <div className={styles.homeCover}>
-                    <img src={coverSrc} alt="" />
-                  </div>
+                <Link
+                  key={article.id}
+                  href={`/knowledge/${article.id}`}
+                  className={styles.homeRequestCardLink}
+                >
+                  <article className={styles.homeRequestCard}>
+                  <div className={styles.articleCoverPlaceholder} aria-hidden />
                   <div className={styles.homeRequestBody}>
                     <h3 className={styles.homeRequestName}>{article.title}</h3>
                     <div className={styles.homeTags}>
                       <span>{getArticleCategoryLabel(article.articleType)}</span>
-                      <span>{article.author}</span>
+                      {article.author ? <span>{article.author}</span> : null}
                     </div>
                     <p className={`${styles.homeOrganizationLine} ${styles.articleExcerpt}`}>{article.content}</p>
                     <p className={styles.homeMetaLine}>
@@ -898,8 +925,10 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
                         year: "numeric",
                       })}
                     </p>
-                  </div>
-                </article>
+                      <span className={styles.articleMoreLink}>Подробнее</span>
+                    </div>
+                  </article>
+                </Link>
               );
             })
           )}
@@ -945,7 +974,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
                 <div className={styles.cardBody}>
                   <h2 className={styles.cardTitle}>{animal.name}</h2>
                   <p className={styles.meta}>
-                    <span>{animal.species}</span>
+                    <span>{formatAnimalSpeciesLabel(animal.species)}</span>
                     <span>{animal.breed}</span>
                     <span>{formatAge(animal.age_months)}</span>
                   </p>
@@ -1104,19 +1133,22 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
             </aside>
 
             <nav className={styles.infoLinks} aria-label="Полезные ссылки">
-              <Link href="#" className={styles.infoLink}>
+              <button
+                type="button"
+                className={styles.infoLink}
+                onClick={() => setInstructionModal("admission")}
+              >
                 <img src="/info.svg" alt="" aria-hidden="true" className={styles.infoIcon} />
-                {profileForUi?.admissionRules ||
-                  publicPage?.hero.admission_rules ||
-                  "Правила приема животных"}
-              </Link>
-              <Link href="#" className={styles.infoLink}>
+                Правила приема животных
+              </button>
+              <button
+                type="button"
+                className={styles.infoLink}
+                onClick={() => setInstructionModal("adoption")}
+              >
                 <img src="/info.svg" alt="" aria-hidden="true" className={styles.infoIcon} />
-                {profileForUi?.adoptionRules ||
-                  profileForUi?.adoptionScenario ||
-                  publicPage?.hero.adoption_howto ||
-                  "Как забрать животное домой"}
-              </Link>
+                Как приютить питомца
+              </button>
             </nav>
           </div>
         </div>
@@ -1144,6 +1176,65 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
       </nav>
 
       {renderTabContent()}
+
+      {instructionModal ? (
+        <ModalPortal>
+          <InstructionTextModal
+            kind={instructionModal}
+            text={instructionModal === "admission" ? admissionRulesText : adoptionHowtoText}
+            onClose={() => setInstructionModal(null)}
+          />
+        </ModalPortal>
+      ) : null}
+
+      {helpModalCard ? (
+        <HelpRequisitesModal
+          animalId={helpModalCard.id}
+          animalName={helpModalCard.name}
+          organizationName={helpModalCard.organization || orgName}
+          needText={helpModalCard.needText}
+          primaryHelpRequestId={helpModalCard.primaryHelpRequestId}
+          onClose={() => setHelpModalCard(null)}
+        />
+      ) : null}
     </main>
+  );
+}
+
+function InstructionTextModal({
+  kind,
+  text,
+  onClose,
+}: {
+  kind: InstructionModalKind;
+  text: string;
+  onClose: () => void;
+}) {
+  const title =
+    kind === "admission" ? "Правила приема животных" : "Как приютить питомца";
+  const emptyMessage =
+    kind === "admission"
+      ? "Организация пока не описала правила приёма животных."
+      : "Организация пока не описала, как приютить питомца.";
+  const modalTitleId = `org-instruction-modal-${kind}`;
+
+  return (
+    <div className={styles.instructionOverlay} role="presentation" onClick={onClose}>
+      <div
+        className={styles.instructionModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modalTitleId}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id={modalTitleId} className={styles.instructionModalTitle}>
+          {title}
+        </h2>
+        <p className={styles.instructionModalText}>{text.trim() ? text : emptyMessage}</p>
+        <button type="button" className={styles.instructionModalClose} onClick={onClose}>
+          Закрыть
+        </button>
+      </div>
+    </div>
   );
 }

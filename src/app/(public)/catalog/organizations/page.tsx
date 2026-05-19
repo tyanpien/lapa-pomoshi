@@ -23,6 +23,7 @@ const needsMap: Record<string, string> = {
   financial: "Финансовая помощь",
   items: "Помощь вещами / кормом",
   auto: "Автопомощь",
+  fundraising: "Сбор",
 };
 
 type OrgPublicStats = { wards: number; adopted: number };

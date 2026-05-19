@@ -150,7 +150,8 @@
 }
 
 .stateTag,
-.experienceTag {
+.experienceTag,
+.helpFormatTag {
   display: inline-flex;
   align-items: center;
   border-radius: 8px;
@@ -167,6 +168,12 @@
 .experienceTag {
   background: #efe4d2;
   color: #544a42;
+}
+
+.helpFormatTag {
+  background: #3d4f3a;
+  color: #f8f5ef;
+  font-weight: 600;
 }
 
 .actionsRow {

@@ -5,7 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import { meApplicationsApi, type AdoptionApplicationListItem } from "@/shared/api/endpoints/meApplications";
 import { meProfileApi } from "@/shared/api/endpoints/meProfile";
+import { meUserCommunicationsApi } from "@/shared/api/endpoints/meUserCommunications";
 import { getImageUrl } from "@/shared/api/client";
+import type { ChatThread } from "@/shared/lib/messages";
+import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
+import { mapUserDialogListRow } from "@/shared/lib/userOrgDialogs";
 import styles from "./page.module.css";
 
 function resolveProfileAvatar(volunteerUrl: string | null | undefined, userUrl: string | null | undefined) {
@@ -22,6 +26,8 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState<string>("");
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
   const [deleteBusyId, setDeleteBusyId] = useState<number | null>(null);
+  const [messageThreads, setMessageThreads] = useState<ChatThread[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(true);
 
   const reload = useCallback(async () => {
     setLoadError("");
@@ -56,6 +62,27 @@ export default function ProfilePage() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMessagesLoading(true);
+    void meUserCommunicationsApi
+      .listDialogs()
+      .then((raw) => {
+        if (cancelled) return;
+        const rows = unwrapApiList<Record<string, unknown>>(raw);
+        setMessageThreads(rows.map((row) => mapUserDialogListRow(row)));
+      })
+      .catch(() => {
+        if (!cancelled) setMessageThreads([]);
+      })
+      .finally(() => {
+        if (!cancelled) setMessagesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleMenu = (formId: number) => {
     setOpenedMenuId((prevId) => (prevId === formId ? null : formId));
@@ -103,9 +130,39 @@ export default function ProfilePage() {
               Смотреть все
             </Link>
           </div>
-          <p className={styles.messagesPlaceholder}>
-            Сообщения с организациями появятся здесь, когда они будут.
-          </p>
+          {messagesLoading ? (
+            <p className={styles.messagesPlaceholder}>Загрузка…</p>
+          ) : messageThreads.length === 0 ? (
+            <p className={styles.messagesPlaceholder}>
+              Сообщения с организациями появятся здесь, когда приют напишет вам.
+            </p>
+          ) : (
+            <div className={styles.messageList}>
+              {messageThreads.map((thread) => (
+                <div key={thread.id} className={styles.messageItem}>
+                  <Link
+                    href={`/messages?thread=${thread.id}`}
+                    className={styles.messageItemLink}
+                    aria-label={`Диалог с «${thread.title}»${thread.unread ? `, непрочитанных: ${thread.unread}` : ""}`}
+                  >
+                    <div className={styles.smallAvatar} aria-hidden="true">
+                      {thread.avatarUrl ? (
+                        <img src={thread.avatarUrl} alt="" className={styles.smallAvatarImg} />
+                      ) : null}
+                    </div>
+                    {thread.unread && thread.unread > 0 ? (
+                      <span className={styles.unread} aria-hidden="true">
+                        {thread.unread > 99 ? "99+" : thread.unread}
+                      </span>
+                    ) : null}
+                    <div className={styles.messageMeta}>
+                      <p>{thread.title}</p>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className={styles.section}>

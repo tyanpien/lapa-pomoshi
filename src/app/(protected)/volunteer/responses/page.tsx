@@ -28,6 +28,8 @@ export type ResponseCard = {
   dateLabel: string;
   status: ResponseStatus;
   urgent?: boolean;
+  canChat?: boolean;
+  chatThreadId?: number;
 };
 
 const filterOptions: { label: string; value: ResponseFilter }[] = [
@@ -307,10 +309,16 @@ export default function VolunteerResponsesPage() {
 
               <div className={styles.bottom}>
                 <div className={styles.actions}>
-                  {item.status !== "Отменено" && item.status !== "Отклонено" ? (
-                    <button type="button" className={styles.chatBtn}>
-                      Чат
-                    </button>
+                  {item.status !== "Отменено" && item.status !== "Отклонено" && item.canChat !== false ? (
+                    item.chatThreadId != null ? (
+                      <Link href={`/messages?thread=${item.chatThreadId}`} className={styles.chatBtn}>
+                        Чат
+                      </Link>
+                    ) : (
+                      <span className={styles.chatBtnMuted} title="Чат откроется после принятия отклика организацией">
+                        Чат
+                      </span>
+                    )
                   ) : null}
                   {item.status === "На рассмотрении" ? (
                     <>
@@ -452,7 +460,15 @@ function mapCardDtoToUi(item: VolunteerResponseCardDto): ResponseCard | null {
     dateLabel: item.created_at ? formatDateRu(item.created_at) : "",
     status: mapBackendStatus(String(item.status ?? ""), item.status_label),
     urgent: Boolean(item.is_urgent),
+    canChat: item.can_chat !== false,
+    chatThreadId: parseChatThreadId(item.chat_thread_id),
   };
+}
+
+function parseChatThreadId(raw: string | null | undefined): number | undefined {
+  if (raw == null || raw === "") return undefined;
+  const n = Number.parseInt(String(raw).trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
 function mapDetailDtoToUi(item: VolunteerResponseDetailDto): ResponseCard | null {

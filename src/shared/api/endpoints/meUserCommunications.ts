@@ -1,8 +1,8 @@
 import { apiFetch } from "../client";
 
-const BASE = "/api/v1/me/volunteer";
+const BASE = "/api/v1/me/user";
 
-export const meVolunteerCommunicationsApi = {
+export const meUserCommunicationsApi = {
   listDialogs: (params?: { limit?: number; offset?: number }) => {
     const q = new URLSearchParams();
     const limit = Math.min(100, Math.max(1, params?.limit ?? 100));

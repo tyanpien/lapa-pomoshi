@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { meApplicationsApi } from "@/shared/api/endpoints/meApplications";
-import { formatAdoptionQuestionnaireForApi } from "./formatMessage";
+import { mapAdoptionQuestionnaireToApiBody } from "./formatMessage";
 import {
   emptyAdoptionQuestionnaireForm,
   type AdoptionQuestionnaireForm,
@@ -16,10 +16,13 @@ const TOTAL_STEPS = 7;
 type AdoptionQuestionnaireModalProps = {
   animalId: number;
   animalName: string;
+  applicationId?: number;
   initialName?: string;
   initialEmail?: string;
   initialPhone?: string;
+  initialForm?: AdoptionQuestionnaireForm;
   onClose: () => void;
+  onSaved?: () => void;
 };
 
 function Stepper({ step, success }: { step: number; success: boolean }) {
@@ -145,18 +148,23 @@ function validateStep(step: number, form: AdoptionQuestionnaireForm): string | n
 
 export function AdoptionQuestionnaireModal({
   animalId,
+  applicationId,
   initialName = "",
   initialEmail = "",
   initialPhone = "",
+  initialForm,
   onClose,
+  onSaved,
 }: AdoptionQuestionnaireModalProps) {
+  const isEdit = applicationId != null;
   const [step, setStep] = useState(1);
   const [success, setSuccess] = useState(false);
   const [form, setForm] = useState<AdoptionQuestionnaireForm>(() => ({
     ...emptyAdoptionQuestionnaireForm(),
-    name: initialName,
-    email: initialEmail,
-    phone: initialPhone,
+    ...initialForm,
+    name: initialForm?.name ?? initialName,
+    email: initialForm?.email ?? initialEmail,
+    phone: initialForm?.phone ?? initialPhone,
   }));
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
@@ -194,14 +202,23 @@ export function AdoptionQuestionnaireModal({
     }
     setSending(true);
     setError("");
-    void meApplicationsApi
-      .create({
-        animal_id: animalId,
-        message: formatAdoptionQuestionnaireForApi(form),
+    const body = mapAdoptionQuestionnaireToApiBody(form);
+    const request = isEdit
+      ? meApplicationsApi.patch(applicationId, body)
+      : meApplicationsApi.create({ animal_id: animalId, ...body });
+    void request
+      .then(() => {
+        setSuccess(true);
+        onSaved?.();
       })
-      .then(() => setSuccess(true))
       .catch((e) =>
-        setError(e instanceof Error ? e.message : "Не удалось отправить анкету. Попробуйте позже.")
+        setError(
+          e instanceof Error
+            ? e.message
+            : isEdit
+              ? "Не удалось сохранить изменения. Попробуйте позже."
+              : "Не удалось отправить анкету. Попробуйте позже."
+        )
       )
       .finally(() => setSending(false));
   };
@@ -212,10 +229,12 @@ export function AdoptionQuestionnaireModal({
         <div className={styles.successBody}>
           <img src="/lapa-reg.svg" alt="" className={styles.pawIcon} />
           <p className={styles.successTitle}>
-            Анкета отправлена!
+            {isEdit ? "Изменения сохранены!" : "Анкета отправлена!"}
           </p>
           <p className={styles.successText}>
-            Организация рассмотрит её и свяжется с вами в ближайшее время
+            {isEdit
+              ? "Организация увидит обновлённую анкету."
+              : "Организация рассмотрит её и свяжется с вами в ближайшее время"}
           </p>
         </div>
       );

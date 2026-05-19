@@ -1,6 +1,6 @@
 import { getImageUrl } from "@/shared/api/client";
 import type { ChatMessage, ChatThread } from "@/shared/lib/messages";
-import { mapOrgDialogMessages } from "@/shared/lib/organizationOrgDialogs";
+import { mapOrgDialogDetailMeta, mapOrgDialogMessages } from "@/shared/lib/organizationOrgDialogs";
 
 function pickStr(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -17,7 +17,7 @@ function formatShortTime(iso: unknown): string {
   }
 }
 
-export function mapVolDialogListRow(row: Record<string, unknown>): ChatThread {
+export function mapUserDialogListRow(row: Record<string, unknown>): ChatThread {
   const idRaw = row.id;
   const id =
     typeof idRaw === "number" && Number.isFinite(idRaw)
@@ -39,6 +39,8 @@ export function mapVolDialogListRow(row: Record<string, unknown>): ChatThread {
   };
 }
 
-export function mapVolDialogMessages(raw: unknown): ChatMessage[] {
-  return mapOrgDialogMessages(raw, "volunteer");
+export function mapUserDialogMessages(raw: unknown): ChatMessage[] {
+  return mapOrgDialogMessages(raw, "user");
 }
+
+export { mapOrgDialogDetailMeta as mapUserDialogDetailMeta };

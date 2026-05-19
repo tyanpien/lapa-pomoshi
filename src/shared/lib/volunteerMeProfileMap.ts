@@ -53,6 +53,18 @@ const HELP_FORMAT_TO_UI: Record<string, string> = {
   recurring: "Регулярная помощь",
 };
 
+export function resolveVolunteerHelpFormatLabel(
+  helpFormat?: string | null,
+  helpFormatLabel?: string | null
+): string | null {
+  const fromApi = helpFormatLabel?.trim();
+  if (fromApi) return fromApi;
+  if (helpFormat && helpFormat in HELP_FORMAT_TO_UI) {
+    return HELP_FORMAT_TO_UI[helpFormat];
+  }
+  return null;
+}
+
 const UI_TO_HELP_FORMAT: Record<string, string> = {
   "Разовая помощь": "one_time",
   "Регулярная помощь": "recurring",

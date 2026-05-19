@@ -1,18 +1,65 @@
 "use client";
 
-import { FormEvent, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
+import { meUserCommunicationsApi } from "@/shared/api/endpoints/meUserCommunications";
 import { meVolunteerCommunicationsApi } from "@/shared/api/endpoints/meVolunteerCommunications";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import type { ChatMessage, ChatThread } from "@/shared/lib/messages";
-import { mapOrgDialogListRow, mapOrgDialogMessages } from "@/shared/lib/organizationOrgDialogs";
-import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
-import { mapVolDialogListRow } from "@/shared/lib/volunteerOrgDialogs";
+import {
+  findOrgThreadForPeer,
+  mapOpenedOrgDialog,
+  mapOrgDialogDetailMeta,
+  mapOrgDialogListRow,
+  mapOrgDialogMessages,
+  mergeOrgThreadList,
+  pickOrgDialogId,
+} from "@/shared/lib/organizationOrgDialogs";
+import { fetchCommsDialogsAllPages } from "@/shared/lib/fetchCommsDialogsAllPages";
+import { mapUserDialogListRow, mapUserDialogMessages, mapUserDialogDetailMeta } from "@/shared/lib/userOrgDialogs";
+import { mapVolDialogListRow, mapVolDialogMessages } from "@/shared/lib/volunteerOrgDialogs";
 import styles from "./page.module.css";
 
-function normalizePersonName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
+function formatListDialogsError(e: unknown) {
+  const msg = e instanceof Error ? e.message : "";
+  if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+    return "Сессия истекла — войдите снова.";
+  }
+  if (msg.includes("403")) {
+    return "Нет доступа к списку диалогов для этой роли.";
+  }
+  return msg || "Не удалось загрузить диалоги с сервера. Проверьте, что бэкенд запущен.";
+}
+
+async function resolveOpenedOrgThreadId(
+  openedRaw: unknown,
+  setOrgThreads: Dispatch<SetStateAction<ChatThread[]>>,
+  findThread?: (threads: ChatThread[]) => ChatThread | undefined
+): Promise<number | null> {
+  const openedThread = mapOpenedOrgDialog(openedRaw);
+  const openedId = openedThread?.id ?? pickOrgDialogId(openedRaw);
+  if (openedThread) {
+    setOrgThreads((prev) => mergeOrgThreadList(prev, openedThread));
+  }
+  if (openedId != null && openedId > 0) {
+    return openedId;
+  }
+  const rows = await fetchCommsDialogsAllPages((p) => meOrganizationApi.listDialogs(p));
+  const mapped = rows.map((r) => mapOrgDialogListRow(r as Record<string, unknown>));
+  setOrgThreads(mapped);
+  const found = findThread?.(mapped) ?? mapped[0];
+  return found?.id ?? null;
 }
 
 function MessagesPageContent() {
@@ -25,15 +72,28 @@ function MessagesPageContent() {
   const [volThreads, setVolThreads] = useState<ChatThread[]>([]);
   const [volDialogsLoading, setVolDialogsLoading] = useState(false);
   const [volDialogsReady, setVolDialogsReady] = useState(false);
+  const [userThreads, setUserThreads] = useState<ChatThread[]>([]);
+  const [userDialogsLoading, setUserDialogsLoading] = useState(false);
+  const [userDialogsReady, setUserDialogsReady] = useState(false);
   const [dialogMessages, setDialogMessages] = useState<ChatMessage[]>([]);
   const [volunteerDialogMessages, setVolunteerDialogMessages] = useState<ChatMessage[]>([]);
+  const [userDialogMessages, setUserDialogMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState("");
+  const [dialogLoadError, setDialogLoadError] = useState("");
+  const [dialogLoading, setDialogLoading] = useState(false);
+  const [contextHint, setContextHint] = useState("");
   const [recipientResolveError, setRecipientResolveError] = useState("");
-  const ensureInflightRef = useRef(false);
-  const ensureFailedPeerRef = useRef<number | null>(null);
+  const [listDialogsError, setListDialogsError] = useState("");
+  const orgThreadsRef = useRef<ChatThread[]>([]);
 
   const pendingRecipientId = searchParams.get("recipientId");
+  const pendingApplicationId = searchParams.get("applicationId");
+  const pendingVolunteerResponseId = searchParams.get("volunteerResponseId");
+
+  useEffect(() => {
+    orgThreadsRef.current = orgThreads;
+  }, [orgThreads]);
 
   useEffect(() => {
     if (role !== "organization") {
@@ -50,15 +110,17 @@ function MessagesPageContent() {
       if (cancelled) return;
       setOrgDialogsLoading(true);
     });
-    void meOrganizationApi
-      .listDialogs()
-      .then((raw) => {
+    void fetchCommsDialogsAllPages((p) => meOrganizationApi.listDialogs(p))
+      .then((rows) => {
         if (cancelled) return;
-        const rows = unwrapApiList<Record<string, unknown>>(raw);
-        setOrgThreads(rows.map((r) => mapOrgDialogListRow(r)));
+        setListDialogsError("");
+        setOrgThreads(rows.map((r) => mapOrgDialogListRow(r as Record<string, unknown>)));
       })
-      .catch(() => {
-        if (!cancelled) setOrgThreads([]);
+      .catch((e) => {
+        if (!cancelled) {
+          setOrgThreads([]);
+          setListDialogsError(formatListDialogsError(e));
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -85,15 +147,17 @@ function MessagesPageContent() {
     queueMicrotask(() => {
       if (!cancelled) setVolDialogsLoading(true);
     });
-    void meVolunteerCommunicationsApi
-      .listDialogs()
-      .then((raw) => {
+    void fetchCommsDialogsAllPages((p) => meVolunteerCommunicationsApi.listDialogs(p))
+      .then((rows) => {
         if (cancelled) return;
-        const rows = unwrapApiList<Record<string, unknown>>(raw);
-        setVolThreads(rows.map((r) => mapVolDialogListRow(r)));
+        setListDialogsError("");
+        setVolThreads(rows.map((r) => mapVolDialogListRow(r as Record<string, unknown>)));
       })
-      .catch(() => {
-        if (!cancelled) setVolThreads([]);
+      .catch((e) => {
+        if (!cancelled) {
+          setVolThreads([]);
+          setListDialogsError(formatListDialogsError(e));
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -106,82 +170,270 @@ function MessagesPageContent() {
     };
   }, [role]);
 
+  useEffect(() => {
+    if (role !== "user") {
+      queueMicrotask(() => {
+        setUserThreads([]);
+        setUserDialogMessages([]);
+        setUserDialogsReady(false);
+      });
+      return;
+    }
+    let cancelled = false;
+    setUserDialogsReady(false);
+    queueMicrotask(() => {
+      if (!cancelled) setUserDialogsLoading(true);
+    });
+    void fetchCommsDialogsAllPages((p) => meUserCommunicationsApi.listDialogs(p))
+      .then((rows) => {
+        if (cancelled) return;
+        setListDialogsError("");
+        setUserThreads(rows.map((r) => mapUserDialogListRow(r as Record<string, unknown>)));
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setUserThreads([]);
+          setListDialogsError(formatListDialogsError(e));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setUserDialogsLoading(false);
+          setUserDialogsReady(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
+
   const threads = useMemo(() => {
     if (role === "organization") return orgThreads;
     if (role === "volunteer") return volThreads;
+    if (role === "user") return userThreads;
     return [];
-  }, [role, orgThreads, volThreads]);
+  }, [role, orgThreads, volThreads, userThreads]);
+
+  const reloadOrgDialogs = useCallback(() => {
+    return fetchCommsDialogsAllPages((p) => meOrganizationApi.listDialogs(p))
+      .then((rows) => {
+        setListDialogsError("");
+        setOrgThreads(rows.map((r) => mapOrgDialogListRow(r as Record<string, unknown>)));
+      })
+      .catch((e) => {
+        setOrgThreads([]);
+        setListDialogsError(formatListDialogsError(e));
+      });
+  }, []);
 
   useEffect(() => {
     if (role !== "organization" || orgDialogsLoading || !orgDialogsReady) return;
     if (!pendingRecipientId?.trim()) {
       setRecipientResolveError("");
-      ensureFailedPeerRef.current = null;
       return;
     }
     const peerId = Number.parseInt(pendingRecipientId.trim(), 10);
-    if (!Number.isFinite(peerId)) {
+    if (!Number.isFinite(peerId) || peerId < 1) {
       setRecipientResolveError("Некорректная ссылка на волонтёра.");
       return;
     }
-    if (ensureFailedPeerRef.current === peerId) return;
 
     const nameGuess = (searchParams.get("recipientName") ?? "").trim();
-    const match =
-      threads.find((t) => t.participantUserId === peerId) ??
-      (nameGuess.length >= 2
-        ? threads.find((t) => normalizePersonName(t.title) === normalizePersonName(nameGuess))
-        : undefined);
 
-    if (match) {
+    const navigateToThread = (threadId: number) => {
       setRecipientResolveError("");
-      ensureFailedPeerRef.current = null;
       const sp = new URLSearchParams(searchParams.toString());
       sp.delete("recipientId");
       sp.delete("recipientName");
-      sp.set("thread", String(match.id));
+      sp.set("thread", String(threadId));
       const qs = sp.toString();
       router.replace(qs ? `/messages?${qs}` : "/messages", { scroll: false });
+    };
+
+    const existing = findOrgThreadForPeer(orgThreadsRef.current, peerId, nameGuess);
+    if (existing) {
+      navigateToThread(existing.id);
       return;
     }
 
-    if (ensureInflightRef.current) return;
-
-    ensureInflightRef.current = true;
+    let cancelled = false;
     setRecipientResolveError("");
-    void meOrganizationApi
-      .openVolunteerDialog(peerId)
-      .then(() => meOrganizationApi.listDialogs())
-      .then((raw) => {
-        const rows = unwrapApiList<Record<string, unknown>>(raw);
-        const mapped = rows.map((r) => mapOrgDialogListRow(r));
-        setOrgThreads(mapped);
-        const found =
-          mapped.find((t) => t.participantUserId === peerId) ??
-          (nameGuess.length >= 2
-            ? mapped.find((t) => normalizePersonName(t.title) === normalizePersonName(nameGuess))
-            : undefined);
-        if (found) {
-          ensureFailedPeerRef.current = null;
-          const sp = new URLSearchParams(searchParams.toString());
-          sp.delete("recipientId");
-          sp.delete("recipientName");
-          sp.set("thread", String(found.id));
-          const qs = sp.toString();
-          router.replace(qs ? `/messages?${qs}` : "/messages", { scroll: false });
+
+    void (async () => {
+      try {
+        const peerType = (searchParams.get("peerType") ?? "").trim().toLowerCase();
+        const openedRaw =
+          peerType === "user"
+            ? await meOrganizationApi.openUserDialog(peerId, {
+                participant_name: nameGuess || undefined,
+              })
+            : await meOrganizationApi.openVolunteerDialog(peerId, {
+                participant_name: nameGuess || undefined,
+              });
+        if (cancelled) return;
+
+        const openedId = await resolveOpenedOrgThreadId(openedRaw, setOrgThreads, (mapped) =>
+          findOrgThreadForPeer(mapped, peerId, nameGuess)
+        );
+        if (cancelled) return;
+
+        if (openedId != null && openedId > 0) {
+          navigateToThread(openedId);
+          void reloadOrgDialogs();
         } else {
-          ensureFailedPeerRef.current = peerId;
-          setRecipientResolveError("Не удалось сопоставить открытый диалог. Обновите страницу.");
+          setRecipientResolveError(
+            "Диалог создан, но не удалось открыть его автоматически. Выберите чат в списке слева."
+          );
         }
-      })
-      .catch(() => {
-        ensureFailedPeerRef.current = peerId;
-        setRecipientResolveError("Не удалось открыть чат. Убедитесь, что пользователь — волонтёр.");
-      })
-      .finally(() => {
-        ensureInflightRef.current = false;
-      });
-  }, [role, orgDialogsLoading, orgDialogsReady, threads, pendingRecipientId, searchParams, router]);
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "";
+        if (msg.includes("404") || msg.toLowerCase().includes("не найден")) {
+          setRecipientResolveError("Участник не найден. Откройте карточку ещё раз.");
+        } else if (msg.includes("403") || msg.toLowerCase().includes("организац")) {
+          setRecipientResolveError("Открыть чат могут только организации. Войдите под аккаунтом приюта.");
+        } else if (msg.includes("400")) {
+          setRecipientResolveError(msg);
+        } else {
+          setRecipientResolveError(msg || "Не удалось открыть чат.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [role, orgDialogsLoading, orgDialogsReady, pendingRecipientId, searchParams, router, reloadOrgDialogs]);
+
+  useEffect(() => {
+    if (role !== "organization" || orgDialogsLoading || !orgDialogsReady) return;
+    if (!pendingVolunteerResponseId?.trim() || pendingRecipientId?.trim() || pendingApplicationId?.trim()) {
+      return;
+    }
+    const responseId = Number.parseInt(pendingVolunteerResponseId.trim(), 10);
+    if (!Number.isFinite(responseId) || responseId < 1) {
+      setRecipientResolveError("Некорректная ссылка на отклик.");
+      return;
+    }
+
+    const navigateToThread = (threadId: number) => {
+      setRecipientResolveError("");
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.delete("volunteerResponseId");
+      sp.set("thread", String(threadId));
+      const qs = sp.toString();
+      router.replace(qs ? `/messages?${qs}` : "/messages", { scroll: false });
+    };
+
+    let cancelled = false;
+    setRecipientResolveError("");
+
+    void (async () => {
+      try {
+        const openedRaw = await meOrganizationApi.openIncomingVolunteerResponseDialog(responseId);
+        if (cancelled) return;
+        const openedId = await resolveOpenedOrgThreadId(openedRaw, setOrgThreads);
+        if (cancelled) return;
+        if (openedId != null && openedId > 0) {
+          navigateToThread(openedId);
+          void reloadOrgDialogs();
+        } else {
+          setRecipientResolveError(
+            "Диалог создан, но не удалось открыть его автоматически. Выберите чат в списке слева."
+          );
+        }
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "";
+        if (msg.includes("404") || msg.toLowerCase().includes("не найден")) {
+          setRecipientResolveError("Отклик не найден. Обновите список входящих заявок.");
+        } else if (msg.includes("403") || msg.toLowerCase().includes("организац")) {
+          setRecipientResolveError("Открыть чат могут только организации. Войдите под аккаунтом приюта.");
+        } else {
+          setRecipientResolveError(msg || "Не удалось открыть чат с волонтёром.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    role,
+    orgDialogsLoading,
+    orgDialogsReady,
+    pendingVolunteerResponseId,
+    pendingRecipientId,
+    pendingApplicationId,
+    searchParams,
+    router,
+    reloadOrgDialogs,
+  ]);
+
+  useEffect(() => {
+    if (role !== "organization" || orgDialogsLoading || !orgDialogsReady) return;
+    if (!pendingApplicationId?.trim() || pendingRecipientId?.trim() || pendingVolunteerResponseId?.trim()) {
+      return;
+    }
+    const applicationId = Number.parseInt(pendingApplicationId.trim(), 10);
+    if (!Number.isFinite(applicationId) || applicationId < 1) {
+      setRecipientResolveError("Некорректная ссылка на анкету.");
+      return;
+    }
+
+    const navigateToThread = (threadId: number) => {
+      setRecipientResolveError("");
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.delete("applicationId");
+      sp.set("thread", String(threadId));
+      const qs = sp.toString();
+      router.replace(qs ? `/messages?${qs}` : "/messages", { scroll: false });
+    };
+
+    let cancelled = false;
+    setRecipientResolveError("");
+
+    void (async () => {
+      try {
+        const openedRaw = await meOrganizationApi.openIncomingAdoptionDialog(applicationId);
+        if (cancelled) return;
+        const openedId = await resolveOpenedOrgThreadId(openedRaw, setOrgThreads);
+        if (cancelled) return;
+        if (openedId != null && openedId > 0) {
+          navigateToThread(openedId);
+          void reloadOrgDialogs();
+        } else {
+          setRecipientResolveError(
+            "Диалог создан, но не удалось открыть его автоматически. Выберите чат в списке слева."
+          );
+        }
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "";
+        if (msg.includes("404") || msg.toLowerCase().includes("не найден")) {
+          setRecipientResolveError("Анкета не найдена. Обновите список входящих заявок.");
+        } else if (msg.includes("403") || msg.toLowerCase().includes("организац")) {
+          setRecipientResolveError("Открыть чат могут только организации. Войдите под аккаунтом приюта.");
+        } else {
+          setRecipientResolveError(msg || "Не удалось открыть чат с заявителем.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    role,
+    orgDialogsLoading,
+    orgDialogsReady,
+    pendingApplicationId,
+    pendingRecipientId,
+    pendingVolunteerResponseId,
+    searchParams,
+    router,
+    reloadOrgDialogs,
+  ]);
 
   const activeThreadId = useMemo(() => {
     if (!threads.length) return 0;
@@ -216,16 +468,63 @@ function MessagesPageContent() {
     });
   }, [searchParams, threads]);
 
+  const reloadVolDialogs = useCallback(() => {
+    return fetchCommsDialogsAllPages((p) => meVolunteerCommunicationsApi.listDialogs(p))
+      .then((rows) => {
+        setListDialogsError("");
+        setVolThreads(rows.map((r) => mapVolDialogListRow(r as Record<string, unknown>)));
+      })
+      .catch((e) => {
+        setVolThreads([]);
+        setListDialogsError(formatListDialogsError(e));
+      });
+  }, []);
+
+  const reloadUserDialogs = useCallback(() => {
+    return fetchCommsDialogsAllPages((p) => meUserCommunicationsApi.listDialogs(p))
+      .then((rows) => {
+        setListDialogsError("");
+        setUserThreads(rows.map((r) => mapUserDialogListRow(r as Record<string, unknown>)));
+      })
+      .catch((e) => {
+        setUserThreads([]);
+        setListDialogsError(formatListDialogsError(e));
+      });
+  }, []);
+
   useEffect(() => {
     if (role !== "organization" || !activeThreadId) {
-      queueMicrotask(() => setDialogMessages([]));
+      queueMicrotask(() => {
+        setDialogMessages([]);
+        setContextHint("");
+        setDialogLoadError("");
+      });
       return;
     }
     let cancelled = false;
-    void meOrganizationApi.getDialog(activeThreadId).then((raw) => {
-      if (cancelled) return;
-      setDialogMessages(mapOrgDialogMessages(raw));
-    });
+    setDialogLoading(true);
+    setDialogLoadError("");
+    void meOrganizationApi
+      .getDialog(activeThreadId)
+      .then((raw) => {
+        if (cancelled) return;
+        setDialogMessages(mapOrgDialogMessages(raw));
+        setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setDialogMessages([]);
+        setContextHint("");
+        const msg = e instanceof Error ? e.message : "";
+        setDialogLoadError(
+          msg.includes("500")
+            ? "Сервер вернул ошибку при открытии чата. Список диалогов загружается, но история сообщений сейчас недоступна — нужна правка на бэкенде (см. ниже)."
+            : "Не удалось загрузить переписку."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setDialogLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -233,14 +532,75 @@ function MessagesPageContent() {
 
   useEffect(() => {
     if (role !== "volunteer" || !activeThreadId) {
-      queueMicrotask(() => setVolunteerDialogMessages([]));
+      queueMicrotask(() => {
+        setVolunteerDialogMessages([]);
+        setContextHint("");
+        setDialogLoadError("");
+      });
       return;
     }
     let cancelled = false;
-    void meVolunteerCommunicationsApi.getDialog(activeThreadId).then((raw) => {
-      if (cancelled) return;
-      setVolunteerDialogMessages(mapOrgDialogMessages(raw));
-    });
+    setDialogLoading(true);
+    setDialogLoadError("");
+    void meVolunteerCommunicationsApi
+      .getDialog(activeThreadId)
+      .then((raw) => {
+        if (cancelled) return;
+        setVolunteerDialogMessages(mapVolDialogMessages(raw));
+        setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setVolunteerDialogMessages([]);
+        setContextHint("");
+        const msg = e instanceof Error ? e.message : "";
+        setDialogLoadError(
+          msg.includes("500")
+            ? "Не удалось загрузить переписку (ошибка сервера). Нужна правка бэкенда для PostgreSQL (см. сообщение для организации)."
+            : "Не удалось загрузить переписку. Ответ возможен только после сообщения организации."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setDialogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role, activeThreadId]);
+
+  useEffect(() => {
+    if (role !== "user" || !activeThreadId) {
+      queueMicrotask(() => {
+        setUserDialogMessages([]);
+        setContextHint("");
+        setDialogLoadError("");
+      });
+      return;
+    }
+    let cancelled = false;
+    setDialogLoading(true);
+    setDialogLoadError("");
+    void meUserCommunicationsApi
+      .getDialog(activeThreadId)
+      .then((raw) => {
+        if (cancelled) return;
+        setUserDialogMessages(mapUserDialogMessages(raw));
+        setContextHint(mapUserDialogDetailMeta(raw).contextHint);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setUserDialogMessages([]);
+        setContextHint("");
+        const msg = e instanceof Error ? e.message : "";
+        setDialogLoadError(
+          msg.includes("500")
+            ? "Не удалось загрузить переписку (ошибка сервера)."
+            : "Не удалось загрузить переписку. Ответ возможен только после сообщения организации."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setDialogLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -261,7 +621,9 @@ function MessagesPageContent() {
       ? dialogMessages
       : role === "volunteer"
         ? volunteerDialogMessages
-        : activeThread.messages;
+        : role === "user"
+          ? userDialogMessages
+          : activeThread.messages;
 
   const handleSend = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -276,9 +638,19 @@ function MessagesPageContent() {
         .then(() => meOrganizationApi.getDialog(activeThreadId))
         .then((raw) => {
           setDialogMessages(mapOrgDialogMessages(raw));
+          setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
+          setDialogLoadError("");
           setDraft("");
+          return reloadOrgDialogs();
         })
-        .catch(() => setSendError("Не удалось отправить сообщение."));
+        .catch((e) => {
+          const msg = e instanceof Error ? e.message : "";
+          if (msg.includes("403")) {
+            setSendError("Не удалось отправить: проверьте права или обновите страницу.");
+          } else {
+            setSendError("Не удалось отправить сообщение.");
+          }
+        });
       return;
     }
 
@@ -288,19 +660,66 @@ function MessagesPageContent() {
         .postDialogMessage(activeThreadId, text)
         .then(() => meVolunteerCommunicationsApi.getDialog(activeThreadId))
         .then((raw) => {
-          setVolunteerDialogMessages(mapOrgDialogMessages(raw));
+          setVolunteerDialogMessages(mapVolDialogMessages(raw));
+          setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
+          setDialogLoadError("");
           setDraft("");
+          return reloadVolDialogs();
         })
-        .catch(() => setSendError("Не удалось отправить сообщение."));
+        .catch((e) => {
+          const msg = e instanceof Error ? e.message : "";
+          if (msg.includes("403")) {
+            setSendError(
+              "Организация ещё не писала в этот чат — дождитесь первого сообщения от приюта."
+            );
+          } else {
+            setSendError("Не удалось отправить сообщение.");
+          }
+        });
+      return;
+    }
+
+    if (role === "user") {
+      if (!activeThreadId) return;
+      void meUserCommunicationsApi
+        .postDialogMessage(activeThreadId, text)
+        .then(() => meUserCommunicationsApi.getDialog(activeThreadId))
+        .then((raw) => {
+          setUserDialogMessages(mapUserDialogMessages(raw));
+          setContextHint(mapUserDialogDetailMeta(raw).contextHint);
+          setDialogLoadError("");
+          setDraft("");
+          return reloadUserDialogs();
+        })
+        .catch((e) => {
+          const msg = e instanceof Error ? e.message : "";
+          if (msg.includes("403")) {
+            setSendError(
+              "Организация ещё не писала в этот чат — дождитесь первого сообщения от приюта."
+            );
+          } else {
+            setSendError("Не удалось отправить сообщение.");
+          }
+        });
       return;
     }
 
     setDraft("");
   };
 
+  const dialogsLoading =
+    (role === "organization" && orgDialogsLoading) ||
+    (role === "volunteer" && volDialogsLoading) ||
+    (role === "user" && userDialogsLoading);
+
   return (
     <main className={styles.page}>
       <div className={styles.container}>
+        {listDialogsError ? (
+          <p className={styles.recipientResolveBanner} role="alert">
+            {listDialogsError}
+          </p>
+        ) : null}
         {recipientResolveError ? (
           <p className={styles.recipientResolveBanner} role="alert">
             {recipientResolveError}
@@ -311,16 +730,8 @@ function MessagesPageContent() {
             {role === "guest" ? (
               <div className={styles.chatListItem}>Загрузка…</div>
             ) : null}
-            {role === "organization" && orgDialogsLoading ? (
-              <div className={styles.chatListItem}>Загрузка диалогов…</div>
-            ) : null}
-            {role === "volunteer" && volDialogsLoading ? (
-              <div className={styles.chatListItem}>Загрузка диалогов…</div>
-            ) : null}
-            {role === "organization" && !orgDialogsLoading && threads.length === 0 ? (
-              <div className={styles.chatListItem}>Диалогов пока нет.</div>
-            ) : null}
-            {role === "volunteer" && !volDialogsLoading && threads.length === 0 ? (
+            {dialogsLoading ? <div className={styles.chatListItem}>Загрузка диалогов…</div> : null}
+            {!dialogsLoading && role !== "guest" && threads.length === 0 ? (
               <div className={styles.chatListItem}>Диалогов пока нет.</div>
             ) : null}
             {threads.map((thread) => (
@@ -346,9 +757,22 @@ function MessagesPageContent() {
 
           <section className={styles.chatPanel}>
             <h1 className={styles.chatTitle}>{activeThread.title}</h1>
+            {contextHint ? <p className={styles.contextHint}>{contextHint}</p> : null}
 
             <div className={styles.chatWindow}>
-              <div className={styles.dateBadge}>20 апреля</div>
+              {dialogLoading ? <p className={styles.dialogStatus}>Загрузка сообщений…</p> : null}
+              {dialogLoadError ? (
+                <p className={styles.dialogError} role="alert">
+                  {dialogLoadError}
+                </p>
+              ) : null}
+
+              {!dialogLoading &&
+              !dialogLoadError &&
+              displayedMessages.length === 0 &&
+              activeThreadId > 0 ? (
+                <p className={styles.dialogStatus}>Сообщений пока нет. Напишите первым.</p>
+              ) : null}
 
               {displayedMessages.map((message) => (
                 <article
@@ -364,14 +788,17 @@ function MessagesPageContent() {
                         message.from === "me" ? styles.messageBubbleMine : styles.messageBubbleOther
                       }`}
                     >
-                      {message.text}
+                      {message.photoUrl ? (
+                        <img src={message.photoUrl} alt="" className={styles.messagePhoto} />
+                      ) : null}
+                      {message.text ? <span>{message.text}</span> : null}
                     </div>
                     <span className={styles.messageTime}>{message.time}</span>
                   </div>
                 </article>
               ))}
 
-              {sendError ? <p style={{ color: "#a33", fontSize: 13 }}>{sendError}</p> : null}
+              {sendError ? <p className={styles.sendError}>{sendError}</p> : null}
 
               <form className={styles.messageForm} onSubmit={handleSend}>
                 <input
