@@ -1,4 +1,4 @@
-﻿import { apiFetch } from "../client";
+import { apiFetch } from "../client";
 
 export interface UrgentItem {
   id: number;
@@ -42,6 +42,10 @@ export interface UrgentCatalogs {
     label: string;
   }[];
   help_types: {
+    id: string;
+    label: string;
+  }[];
+  volunteer_task_types?: {
     id: string;
     label: string;
   }[];

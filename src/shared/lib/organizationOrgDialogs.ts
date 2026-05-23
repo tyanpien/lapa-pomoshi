@@ -102,6 +102,10 @@ export function mapOrgDialogListRow(row: Record<string, unknown>): ChatThread {
     pickUserId(row.participant_user_id) ??
     pickUserId(row.peer_user_id) ??
     pickUserId(row.counterparty_user_id);
+  const avatarRaw =
+    pickStr(row.participant_avatar_url) ||
+    pickStr(row.avatar_url) ||
+    pickStr(row.peer_avatar_url);
   return {
     id,
     title:
@@ -119,6 +123,7 @@ export function mapOrgDialogListRow(row: Record<string, unknown>): ChatThread {
     time: formatShortTime(row.updated_at ?? row.last_message_at ?? row.created_at),
     unread: typeof row.unread_count === "number" ? row.unread_count : undefined,
     participantUserId,
+    avatarUrl: avatarRaw ? getImageUrl(avatarRaw) : undefined,
     messages: [],
   };
 }

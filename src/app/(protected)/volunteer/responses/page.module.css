@@ -275,7 +275,14 @@
   line-height: 1;
   display: inline-flex;
   align-items: center;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.statusSub {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.9;
 }
 
 .statusPending {

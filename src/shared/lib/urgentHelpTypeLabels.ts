@@ -1,11 +1,14 @@
+import { VOLUNTEER_COMPETENCY_LABEL_BY_SLUG } from "@/shared/lib/volunteerCompetencyCatalog";
+
 export const URGENT_HELP_TYPE_LABELS: Record<string, string> = {
   financial: "Финансовая помощь",
   foster: "Передержка",
-  manual: "Помощь руками",
+  manual: "Помощь в приюте",
   auto: "Автопомощь",
-  medical: "Лекарства и кровь",
+  medical: "Медицина",
   food: "Накормить",
   feed: "Накормить",
+  ...VOLUNTEER_COMPETENCY_LABEL_BY_SLUG,
 };
 
 function splitHelpTypeList(raw: string): string[] {
@@ -39,11 +42,18 @@ export function getUrgentHelpTypeLabel(helpType: string): string {
 const URGENT_HELP_TYPE_SHORT_TAGS: Record<string, string> = {
   financial: "сбор",
   foster: "передержка",
-  manual: "руками",
+  manual: "приют",
   auto: "авто",
   medical: "медицина",
   food: "корм",
   feed: "корм",
+  walk: "выгул",
+  photo_video: "фото",
+  texts_social: "smm",
+  rescue: "спасение",
+  events: "ивенты",
+  fundraising: "фандрайз",
+  other: "другое",
 };
 
 function shortTagSingle(helpType: string): string {

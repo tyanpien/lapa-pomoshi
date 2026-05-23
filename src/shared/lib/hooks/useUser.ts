@@ -2,6 +2,7 @@ import { UserRole } from "@/shared/types/user";
 import { clearAuthCookies, setAuthCookies } from "@/shared/lib/auth/cookies";
 import { useState, useEffect } from "react";
 import { meProfileApi } from "@/shared/api/endpoints/meProfile";
+import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import { getImageUrl } from "@/shared/api/client";
 
 const AUTH_CHANGED_EVENT = "auth-changed";
@@ -14,6 +15,28 @@ function readStoredRoleFromBrowser(): UserRole {
   const token = (localStorage.getItem("token") || localStorage.getItem("access_token") || "").trim();
   if (token && storedRole && storedRole !== "guest") return storedRole;
   return "guest";
+}
+
+function pickOrgCabinetLogoUrl(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const profile = (data as { profile?: unknown }).profile;
+  if (!profile || typeof profile !== "object") return null;
+  const logo = (profile as { logo_url?: unknown }).logo_url;
+  return typeof logo === "string" && logo.trim() ? logo.trim() : null;
+}
+
+function pickOrgCabinetName(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const profile = (data as { profile?: unknown }).profile;
+  if (!profile || typeof profile !== "object") return null;
+  const name = (profile as { name?: unknown }).name;
+  return typeof name === "string" && name.trim() ? name.trim() : null;
+}
+
+export function syncStoredUserAvatar(url: string | null) {
+  if (url) localStorage.setItem("userAvatar", url);
+  else localStorage.removeItem("userAvatar");
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export function useUser() {
@@ -54,13 +77,29 @@ export function useUser() {
             if (!profile) {
               return;
             }
-            const apiName =
+            let apiName =
               profile.user.full_name?.trim() || profile.user.email?.trim() || null;
-            const rawAvatar =
-              profile.volunteer_profile?.avatar_url?.trim() ||
-              profile.user_profile?.avatar_url?.trim() ||
-              "";
-            const apiAvatar = rawAvatar ? getImageUrl(rawAvatar) : null;
+            let apiAvatar: string | null = null;
+
+            if (storedRole === "organization") {
+              try {
+                const cabinet = await Promise.race([
+                  meOrganizationApi.getProfileCabinet(),
+                  new Promise<null>((resolve) => setTimeout(() => resolve(null), ME_PROFILE_FETCH_MS)),
+                ]);
+                const logoRaw = cabinet ? pickOrgCabinetLogoUrl(cabinet) : null;
+                apiAvatar = logoRaw ? getImageUrl(logoRaw) : null;
+                const orgName = cabinet ? pickOrgCabinetName(cabinet) : null;
+                if (orgName) apiName = orgName;
+              } catch {
+              }
+            } else {
+              const rawAvatar =
+                profile.volunteer_profile?.avatar_url?.trim() ||
+                profile.user_profile?.avatar_url?.trim() ||
+                "";
+              apiAvatar = rawAvatar ? getImageUrl(rawAvatar) : null;
+            }
 
             const tokenStill =
               typeof window !== "undefined"

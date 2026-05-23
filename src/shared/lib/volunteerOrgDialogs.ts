@@ -24,8 +24,14 @@ export function mapVolDialogListRow(row: Record<string, unknown>): ChatThread {
       ? idRaw
       : Number.parseInt(pickStr(idRaw), 10) || 0;
   const logoRaw = pickStr(row.organization_logo_url);
+  const orgIdRaw = row.organization_id;
+  const organizationId =
+    typeof orgIdRaw === "number" && Number.isFinite(orgIdRaw)
+      ? orgIdRaw
+      : Number.parseInt(pickStr(orgIdRaw), 10) || undefined;
   return {
     id,
+    organizationId: organizationId && organizationId > 0 ? organizationId : undefined,
     title: pickStr(row.organization_name) || "Организация",
     avatarUrl: logoRaw ? getImageUrl(logoRaw) : undefined,
     preview:

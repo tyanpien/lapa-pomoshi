@@ -1,5 +1,6 @@
 import type { HelpAnimalItem } from "@/shared/api/endpoints/help";
 import { helpApi } from "@/shared/api/endpoints/help";
+import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
 
 export type HelpCardNeedType = "adopt" | "food" | "treatment" | "other";
 
@@ -17,6 +18,8 @@ export interface HelpAnimalCardModel {
   needType: HelpCardNeedType;
   amount: string | null;
   primaryHelpRequestId: number | null;
+  adoptReady: boolean;
+  hasFundraising: boolean;
 }
 
 export type HelpAnimalCardRendered = HelpAnimalCardModel & { actionLabel: string };
@@ -84,7 +87,10 @@ export const mapHelpAnimalItemToCard = (item: HelpAnimalItem): HelpAnimalCardMod
     image: helpApi.getImageUrl(item.primary_photo_url),
     isUrgent: item.is_urgent,
     species: item.species_tag?.trim() ? item.species_tag.trim().toLowerCase() : "животное",
-    age: item.age_tag?.trim() || "Возраст не указан",
+    age:
+      typeof item.age_months === "number"
+        ? formatAgeMonthsRu(item.age_months)
+        : item.age_tag?.trim() || "Возраст не указан",
     statusTag: item.status_chip?.trim() || "—",
     organization: item.organization_name?.trim() || "Организация",
     needText,
@@ -92,14 +98,22 @@ export const mapHelpAnimalItemToCard = (item: HelpAnimalItem): HelpAnimalCardMod
     needType,
     amount: amountStr,
     primaryHelpRequestId,
+    adoptReady: Boolean(item.adopt_ready),
+    hasFundraising: (item.monetary ?? []).length > 0,
   };
 };
 
+const prefersHelpAction = (card: Pick<HelpAnimalCardModel, "adoptReady" | "hasFundraising" | "statusTag">) => {
+  if (card.hasFundraising) return true;
+  if (!card.adoptReady) return true;
+  return card.statusTag.toLowerCase().includes("лечен");
+};
+
 export const withHelpActionLabel = (card: HelpAnimalCardModel): HelpAnimalCardRendered => {
-  const hasCollection = Boolean(card.amount?.trim());
+  const showHelp = prefersHelpAction(card);
   return {
     ...card,
-    actionLabel: hasCollection ? "Помочь" : "Забрать домой",
-    amount: hasCollection ? card.amount : null,
+    actionLabel: showHelp ? "Помочь" : "Забрать домой",
+    amount: showHelp ? card.amount : null,
   };
 };

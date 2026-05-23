@@ -28,6 +28,11 @@ import {
   parseVolunteerTaskDescription,
 } from "@/shared/lib/helpRequestType";
 import {
+  VOLUNTEER_COMPETENCY_OPTIONS,
+  VOLUNTEER_COMPETENCY_SLUGS,
+  resolveVolunteerTaskTypeSlug,
+} from "@/shared/lib/volunteerCompetencyCatalog";
+import {
   CreateRequestModal,
   emptyCreateForm,
   type CreateRequestFormState,
@@ -93,6 +98,7 @@ export default function OrganizationRequestsPage() {
   const [items, setItems] = useState<UrgentItem[]>([]);
   const [catalogsLoaded, setCatalogsLoaded] = useState<{
     help_types: { id: string; label: string }[];
+    volunteer_task_types: { id: string; label: string }[];
     statuses: { id: string; label: string }[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -142,6 +148,10 @@ export default function OrganizationRequestsPage() {
         if (catalogs) {
           setCatalogsLoaded({
             help_types: catalogs.help_types ?? [],
+            volunteer_task_types:
+              catalogs.volunteer_task_types?.length
+                ? catalogs.volunteer_task_types
+                : VOLUNTEER_COMPETENCY_OPTIONS,
             statuses: catalogs.statuses ?? [],
           });
         } else setCatalogsLoaded(null);
@@ -164,6 +174,10 @@ export default function OrganizationRequestsPage() {
       if (catalogs) {
         setCatalogsLoaded({
           help_types: catalogs.help_types ?? [],
+          volunteer_task_types:
+            catalogs.volunteer_task_types?.length
+              ? catalogs.volunteer_task_types
+              : VOLUNTEER_COMPETENCY_OPTIONS,
           statuses: catalogs.statuses ?? [],
         });
       } else setCatalogsLoaded(null);
@@ -346,7 +360,7 @@ export default function OrganizationRequestsPage() {
     setCreateModalOpen(false);
     setEditingRequestId(null);
     setModalKind(null);
-    setForm(emptyCreateForm(catalogsLoaded?.help_types?.[0]?.id ?? "manual"));
+    setForm(emptyCreateForm(catalogsLoaded?.volunteer_task_types?.[0]?.id ?? "walk"));
   };
 
   const formatSaveError = (e: unknown, action: "создать" | "сохранить") => {
@@ -380,12 +394,11 @@ export default function OrganizationRequestsPage() {
 
     let helpSlug =
       kind === "collection" ? form.collectionHelpType.trim() : form.helpType.trim();
-    if (
-      kind === "volunteer" &&
-      catalogsLoaded?.help_types?.length &&
-      !catalogsLoaded.help_types.some((h) => h.id === helpSlug)
-    ) {
-      helpSlug = catalogsLoaded.help_types[0]?.id ?? "manual";
+    if (kind === "volunteer") {
+      const allowed = catalogsLoaded?.volunteer_task_types ?? VOLUNTEER_COMPETENCY_OPTIONS;
+      if (!VOLUNTEER_COMPETENCY_SLUGS.has(helpSlug) && allowed.length) {
+        helpSlug = allowed[0]?.id ?? "walk";
+      }
     }
 
     const deadlineIso = form.deadlineAt
@@ -399,7 +412,7 @@ export default function OrganizationRequestsPage() {
       help_type: helpSlug,
       is_urgent: form.isUrgent,
       volunteer_needed: kind === "volunteer",
-      volunteer_competencies: [] as string[],
+      volunteer_competencies: kind === "volunteer" ? [helpSlug] : [],
       volunteer_requirements:
         kind === "collection" && form.requisites.trim()
           ? form.requisites.trim()
@@ -492,7 +505,7 @@ export default function OrganizationRequestsPage() {
     setModalKind(null);
     setErrorText("");
     setForm({
-      ...emptyCreateForm(catalogsLoaded?.help_types?.[0]?.id ?? "manual"),
+      ...emptyCreateForm(catalogsLoaded?.volunteer_task_types?.[0]?.id ?? "walk"),
       requisites: resolveOrgBankAccountDigits(apiPayload.publicPage?.about?.bank_account),
     });
     setCreateModalOpen(true);
@@ -500,7 +513,7 @@ export default function OrganizationRequestsPage() {
 
   const fillFormFromDetail = (d: UrgentRequestDetail, kind: RequestKind) => {
     setForm({
-      ...emptyCreateForm(catalogsLoaded?.help_types?.[0]?.id ?? "manual"),
+      ...emptyCreateForm(catalogsLoaded?.volunteer_task_types?.[0]?.id ?? "walk"),
       title: d.title,
       isUrgent: d.is_urgent,
       linkedAnimalId: d.animal_id != null ? String(d.animal_id) : "",
@@ -514,7 +527,10 @@ export default function OrganizationRequestsPage() {
         orgBankAccountDigits ||
         resolveOrgBankAccountDigits(apiPayload.publicPage?.about?.bank_account),
       problemDescription: d.description,
-      helpType: d.help_type,
+      helpType:
+        kind === "volunteer"
+          ? resolveVolunteerTaskTypeSlug(d.help_type, d.volunteer_competencies)
+          : d.help_type,
       location: d.address?.trim() || d.city?.trim() || "",
       deadlineAt: toDatetimeLocalValue(d.deadline_at),
     });
@@ -829,7 +845,7 @@ export default function OrganizationRequestsPage() {
       {isCreateModalOpen ? (
         <CreateRequestModal
           animals={animals}
-          helpTypeOptions={catalogsLoaded?.help_types}
+          volunteerTaskTypeOptions={catalogsLoaded?.volunteer_task_types}
           editingId={editingRequestId}
           initialKind={modalKind}
           initialStep={editingRequestId != null && modalKind ? modalKind : undefined}

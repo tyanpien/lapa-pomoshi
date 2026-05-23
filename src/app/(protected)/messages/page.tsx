@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type Dispatch,
   type SetStateAction,
 } from "react";
@@ -28,8 +29,19 @@ import {
 } from "@/shared/lib/organizationOrgDialogs";
 import { fetchCommsDialogsAllPages } from "@/shared/lib/fetchCommsDialogsAllPages";
 import { mapUserDialogListRow, mapUserDialogMessages, mapUserDialogDetailMeta } from "@/shared/lib/userOrgDialogs";
+import { dedupeCommsThreadsForRole } from "@/shared/lib/dedupeCommsThreads";
 import { mapVolDialogListRow, mapVolDialogMessages } from "@/shared/lib/volunteerOrgDialogs";
 import styles from "./page.module.css";
+
+const CHAT_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/jpg";
+
+function DialogAvatar({ url, className }: { url?: string; className: string }) {
+  const src = url?.trim();
+  if (src) {
+    return <img src={src} alt="" className={className} />;
+  }
+  return <span className={className} aria-hidden />;
+}
 
 function formatListDialogsError(e: unknown) {
   const msg = e instanceof Error ? e.message : "";
@@ -79,7 +91,10 @@ function MessagesPageContent() {
   const [volunteerDialogMessages, setVolunteerDialogMessages] = useState<ChatMessage[]>([]);
   const [userDialogMessages, setUserDialogMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [sendError, setSendError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogLoadError, setDialogLoadError] = useState("");
   const [dialogLoading, setDialogLoading] = useState(false);
   const [contextHint, setContextHint] = useState("");
@@ -94,6 +109,29 @@ function MessagesPageContent() {
   useEffect(() => {
     orgThreadsRef.current = orgThreads;
   }, [orgThreads]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview);
+    };
+  }, [pendingImagePreview]);
+
+  const mapDialogList = useCallback(
+    (rows: Record<string, unknown>[], mapper: (row: Record<string, unknown>) => ChatThread) =>
+      dedupeCommsThreadsForRole(rows.map((r) => mapper(r)), role),
+    [role]
+  );
+
+  const clearActiveThreadUnread = useCallback(
+    (threadId: number) => {
+      const patch = (prev: ChatThread[]) =>
+        prev.map((t) => (t.id === threadId ? { ...t, unread: undefined } : t));
+      if (role === "organization") setOrgThreads(patch);
+      else if (role === "volunteer") setVolThreads(patch);
+      else if (role === "user") setUserThreads(patch);
+    },
+    [role]
+  );
 
   useEffect(() => {
     if (role !== "organization") {
@@ -114,7 +152,7 @@ function MessagesPageContent() {
       .then((rows) => {
         if (cancelled) return;
         setListDialogsError("");
-        setOrgThreads(rows.map((r) => mapOrgDialogListRow(r as Record<string, unknown>)));
+        setOrgThreads(mapDialogList(rows as Record<string, unknown>[], mapOrgDialogListRow));
       })
       .catch((e) => {
         if (!cancelled) {
@@ -151,7 +189,7 @@ function MessagesPageContent() {
       .then((rows) => {
         if (cancelled) return;
         setListDialogsError("");
-        setVolThreads(rows.map((r) => mapVolDialogListRow(r as Record<string, unknown>)));
+        setVolThreads(mapDialogList(rows as Record<string, unknown>[], mapVolDialogListRow));
       })
       .catch((e) => {
         if (!cancelled) {
@@ -188,7 +226,7 @@ function MessagesPageContent() {
       .then((rows) => {
         if (cancelled) return;
         setListDialogsError("");
-        setUserThreads(rows.map((r) => mapUserDialogListRow(r as Record<string, unknown>)));
+        setUserThreads(mapDialogList(rows as Record<string, unknown>[], mapUserDialogListRow));
       })
       .catch((e) => {
         if (!cancelled) {
@@ -218,13 +256,13 @@ function MessagesPageContent() {
     return fetchCommsDialogsAllPages((p) => meOrganizationApi.listDialogs(p))
       .then((rows) => {
         setListDialogsError("");
-        setOrgThreads(rows.map((r) => mapOrgDialogListRow(r as Record<string, unknown>)));
+        setOrgThreads(mapDialogList(rows as Record<string, unknown>[], mapOrgDialogListRow));
       })
       .catch((e) => {
         setOrgThreads([]);
         setListDialogsError(formatListDialogsError(e));
       });
-  }, []);
+  }, [mapDialogList]);
 
   useEffect(() => {
     if (role !== "organization" || orgDialogsLoading || !orgDialogsReady) return;
@@ -472,25 +510,25 @@ function MessagesPageContent() {
     return fetchCommsDialogsAllPages((p) => meVolunteerCommunicationsApi.listDialogs(p))
       .then((rows) => {
         setListDialogsError("");
-        setVolThreads(rows.map((r) => mapVolDialogListRow(r as Record<string, unknown>)));
+        setVolThreads(mapDialogList(rows as Record<string, unknown>[], mapVolDialogListRow));
       })
       .catch((e) => {
         setVolThreads([]);
         setListDialogsError(formatListDialogsError(e));
       });
-  }, []);
+  }, [mapDialogList]);
 
   const reloadUserDialogs = useCallback(() => {
     return fetchCommsDialogsAllPages((p) => meUserCommunicationsApi.listDialogs(p))
       .then((rows) => {
         setListDialogsError("");
-        setUserThreads(rows.map((r) => mapUserDialogListRow(r as Record<string, unknown>)));
+        setUserThreads(mapDialogList(rows as Record<string, unknown>[], mapUserDialogListRow));
       })
       .catch((e) => {
         setUserThreads([]);
         setListDialogsError(formatListDialogsError(e));
       });
-  }, []);
+  }, [mapDialogList]);
 
   useEffect(() => {
     if (role !== "organization" || !activeThreadId) {
@@ -510,6 +548,8 @@ function MessagesPageContent() {
         if (cancelled) return;
         setDialogMessages(mapOrgDialogMessages(raw));
         setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
+        clearActiveThreadUnread(activeThreadId);
+        return reloadOrgDialogs();
       })
       .catch((e) => {
         if (cancelled) return;
@@ -528,7 +568,7 @@ function MessagesPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [role, activeThreadId]);
+  }, [role, activeThreadId, clearActiveThreadUnread, reloadOrgDialogs]);
 
   useEffect(() => {
     if (role !== "volunteer" || !activeThreadId) {
@@ -548,6 +588,8 @@ function MessagesPageContent() {
         if (cancelled) return;
         setVolunteerDialogMessages(mapVolDialogMessages(raw));
         setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
+        clearActiveThreadUnread(activeThreadId);
+        return reloadVolDialogs();
       })
       .catch((e) => {
         if (cancelled) return;
@@ -566,7 +608,7 @@ function MessagesPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [role, activeThreadId]);
+  }, [role, activeThreadId, clearActiveThreadUnread, reloadVolDialogs]);
 
   useEffect(() => {
     if (role !== "user" || !activeThreadId) {
@@ -586,6 +628,8 @@ function MessagesPageContent() {
         if (cancelled) return;
         setUserDialogMessages(mapUserDialogMessages(raw));
         setContextHint(mapUserDialogDetailMeta(raw).contextHint);
+        clearActiveThreadUnread(activeThreadId);
+        return reloadUserDialogs();
       })
       .catch((e) => {
         if (cancelled) return;
@@ -604,7 +648,7 @@ function MessagesPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [role, activeThreadId]);
+  }, [role, activeThreadId, clearActiveThreadUnread, reloadUserDialogs]);
 
   const activeThread =
     threads.find((thread) => thread.id === activeThreadId) ??
@@ -625,22 +669,61 @@ function MessagesPageContent() {
           ? userDialogMessages
           : activeThread.messages;
 
+  const clearPendingImage = useCallback(() => {
+    setPendingImage(null);
+    setPendingImagePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  const handlePickImage = () => {
+    setSendError("");
+    fileInputRef.current?.click();
+  };
+
+  const handleImageSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setSendError("Можно прикрепить только изображение (JPG, PNG, WebP).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSendError("Размер файла — не больше 5 МБ.");
+      return;
+    }
+    setSendError("");
+    setPendingImagePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+    setPendingImage(file);
+  };
+
   const handleSend = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSendError("");
     const text = draft.trim();
-    if (!text) return;
+    const image = pendingImage;
+    if (!text && !image) return;
+
+    const afterSendClear = () => {
+      setDraft("");
+      clearPendingImage();
+    };
 
     if (role === "organization") {
       if (!activeThreadId) return;
       void meOrganizationApi
-        .postDialogMessage(activeThreadId, text)
+        .postDialogMessage(activeThreadId, text, image)
         .then(() => meOrganizationApi.getDialog(activeThreadId))
         .then((raw) => {
           setDialogMessages(mapOrgDialogMessages(raw));
           setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
           setDialogLoadError("");
-          setDraft("");
+          afterSendClear();
           return reloadOrgDialogs();
         })
         .catch((e) => {
@@ -657,13 +740,13 @@ function MessagesPageContent() {
     if (role === "volunteer") {
       if (!activeThreadId) return;
       void meVolunteerCommunicationsApi
-        .postDialogMessage(activeThreadId, text)
+        .postDialogMessage(activeThreadId, text, image)
         .then(() => meVolunteerCommunicationsApi.getDialog(activeThreadId))
         .then((raw) => {
           setVolunteerDialogMessages(mapVolDialogMessages(raw));
           setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
           setDialogLoadError("");
-          setDraft("");
+          afterSendClear();
           return reloadVolDialogs();
         })
         .catch((e) => {
@@ -682,13 +765,13 @@ function MessagesPageContent() {
     if (role === "user") {
       if (!activeThreadId) return;
       void meUserCommunicationsApi
-        .postDialogMessage(activeThreadId, text)
+        .postDialogMessage(activeThreadId, text, image)
         .then(() => meUserCommunicationsApi.getDialog(activeThreadId))
         .then((raw) => {
           setUserDialogMessages(mapUserDialogMessages(raw));
           setContextHint(mapUserDialogDetailMeta(raw).contextHint);
           setDialogLoadError("");
-          setDraft("");
+          afterSendClear();
           return reloadUserDialogs();
         })
         .catch((e) => {
@@ -742,7 +825,7 @@ function MessagesPageContent() {
                 className={`${styles.chatListItem} ${activeThread.id === thread.id ? styles.active : ""}`}
                 onClick={() => selectThread(thread.id)}
               >
-                <span className={styles.avatar} />
+                <DialogAvatar url={thread.avatarUrl} className={styles.avatar} />
                 <span className={styles.chatListText}>
                   <span className={styles.chatListTitle}>{thread.title}</span>
                   <span className={styles.chatListPreview}>{thread.preview}</span>
@@ -781,7 +864,9 @@ function MessagesPageContent() {
                     message.from === "me" ? styles.messageRowMine : styles.messageRowOther
                   }`}
                 >
-                  {message.from === "other" ? <span className={styles.messageAvatar} /> : null}
+                  {message.from === "other" ? (
+                    <DialogAvatar url={activeThread.avatarUrl} className={styles.messageAvatar} />
+                  ) : null}
                   <div className={styles.messageContent}>
                     <div
                       className={`${styles.messageBubble} ${
@@ -800,7 +885,29 @@ function MessagesPageContent() {
 
               {sendError ? <p className={styles.sendError}>{sendError}</p> : null}
 
+              {pendingImagePreview ? (
+                <div className={styles.pendingImageWrap}>
+                  <img src={pendingImagePreview} alt="" className={styles.pendingImage} />
+                  <button
+                    type="button"
+                    className={styles.pendingImageRemove}
+                    onClick={clearPendingImage}
+                  >
+                    Убрать фото
+                  </button>
+                </div>
+              ) : null}
+
               <form className={styles.messageForm} onSubmit={handleSend}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={CHAT_IMAGE_ACCEPT}
+                  className={styles.hiddenFileInput}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onChange={handleImageSelected}
+                />
                 <input
                   type="text"
                   placeholder={role === "volunteer" ? "Ответ волонтера..." : "Сообщение..."}
@@ -809,8 +916,13 @@ function MessagesPageContent() {
                   onChange={(e) => setDraft(e.target.value)}
                 />
                 <div className={styles.messageActions}>
-                  <button type="button" className={styles.attachButton} aria-label="Прикрепить файл">
-                    <img src="/screpka.svg" alt="прикрепить файл" />
+                  <button
+                    type="button"
+                    className={styles.attachButton}
+                    aria-label="Прикрепить фото"
+                    onClick={handlePickImage}
+                  >
+                    <img src="/screpka.svg" alt="" />
                   </button>
                   <button type="submit" className={styles.sendButton}>
                     Отправить

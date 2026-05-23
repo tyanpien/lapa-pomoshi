@@ -3,10 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import { knowledgeApi, type KnowledgeItem } from "@/shared/api/endpoints/knowledge";
-import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
-import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
 import { getOrganizationCabinetEventName } from "@/shared/lib/organizationCabinet";
-import { useUser } from "@/shared/lib/hooks/useUser";
 
 function notifyCabinetUpdated() {
   window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
@@ -14,11 +11,6 @@ function notifyCabinetUpdated() {
 import { getArticleCategoryLabel } from "@/shared/lib/articleCategoryLabels";
 
 type VisibilityFilter = "all" | "archive";
-
-type OrgArticleRow = KnowledgeItem & {
-  is_archived: boolean;
-  is_published: boolean;
-};
 
 type ArticleForm = {
   title: string;
@@ -40,32 +32,21 @@ const FALLBACK_CATEGORIES = [
   { id: "adaptation", label: "Адаптация" },
 ];
 
-function mapMeArticleRow(
-  row: Record<string, unknown>,
-  categoryLabel: (id: string) => string
-): OrgArticleRow {
-  const id = typeof row.id === "number" ? row.id : Number(row.id) || 0;
-  const category = String(row.category ?? "care");
-  return {
-    id,
-    title: String(row.title ?? ""),
-    summary: "",
-    content: undefined,
-    category,
-    category_label: categoryLabel(category),
-    read_minutes: typeof row.read_minutes === "number" ? row.read_minutes : 0,
-    is_context_tip: false,
-    created_at: String(row.created_at ?? new Date().toISOString()),
-    is_archived: Boolean(row.is_archived),
-    is_published: row.is_published !== false,
-  };
-}
+type OrgArticleRow = KnowledgeItem & {
+  is_archived: boolean;
+  is_published: boolean;
+  can_edit: boolean;
+};
 
-function mapPublicArticle(item: KnowledgeItem): OrgArticleRow {
+function mapMineArticle(item: KnowledgeItem, categoryLabel: (id: string) => string): OrgArticleRow {
+  const category = item.category ?? "care";
   return {
     ...item,
-    is_archived: false,
-    is_published: true,
+    category,
+    category_label: item.category_label ?? categoryLabel(category),
+    is_archived: Boolean(item.is_archived),
+    is_published: item.is_published !== false,
+    can_edit: item.can_edit !== false,
   };
 }
 
@@ -80,7 +61,6 @@ function formatCreatedAt(iso: string): string {
 }
 
 export default function OrganizationArticlesPage() {
-  const { role } = useUser();
   const [articles, setArticles] = useState<OrgArticleRow[]>([]);
   const [catalogs, setCatalogs] = useState<{ id: string; label: string }[]>(FALLBACK_CATEGORIES);
   const [loading, setLoading] = useState(true);
@@ -108,26 +88,19 @@ export default function OrganizationArticlesPage() {
       setCatalogs(categories);
       const labelMap = new Map(categories.map((c) => [c.id, c.label]));
 
-      if (role === "organization") {
-        const raw = await meOrganizationApi.listArticles();
-        const rows = unwrapApiList<Record<string, unknown>>(raw);
-        setArticles(
-          rows
-            .map((row) => mapMeArticleRow(row, (id) => labelMap.get(id) ?? id))
-            .filter((a) => a.id > 0)
-        );
-        return;
-      }
-
-      const list = await knowledgeApi.getList();
-      setArticles((list.items ?? []).map(mapPublicArticle));
+      const mine = await knowledgeApi.listMine();
+      setArticles(
+        (mine.items ?? [])
+          .map((item) => mapMineArticle(item, (id) => labelMap.get(id) ?? id))
+          .filter((a) => a.id > 0)
+      );
     } catch (e) {
       setArticles([]);
       setErrorText(e instanceof Error ? e.message : "Не удалось загрузить статьи.");
     } finally {
       setLoading(false);
     }
-  }, [role]);
+  }, []);
 
   useEffect(() => {
     void reload();
@@ -176,11 +149,20 @@ export default function OrganizationArticlesPage() {
   };
 
   const openEditModal = (article: OrgArticleRow) => {
+    if (!article.can_edit) {
+      setErrorText("Редактировать можно только свои статьи.");
+      return;
+    }
     setEditId(article.id);
     setEditLoading(true);
     void knowledgeApi
       .getById(article.id)
       .then((d) => {
+        if (d.can_edit === false) {
+          setErrorText("Редактировать можно только свои статьи.");
+          setEditId(null);
+          return;
+        }
         setEditForm({
           title: d.title,
           summary: d.summary ?? "",
@@ -202,7 +184,14 @@ export default function OrganizationArticlesPage() {
         return reload();
       })
       .then(() => setEditId(null))
-      .catch(() => setErrorText("Не удалось сохранить статью."));
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : "";
+        setErrorText(
+          msg.includes("403") || /edit own|own article/i.test(msg)
+            ? "Редактировать можно только свои статьи."
+            : "Не удалось сохранить статью."
+        );
+      });
   };
 
   const handleArchive = (id: number) => {
@@ -355,34 +344,36 @@ export default function OrganizationArticlesPage() {
                     {article.is_archived ? "Архив" : "Опубликовано"}
                   </span>
                 </div>
-                <div className={styles.cardActions}>
-                  <button
-                    type="button"
-                    className={styles.editBtn}
-                    disabled={busyId === article.id}
-                    onClick={() => openEditModal(article)}
-                  >
-                    Изменить
-                  </button>
-                  {!article.is_archived ? (
+                {article.can_edit ? (
+                  <div className={styles.cardActions}>
                     <button
                       type="button"
-                      className={styles.archiveBtn}
+                      className={styles.editBtn}
                       disabled={busyId === article.id}
-                      onClick={() => handleArchive(article.id)}
+                      onClick={() => openEditModal(article)}
                     >
-                      В архив
+                      Изменить
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.deleteBtn}
-                    disabled={busyId === article.id}
-                    onClick={() => handleDelete(article.id)}
-                  >
-                    Удалить
-                  </button>
-                </div>
+                    {!article.is_archived ? (
+                      <button
+                        type="button"
+                        className={styles.archiveBtn}
+                        disabled={busyId === article.id}
+                        onClick={() => handleArchive(article.id)}
+                      >
+                        В архив
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={styles.deleteBtn}
+                      disabled={busyId === article.id}
+                      onClick={() => handleDelete(article.id)}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                ) : null}
               </article>
             ))}
           </section>

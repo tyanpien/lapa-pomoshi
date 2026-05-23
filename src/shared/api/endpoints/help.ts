@@ -14,6 +14,7 @@ export interface HelpAnimalItem {
   name: string;
   species_tag: string;
   age_tag: string;
+  age_months: number;
   status_chip: string;
   organization_name: string;
   location_city: string;

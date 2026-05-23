@@ -142,6 +142,11 @@
   background: #3f5b3e;
 }
 
+.archiveBadge {
+  bottom: 12px;
+  background: #6b6b6b;
+}
+
 .animalBody {
   margin-top: 10px;
   border: 1px solid #C49A4A;

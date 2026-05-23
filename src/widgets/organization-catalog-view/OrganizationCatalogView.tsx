@@ -44,6 +44,7 @@ import {
 import { helpApi } from "@/shared/api/endpoints/help";
 import { getArticleCategoryLabel } from "@/shared/lib/articleCategoryLabels";
 import { formatAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
+import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
 import { formatInstructionDisplayText } from "@/shared/lib/formatInstructionText";
 import type {
   OrganizationEvent,
@@ -630,13 +631,6 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
       ? profileForUi?.bankAccount?.trim() || ""
       : profileForUi?.bankAccount?.trim() || publicPage?.about.bank_account?.trim() || "";
 
-  const formatAge = (months: number) => {
-    if (!months) return "Возраст не указан";
-    if (months < 12) return `${months} мес.`;
-    const years = Math.floor(months / 12);
-    return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
-  };
-
   const getAnimalStatus = (status: string) => {
     if (status === "looking_for_home") return "Ищет дом";
     if (status === "on_treatment") return "На лечении";
@@ -976,7 +970,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
                   <p className={styles.meta}>
                     <span>{formatAnimalSpeciesLabel(animal.species)}</span>
                     <span>{animal.breed}</span>
-                    <span>{formatAge(animal.age_months)}</span>
+                    <span>{formatAgeMonthsRu(animal.age_months)}</span>
                   </p>
                   <p className={styles.location}>
                     <img src="/org.svg" alt="" className={styles.locationIcon} />
@@ -1194,6 +1188,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
           organizationName={helpModalCard.organization || orgName}
           needText={helpModalCard.needText}
           primaryHelpRequestId={helpModalCard.primaryHelpRequestId}
+          targetAmount={helpModalCard.amount}
           onClose={() => setHelpModalCard(null)}
         />
       ) : null}

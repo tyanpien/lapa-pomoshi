@@ -12,8 +12,12 @@ import {
 } from "@/shared/api/endpoints/meVolunteerResponses";
 import { ResponseCardDescription } from "./responseCardDescription";
 import { volunteerResponseStatusClassMap } from "@/shared/lib/volunteerResponseStatusClassMap";
+import {
+  mapVolunteerResponseStatus,
+  type VolunteerResponseUiStatus,
+} from "@/shared/lib/volunteerResponseStatus";
 
-export type ResponseStatus = "На рассмотрении" | "В работе" | "Завершено" | "Отменено" | "Отклонено";
+export type ResponseStatus = VolunteerResponseUiStatus;
 
 export type ResponseFilter = ResponseStatus | "Архив" | "Все";
 
@@ -30,6 +34,9 @@ export type ResponseCard = {
   urgent?: boolean;
   canChat?: boolean;
   chatThreadId?: number;
+  reportAwaiting?: boolean;
+  canSendReport?: boolean;
+  canViewReport?: boolean;
 };
 
 const filterOptions: { label: string; value: ResponseFilter }[] = [
@@ -122,6 +129,20 @@ export default function VolunteerResponsesPage() {
   }, [reloadList]);
 
   useEffect(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") reloadList();
+    };
+    const intervalId = window.setInterval(refreshIfVisible, 20_000);
+    window.addEventListener("visibilitychange", refreshIfVisible);
+    window.addEventListener("focus", refreshIfVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("visibilitychange", refreshIfVisible);
+      window.removeEventListener("focus", refreshIfVisible);
+    };
+  }, [reloadList]);
+
+  useEffect(() => {
     const id = reportModalResponseId;
     if (id == null) {
       setExistingReport(null);
@@ -171,6 +192,12 @@ export default function VolunteerResponsesPage() {
       })
       .catch(() => setEditMessageDraft(""));
   }, [editMessageId, apiResponses]);
+
+  const reportModalCard = useMemo(
+    () => (reportModalResponseId != null ? apiResponses.find((r) => r.id === reportModalResponseId) ?? null : null),
+    [apiResponses, reportModalResponseId],
+  );
+  const reportModalReadOnly = reportModalCard?.status === "Завершено";
 
   const filteredResponses = useMemo(() => {
     if (activeFilter === "Все") {
@@ -327,13 +354,23 @@ export default function VolunteerResponsesPage() {
                       </button>
                     </>
                   ) : null}
-                  {item.status === "В работе" ? (
+                  {item.status === "В работе" && item.canSendReport ? (
                     <button type="button" className={styles.secondaryBtn} onClick={() => setReportModalResponseId(item.id)}>
-                      Отправить отчет
+                      {item.reportAwaiting ? "Обновить отчёт" : "Отправить отчёт"}
+                    </button>
+                  ) : null}
+                  {item.status === "Завершено" && item.canViewReport ? (
+                    <button type="button" className={styles.secondaryBtn} onClick={() => setReportModalResponseId(item.id)}>
+                      Посмотреть отчёт
                     </button>
                   ) : null}
                 </div>
-                <span className={`${styles.status} ${styles[statusClassMap[item.status]]}`}>{item.status}</span>
+                <span className={`${styles.status} ${styles[statusClassMap[item.status]]}`}>
+                  {item.status}
+                  {item.reportAwaiting && item.status === "В работе" ? (
+                    <span className={styles.statusSub}> · отчёт на проверке</span>
+                  ) : null}
+                </span>
               </div>
             </article>
           ))}
@@ -343,10 +380,15 @@ export default function VolunteerResponsesPage() {
       {reportModalResponseId != null ? (
         <div className={styles.modalOverlay} onClick={() => setReportModalResponseId(null)}>
           <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Отчет по отклику</h2>
-            <p className={styles.modalHint}>
-              Отправьте текст отчёта (минимум 10 символов по требованиям сервера). Если отчёт уже есть — можно обновить.
-            </p>
+            <h2 className={styles.modalTitle}>
+              {reportModalReadOnly ? "Отчёт по задаче" : "Отчёт по отклику"}
+            </h2>
+            {!reportModalReadOnly ? (
+              <p className={styles.modalHint}>
+                Опишите, что сделали (не менее 10 символов). После отправки организация проверит отчёт и завершит
+                задачу.
+              </p>
+            ) : null}
 
             <label className={styles.modalLabel}>
               Текст отчета
@@ -355,7 +397,8 @@ export default function VolunteerResponsesPage() {
                 value={reportText}
                 onChange={(event) => setReportText(event.target.value)}
                 placeholder="Что было сделано, результат, детали"
-                disabled={reportLoading}
+                disabled={reportLoading || reportModalReadOnly}
+                readOnly={reportModalReadOnly}
               />
             </label>
 
@@ -370,6 +413,7 @@ export default function VolunteerResponsesPage() {
               >
                 Закрыть
               </button>
+              {!reportModalReadOnly ? (
               <button
                 type="button"
                 className={styles.modalPrimaryButton}
@@ -401,6 +445,7 @@ export default function VolunteerResponsesPage() {
               >
                 Отправить
               </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -417,28 +462,6 @@ function formatDateRu(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function mapBackendStatus(raw: string, labelFallback?: string | null): ResponseStatus {
-  const s = `${raw ?? ""}`.trim().toLowerCase();
-  if (s === "pending") return "На рассмотрении";
-  if (s === "accepted") return "В работе";
-  if (s === "completed") return "Завершено";
-  if (s === "rejected") return "Отклонено";
-  if (s === "withdrawn") return "Отменено";
-  if (labelFallback?.trim()) {
-    const lb = labelFallback.trim();
-    if (lb.includes("На рассмотрении")) return "На рассмотрении";
-    if (lb.includes("В работ")) return "В работе";
-    if (lb.includes("Заверш")) return "Завершено";
-    if (lb.includes("Отклон")) return "Отклонено";
-    if (lb.includes("Отмен")) return "Отменено";
-  }
-  if (s.includes("withdraw") || s === "withdrawn") return "Отменено";
-  if (s.includes("reject")) return "Отклонено";
-  if (s.includes("accept") || s.includes("progress") || s === "accepted") return "В работе";
-  if (s.includes("done") || s.includes("complete") || s === "completed") return "Завершено";
-  return "На рассмотрении";
 }
 
 function mapCardDtoToUi(item: VolunteerResponseCardDto): ResponseCard | null {
@@ -458,10 +481,13 @@ function mapCardDtoToUi(item: VolunteerResponseCardDto): ResponseCard | null {
     descriptionSnippet: item.description_snippet?.trim() || "",
     descriptionFull: null,
     dateLabel: item.created_at ? formatDateRu(item.created_at) : "",
-    status: mapBackendStatus(String(item.status ?? ""), item.status_label),
+    status: mapVolunteerResponseStatus(String(item.status ?? ""), item.status_label),
     urgent: Boolean(item.is_urgent),
     canChat: item.can_chat !== false,
     chatThreadId: parseChatThreadId(item.chat_thread_id),
+    reportAwaiting: Boolean(item.report_awaiting_org_review),
+    canSendReport: Boolean(item.can_send_report),
+    canViewReport: Boolean(item.can_view_report),
   };
 }
 

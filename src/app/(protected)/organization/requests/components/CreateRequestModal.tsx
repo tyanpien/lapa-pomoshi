@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { Animal } from "@/shared/api/endpoints/animals";
+import { VOLUNTEER_COMPETENCY_OPTIONS } from "@/shared/lib/volunteerCompetencyCatalog";
 import { WardSelect } from "./WardSelect";
 import styles from "./createRequestModal.module.css";
 
@@ -20,7 +21,7 @@ export type CreateRequestFormState = {
   deadlineAt: string;
 };
 
-export const emptyCreateForm = (helpTypeDefault = "manual"): CreateRequestFormState => ({
+export const emptyCreateForm = (helpTypeDefault = "walk"): CreateRequestFormState => ({
   title: "",
   isUrgent: false,
   linkedAnimalId: "",
@@ -39,19 +40,11 @@ const COLLECTION_HELP_OPTIONS = [
   { value: "financial", label: "Другое" },
 ] as const;
 
-const DEFAULT_VOLUNTEER_HELP_TYPES = [
-  { id: "manual", label: "Помощь руками" },
-  { id: "auto", label: "Автопомощь" },
-  { id: "medical", label: "Лекарства и кровь" },
-  { id: "foster", label: "Передержка" },
-  { id: "food", label: "Корм" },
-];
-
 type ModalStep = "choose" | "collection" | "volunteer";
 
 type CreateRequestModalProps = {
   animals: Animal[];
-  helpTypeOptions?: { id: string; label: string }[];
+  volunteerTaskTypeOptions?: { id: string; label: string }[];
   editingId: number | null;
   initialKind?: RequestKind | null;
   initialStep?: ModalStep;
@@ -66,7 +59,7 @@ type CreateRequestModalProps = {
 
 export function CreateRequestModal({
   animals,
-  helpTypeOptions,
+  volunteerTaskTypeOptions,
   editingId,
   initialKind = null,
   initialStep,
@@ -91,7 +84,7 @@ export function CreateRequestModal({
   }, [step, defaultBankAccountDigits, form.requisites, onFormChange]);
 
   const volunteerHelpTypes =
-    helpTypeOptions?.length ? helpTypeOptions : DEFAULT_VOLUNTEER_HELP_TYPES;
+    volunteerTaskTypeOptions?.length ? volunteerTaskTypeOptions : VOLUNTEER_COMPETENCY_OPTIONS;
 
   const activeKind: RequestKind | null =
     step === "collection" ? "collection" : step === "volunteer" ? "volunteer" : pickedKind;

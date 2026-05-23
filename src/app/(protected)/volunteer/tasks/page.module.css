@@ -184,6 +184,11 @@
   color: #f5f5f5;
 }
 
+.actionBtnInProgress {
+  background: #3d4f3a;
+  color: #f2f4ea;
+}
+
 .mapPanel {
   position: relative;
   background: #fff;

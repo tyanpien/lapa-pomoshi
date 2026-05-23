@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useUser } from "@/shared/lib/hooks/useUser";
+import { syncStoredUserAvatar, useUser } from "@/shared/lib/hooks/useUser";
 import { volunteersApi, type CatalogOption } from "@/shared/api/endpoints/volunteers";
 import { eventsApi } from "@/shared/api/endpoints/events";
 import { meProfileApi } from "@/shared/api/endpoints/meProfile";
@@ -16,7 +16,8 @@ import {
 import { meApplicationsApi, type AdoptionApplicationListItem } from "@/shared/api/endpoints/meApplications";
 import { meVolunteerCommunicationsApi } from "@/shared/api/endpoints/meVolunteerCommunications";
 import type { ChatThread } from "@/shared/lib/messages";
-import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
+import { dedupeCommsThreadsByOrganization } from "@/shared/lib/dedupeCommsThreads";
+import { fetchCommsDialogsAllPages } from "@/shared/lib/fetchCommsDialogsAllPages";
 import { mapVolDialogListRow } from "@/shared/lib/volunteerOrgDialogs";
 import {
   storedDetailsToVolunteerPatch,
@@ -39,6 +40,7 @@ import profileFormsStyles from "../../profile/page.module.css";
 import responseStyles from "../responses/page.module.css";
 import { type ResponseCard } from "../responses/page";
 import { volunteerResponseStatusClassMap as statusClassMap } from "@/shared/lib/volunteerResponseStatusClassMap";
+import { mapVolunteerResponseStatus } from "@/shared/lib/volunteerResponseStatus";
 import { ResponseCardDescription } from "../responses/responseCardDescription";
 import {
   WEEKDAY_EDIT_LABELS,
@@ -100,7 +102,10 @@ export default function VolunteerProfilePage() {
   const [messageThreads, setMessageThreads] = useState<ChatThread[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [avatarUploadError, setAvatarUploadError] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const editModalAvatarInputRef = useRef<HTMLInputElement | null>(null);
   const [competencyOptions, setCompetencyOptions] = useState<string[]>(defaultCompetencyOptions);
   const [experienceOptions, setExperienceOptions] = useState<string[]>(defaultExperienceOptions);
   const [helpFormatOptions, setHelpFormatOptions] = useState<string[]>(defaultHelpFormatOptions);
@@ -139,12 +144,11 @@ export default function VolunteerProfilePage() {
     }
     let cancelled = false;
     setMessagesLoading(true);
-    void meVolunteerCommunicationsApi
-      .listDialogs()
-      .then((raw) => {
+    void fetchCommsDialogsAllPages((p) => meVolunteerCommunicationsApi.listDialogs(p))
+      .then((rows) => {
         if (cancelled) return;
-        const rows = unwrapApiList<Record<string, unknown>>(raw);
-        setMessageThreads(rows.map((row) => mapVolDialogListRow(row)));
+        const mapped = (rows as Record<string, unknown>[]).map((row) => mapVolDialogListRow(row));
+        setMessageThreads(dedupeCommsThreadsByOrganization(mapped).slice(0, 3));
       })
       .catch(() => {
         if (!cancelled) setMessageThreads([]);
@@ -462,9 +466,27 @@ export default function VolunteerProfilePage() {
     }));
   };
 
+  const handleAvatarFileSelect = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    setAvatarUploadError(null);
+    setAvatarUploading(true);
+    try {
+      const response = await meProfileApi.uploadAvatar(file);
+      const nextUrl = response.avatar_url ? getImageUrl(response.avatar_url) : null;
+      setAvatarUrl(nextUrl);
+      syncStoredUserAvatar(nextUrl);
+      window.dispatchEvent(new Event(VOLUNTEER_PROFILE_UPDATED_EVENT));
+    } catch {
+      setAvatarUploadError("Не удалось загрузить фото. Допустимы JPG, PNG или WebP.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, []);
+
   const handleOpenEditModal = () => {
     editSnapshotRef.current = JSON.parse(JSON.stringify(details)) as StoredVolunteerDetails;
     setSaveError(null);
+    setAvatarUploadError(null);
     setEditModalOpen(true);
   };
 
@@ -570,24 +592,33 @@ export default function VolunteerProfilePage() {
         <section className={styles.userHeader}>
           <div className={styles.userHeaderIdentity}>
             <div className={styles.avatarWithStatusWrap}>
-              <label className={styles.avatarPlaceholder} style={{ cursor: "pointer", position: "relative" }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    setAvatarUploadError(null);
-                    void meProfileApi
-                      .uploadAvatar(f)
-                      .then((r) => setAvatarUrl(r.avatar_url ? getImageUrl(r.avatar_url) : null))
-                      .catch(() => setAvatarUploadError("Не удалось загрузить фото."));
-                    e.target.value = "";
-                  }}
-                />
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className={styles.avatarFileInput}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  void handleAvatarFileSelect(f);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                className={styles.avatarPlaceholder}
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarUploading}
+                aria-label={avatarUrl ? "Изменить фото профиля" : "Добавить фото профиля"}
+              >
                 <img src={avatarUrl ?? DEFAULT_AVATAR_SRC} alt="" />
-              </label>
+                <span className={styles.avatarOverlay} aria-hidden>
+                  {avatarUploading ? (
+                    <span className={styles.avatarOverlayText}>…</span>
+                  ) : (
+                    <img src="/camera.svg" alt="" className={styles.avatarCameraIcon} />
+                  )}
+                </span>
+              </button>
               <span
                 className={`${styles.statusDot} ${catalogAvailabilityShown ? styles.statusDotAvailable : styles.statusDotBusy}`}
                 aria-label={catalogAvailabilityShown ? "На связи" : "Занят"}
@@ -872,6 +903,42 @@ export default function VolunteerProfilePage() {
               Редактирование профиля
             </h2>
             <div className={styles.modalFormInner}>
+              <div className={styles.editAvatarBlock}>
+                <div className={styles.editAvatarPreview}>
+                  <img src={avatarUrl ?? DEFAULT_AVATAR_SRC} alt="" />
+                </div>
+                <div className={styles.editAvatarActions}>
+                  <input
+                    ref={editModalAvatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className={styles.avatarFileInput}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      void handleAvatarFileSelect(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.editAvatarBtn}
+                    disabled={avatarUploading}
+                    onClick={() => editModalAvatarInputRef.current?.click()}
+                  >
+                    {avatarUploading
+                      ? "Загрузка…"
+                      : avatarUrl
+                        ? "Изменить фото"
+                        : "Добавить фото"}
+                  </button>
+                  <p className={styles.editAvatarHint}>JPG, PNG или WebP</p>
+                  {avatarUploadError ? (
+                    <p role="alert" className={styles.editAvatarError}>
+                      {avatarUploadError}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
               <div className={styles.detailsFormColumns}>
                 <div>
                   <fieldset className={styles.radioFieldset}>
@@ -1134,23 +1201,8 @@ function mapVolunteerCardToPreview(item: VolunteerResponseCardDto): ResponseCard
   if (!Number.isFinite(id)) return null;
 
   type RStatus = ResponseCard["status"];
-  const mapSt = (raw: string, lb?: string | null): RStatus => {
-    const s = `${raw ?? ""}`.trim().toLowerCase();
-    if (s === "pending") return "На рассмотрении";
-    if (s === "accepted") return "В работе";
-    if (s === "completed") return "Завершено";
-    if (s === "rejected") return "Отклонено";
-    if (s === "withdrawn") return "Отменено";
-    const l = lb?.trim() ?? "";
-    if (l.includes("На рассмотрении")) return "На рассмотрении";
-    if (l.includes("В работ")) return "В работе";
-    if (l.includes("Заверш")) return "Завершено";
-    if (l.includes("Отклон")) return "Отклонено";
-    if (l.includes("Отмен")) return "Отменено";
-    if (s.includes("withdraw")) return "Отменено";
-    if (s.includes("reject")) return "Отклонено";
-    return "На рассмотрении";
-  };
+  const mapSt = (raw: string, lb?: string | null): RStatus =>
+    mapVolunteerResponseStatus(raw, lb) as RStatus;
 
   const organizationName = item.organization_name?.trim() || "Организация";
   const orgId = typeof item.organization_id === "number" ? item.organization_id : null;

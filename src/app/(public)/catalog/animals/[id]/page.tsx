@@ -1,8 +1,8 @@
 "use client";
 
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import { animalsApi, Animal } from "@/shared/api/endpoints/animals";
 import { getImageUrl } from "@/shared/api/client";
@@ -13,12 +13,28 @@ import { meProfileApi } from "@/shared/api/endpoints/meProfile";
 import { getLoginHref } from "@/shared/lib/auth/loginHref";
 import { urgentApi, type UrgentItem } from "@/shared/api/endpoints/urgent";
 import { helpApi, type HelpAnimalMonetary } from "@/shared/api/endpoints/help";
-import { AnimalHelpModal } from "@/features/animal-help/AnimalHelpModal";
+import { formatHelpRub } from "@/features/help-animal-card/helpAnimalCardModel";
+import { HelpRequisitesModal } from "@/features/help-requisites/HelpRequisitesModal";
+import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
+
+const uniqueLinesPreservingOrder = (lines: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || seen.has(line)) continue;
+    seen.add(line);
+    out.push(line);
+  }
+  return out;
+};
 
 export default function AnimalPage() {
   const params = useParams();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const id = Number(params.id);
+  const fromHelpIntent = searchParams.get("help") === "1";
 
   const { isAuth, role } = useUser();
   const canApplyAdoption = isAuth && (role === "user" || role === "volunteer");
@@ -32,10 +48,28 @@ export default function AnimalPage() {
   const [profilePhone, setProfilePhone] = useState("");
   const [linkedHelpRows, setLinkedHelpRows] = useState<UrgentItem[]>([]);
   const [monetaryNeeds, setMonetaryNeeds] = useState<HelpAnimalMonetary[]>([]);
-  const [helpBlockLoading, setHelpBlockLoading] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
 
   const hasPublishedHelpRequests = linkedHelpRows.length > 0 || monetaryNeeds.length > 0;
+  const showHelpButton = hasPublishedHelpRequests || fromHelpIntent;
+
+  const helpNeedText =
+    uniqueLinesPreservingOrder((monetaryNeeds ?? []).map((m) => m.line).filter(Boolean)).join(" · ") ||
+    linkedHelpRows[0]?.description?.trim() ||
+    "Нужна помощь";
+
+  const primaryHelpRequestId =
+    monetaryNeeds.length > 0 && typeof monetaryNeeds[0].request_id === "number"
+      ? monetaryNeeds[0].request_id
+      : linkedHelpRows[0]?.id ?? null;
+
+  const helpTargetAmount = useMemo(() => {
+    const fromMonetary = (monetaryNeeds ?? []).reduce((sum, row) => sum + (Number(row.amount_rub) || 0), 0);
+    if (fromMonetary > 0) return formatHelpRub(fromMonetary);
+    const fromRequest = linkedHelpRows[0]?.target_amount;
+    if (fromRequest != null && fromRequest > 0) return formatHelpRub(fromRequest);
+    return null;
+  }, [monetaryNeeds, linkedHelpRows]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +111,6 @@ export default function AnimalPage() {
   useEffect(() => {
     if (!Number.isFinite(id)) return;
     let cancelled = false;
-    setHelpBlockLoading(true);
     Promise.all([
       urgentApi.getList({ limit: 400 }).catch(() => ({ items: [] as UrgentItem[] })),
       helpApi.getAnimalHelp("all").catch(() => ({ items: [] })),
@@ -92,9 +125,7 @@ export default function AnimalPage() {
         const hi = (help.items ?? []).find((i) => i.animal_id === id);
         setMonetaryNeeds(hi?.monetary ?? []);
       })
-      .finally(() => {
-        if (!cancelled) setHelpBlockLoading(false);
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -117,27 +148,8 @@ export default function AnimalPage() {
     };
   }, [canApplyAdoption]);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || loading || !animal) return;
-    if (window.location.hash !== "#animal-help-requests") return;
-    if (!isAuth) return;
-    const timer = window.setTimeout(() => setHelpModalOpen(true), 150);
-    return () => window.clearTimeout(timer);
-  }, [animal, isAuth, loading]);
-
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     e.currentTarget.src = "/cat-placeholder.jpg";
-  };
-
-  const getAge = (months: number) => {
-    if (!months && months !== 0) return "Возраст не указан";
-    if (months < 12) return `${months} ${months === 1 ? "месяц" : months < 5 ? "месяца" : "месяцев"}`;
-    const years = Math.floor(months / 12);
-    const remainingMonths = months % 12;
-    if (remainingMonths === 0) {
-      return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
-    }
-    return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"} ${remainingMonths} ${remainingMonths === 1 ? "месяц" : remainingMonths < 5 ? "месяца" : "месяцев"}`;
   };
 
   if (loading) {
@@ -215,7 +227,7 @@ export default function AnimalPage() {
               {animal.is_urgent && <span className={styles.urgentTag}>Срочно</span>}
               <span>{animal.species}</span>
               <span>{animal.breed || "Метис"}</span>
-              <span>{getAge(animal.age_months)}</span>
+              <span>{formatAgeMonthsRu(animal.age_months)}</span>
             </div>
 
             <p className={styles.description}>
@@ -230,14 +242,14 @@ export default function AnimalPage() {
             </div>
 
             <div className={styles.actionButtons}>
-              {hasPublishedHelpRequests ? (
+              {showHelpButton ? (
                 isAuth ? (
                   <button type="button" className={styles.helpBtn} onClick={() => setHelpModalOpen(true)}>
                     Помочь
                   </button>
                 ) : (
                   <Link
-                    href={getLoginHref(`${pathname || `/catalog/animals/${id}`}#animal-help-requests`)}
+                    href={getLoginHref(`/catalog/animals/${id}?help=1`)}
                     className={styles.helpBtn}
                   >
                     Помочь
@@ -256,7 +268,6 @@ export default function AnimalPage() {
             </div>
           </div>
         </div>
-
 
         <div className={styles.section}>
           <h2>Здоровье и уход</h2>
@@ -320,13 +331,13 @@ export default function AnimalPage() {
       ) : null}
 
       {helpModalOpen && animal ? (
-        <AnimalHelpModal
+        <HelpRequisitesModal
           animalId={animal.id}
           animalName={animal.name}
           organizationName={animal.organization?.name || "Организация"}
-          monetaryNeeds={monetaryNeeds}
-          linkedHelpRows={linkedHelpRows}
-          needsLoading={helpBlockLoading}
+          needText={helpNeedText}
+          primaryHelpRequestId={primaryHelpRequestId}
+          targetAmount={helpTargetAmount}
           onClose={() => setHelpModalOpen(false)}
         />
       ) : null}

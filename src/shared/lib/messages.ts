@@ -13,6 +13,7 @@ export type ChatThread = {
   time: string;
   unread?: number;
   participantUserId?: number;
+  organizationId?: number;
   avatarUrl?: string;
   messages: ChatMessage[];
 };

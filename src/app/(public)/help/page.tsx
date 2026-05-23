@@ -10,7 +10,7 @@ import {
   type HelpAnimalApiTab,
   type HelpAnimalItem,
 } from "@/shared/api/endpoints/help";
-import { HelpRequisitesModal } from "@/features/help-requisites/HelpRequisitesModal";
+import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
 
 type HelpFilter = "all" | "adopt" | "food" | "treatment" | "other";
 type NeedType = "adopt" | "food" | "treatment" | "other";
@@ -29,7 +29,15 @@ interface HelpCard {
   needType: NeedType;
   amount: string | null;
   primaryHelpRequestId: number | null;
+  adoptReady: boolean;
+  hasFundraising: boolean;
 }
+
+const prefersHelpAction = (card: Pick<HelpCard, "adoptReady" | "hasFundraising" | "statusTag">) => {
+  if (card.hasFundraising) return true;
+  if (!card.adoptReady) return true;
+  return card.statusTag.toLowerCase().includes("лечен");
+};
 
 type HelpCardRendered = HelpCard & { actionLabel: string };
 
@@ -109,13 +117,18 @@ const mapItemToCard = (item: HelpAnimalItem): HelpCard => {
       ? item.monetary[0].request_id
       : null;
 
+  const hasFundraising = (item.monetary ?? []).length > 0;
+
   return {
     id: item.animal_id,
     name: item.name,
     image: helpApi.getImageUrl(item.primary_photo_url),
     isUrgent: item.is_urgent,
     species: item.species_tag?.trim() ? item.species_tag.trim().toLowerCase() : "животное",
-    age: item.age_tag?.trim() || "Возраст не указан",
+    age:
+      typeof item.age_months === "number"
+        ? formatAgeMonthsRu(item.age_months)
+        : item.age_tag?.trim() || "Возраст не указан",
     statusTag: item.status_chip?.trim() || "—",
     organization: item.organization_name?.trim() || "Организация",
     needText,
@@ -123,6 +136,8 @@ const mapItemToCard = (item: HelpAnimalItem): HelpCard => {
     needType,
     amount: amountStr,
     primaryHelpRequestId,
+    adoptReady: Boolean(item.adopt_ready),
+    hasFundraising,
   };
 };
 
@@ -136,8 +151,6 @@ export default function HelpPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [helpSearch, setHelpSearch] = useState("");
-  const [helpModalCard, setHelpModalCard] = useState<HelpCardRendered | null>(null);
-
   const handleAdoptNavigate = (animalId: number) => {
     if (!isAuth) {
       router.push(getLoginHref(pathname || "/help"));
@@ -224,12 +237,12 @@ export default function HelpPage() {
         };
       }
 
-      const hasCollection = Boolean(card.amount?.trim());
+      const showHelp = prefersHelpAction(card);
 
       return {
         ...card,
-        actionLabel: hasCollection ? "Помочь" : "Забрать домой",
-        amount: hasCollection ? card.amount : null,
+        actionLabel: showHelp ? "Помочь" : "Забрать домой",
+        amount: showHelp ? card.amount : null,
       };
     });
 
@@ -321,11 +334,7 @@ export default function HelpPage() {
                     className={styles.actionButton}
                     onClick={() => {
                       if (card.actionLabel === "Помочь") {
-                        if (!isAuth) {
-                          router.push(getLoginHref(pathname || "/help"));
-                          return;
-                        }
-                        setHelpModalCard(card);
+                        router.push(`/catalog/animals/${card.id}?help=1`);
                         return;
                       }
                       handleAdoptNavigate(card.id);
@@ -339,16 +348,6 @@ export default function HelpPage() {
         </div>
       </section>
 
-      {helpModalCard ? (
-        <HelpRequisitesModal
-          animalId={helpModalCard.id}
-          animalName={helpModalCard.name}
-          organizationName={helpModalCard.organization}
-          needText={helpModalCard.needText}
-          primaryHelpRequestId={helpModalCard.primaryHelpRequestId}
-          onClose={() => setHelpModalCard(null)}
-        />
-      ) : null}
     </main>
   );
 }

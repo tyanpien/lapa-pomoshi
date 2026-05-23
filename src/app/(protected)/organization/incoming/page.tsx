@@ -32,6 +32,12 @@ type IncomingVolunteerResponseItem = {
   status: string;
   status_label: string;
   message: string | null;
+  report_body?: string | null;
+  report_submitted_at?: string | null;
+  report_awaiting_org_review?: boolean;
+  report_rejection_reason?: string | null;
+  can_complete?: boolean;
+  can_reject_report?: boolean;
 };
 
 function statusClass(status: string): string {
@@ -45,7 +51,9 @@ function statusClass(status: string): string {
 
 function incomingStatusRank(status: string): number {
   if (status === "pending_review" || status === "pending") return 0;
-  if (status === "rejected") return 2;
+  if (status === "accepted") return 1;
+  if (status === "rejected" || status === "withdrawn") return 2;
+  if (status === "completed") return 3;
   return 1;
 }
 
@@ -215,6 +223,26 @@ export default function OrganizationIncomingPage() {
       .finally(() => setBusyId(null));
   };
 
+  const handleCompleteVolunteer = (id: number) => {
+    setBusyId(id);
+    void meOrganizationApi
+      .completeVolunteerResponse(id)
+      .then(() => reloadVolunteers())
+      .catch(() => setErrorText("Не удалось завершить задачу."))
+      .finally(() => setBusyId(null));
+  };
+
+  const handleRejectVolunteerReport = (id: number) => {
+    const reason = window.prompt("Что исправить в отчёте?") ?? "";
+    if (!reason.trim()) return;
+    setBusyId(id);
+    void meOrganizationApi
+      .rejectVolunteerReport(id, { reason: reason.trim() })
+      .then(() => reloadVolunteers())
+      .catch(() => setErrorText("Не удалось отклонить отчёт."))
+      .finally(() => setBusyId(null));
+  };
+
   const adoptionApplicantName = (item: IncomingAdoptionItem) =>
     item.applicant_name?.trim() || "Заявитель";
 
@@ -300,12 +328,26 @@ export default function OrganizationIncomingPage() {
                   ) : (
                     <p className={styles.message}>Сообщение не указано.</p>
                   )}
+                  {item.report_body?.trim() ? (
+                    <div className={styles.reportBlock}>
+                      <p className={styles.reportLabel}>Отчёт волонтёра</p>
+                      <pre className={styles.message}>{item.report_body.trim()}</pre>
+                      {item.report_awaiting_org_review ? (
+                        <p className={styles.reportMeta}>Ожидает проверки организации</p>
+                      ) : null}
+                      {item.report_rejection_reason?.trim() ? (
+                        <p className={styles.reportRejected}>
+                          Отчёт возвращён на доработку: {item.report_rejection_reason.trim()}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className={styles.actions}>
                     <Link
                       href={`/messages?volunteerResponseId=${item.id}`}
                       className={styles.contactBtn}
                     >
-                      Связаться с заявителем
+                      Связаться с волонтёром
                     </Link>
                     {item.status === "pending" ? (
                       <IncomingActionButtons
@@ -313,8 +355,33 @@ export default function OrganizationIncomingPage() {
                         itemId={item.id}
                         onApprove={() => handleAcceptVolunteer(item.id)}
                         onReject={() => handleRejectVolunteer(item.id)}
-                        approveLabel="Принять"
+                        approveLabel="Принять в работу"
                       />
+                    ) : item.can_complete ? (
+                      <>
+                        <button
+                          type="button"
+                          className={styles.approveBtn}
+                          disabled={busyId === item.id}
+                          onClick={() => handleCompleteVolunteer(item.id)}
+                        >
+                          {item.report_awaiting_org_review ? "Принять отчёт и завершить" : "Завершить задачу"}
+                        </button>
+                        {item.can_reject_report ? (
+                          <button
+                            type="button"
+                            className={styles.rejectBtn}
+                            disabled={busyId === item.id}
+                            onClick={() => handleRejectVolunteerReport(item.id)}
+                          >
+                            Вернуть отчёт
+                          </button>
+                        ) : null}
+                      </>
+                    ) : item.status === "completed" ? (
+                      <Link href="/organization/requests" className={styles.contactBtn}>
+                        Задача завершена
+                      </Link>
                     ) : null}
                   </div>
                 </article>

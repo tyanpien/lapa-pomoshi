@@ -102,6 +102,31 @@
   color: #8a3a3a;
 }
 
+.reportBlock {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(141, 91, 61, 0.35);
+}
+
+.reportLabel {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b5a3c;
+}
+
+.reportMeta {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #6b665f;
+}
+
+.reportRejected {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #b3261e;
+}
+
 .message {
   margin: 0;
   white-space: pre-wrap;

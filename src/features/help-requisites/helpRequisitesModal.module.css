@@ -32,6 +32,17 @@
   color: #5c4a3a;
 }
 
+.amountLine {
+  margin: 0 0 18px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #3d2e24;
+}
+
+.amountLabel {
+  font-weight: 700;
+}
+
 .block {
   margin-bottom: 18px;
 }

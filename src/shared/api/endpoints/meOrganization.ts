@@ -89,11 +89,12 @@ export const meOrganizationApi = {
   uploadGalleryImage: (file: File) =>
     apiFetch(`${BASE}/profile/gallery`, { method: "POST", body: fdSingle(file, "file") }),
 
-  listAnimals: (params?: { q?: string; limit?: number; offset?: number }) => {
+  listAnimals: (params?: { q?: string; tab?: "active" | "archive"; limit?: number; offset?: number }) => {
     const q = new URLSearchParams();
     const limit = Math.min(100, Math.max(1, params?.limit ?? 100));
     q.set("limit", String(limit));
     q.set("offset", String(params?.offset ?? 0));
+    q.set("tab", params?.tab === "archive" ? "archive" : "active");
     if (params?.q?.trim()) q.set("q", params.q.trim());
     return apiFetch(`${BASE}/animals?${q.toString()}`);
   },
@@ -127,6 +128,15 @@ export const meOrganizationApi = {
     }),
   rejectVolunteerResponse: (responseId: number, body?: Record<string, unknown>) =>
     apiFetch(`${BASE}/incoming/volunteer-responses/${responseId}/reject`, {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
+  completeVolunteerResponse: (responseId: number) =>
+    apiFetch(`${BASE}/incoming/volunteer-responses/${responseId}/complete`, {
+      method: "POST",
+    }),
+  rejectVolunteerReport: (responseId: number, body?: Record<string, unknown>) =>
+    apiFetch(`${BASE}/incoming/volunteer-responses/${responseId}/report/reject`, {
       method: "POST",
       body: JSON.stringify(body ?? {}),
     }),
@@ -206,6 +216,7 @@ const ANIMALS_PAGE_SIZE = 100;
 
 export async function fetchOrgAnimalsAllPages(params?: {
   q?: string;
+  tab?: "active" | "archive";
 }): Promise<unknown[]> {
   const limit = ANIMALS_PAGE_SIZE;
   let offset = 0;

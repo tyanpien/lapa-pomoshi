@@ -10,7 +10,7 @@ import { getImageUrl } from "@/shared/api/client";
 import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import type { OrganizationProfileData, OrganizationSocialExtra } from "@/shared/lib/organizationCabinet";
 import { buildOrganizationCabinetProfilePatch } from "@/shared/lib/organizationMeCabinet";
-import { useUser } from "@/shared/lib/hooks/useUser";
+import { syncStoredUserAvatar, useUser } from "@/shared/lib/hooks/useUser";
 
 const MESSENGER_OPTIONS = ["VK", "Telegram", "WhatsApp", "Одноклассники", "Другое"];
 
@@ -212,7 +212,9 @@ export function OrganizationEditPanel({
         const res = await meOrganizationApi.uploadLogo(file);
         const u = pickMediaUploadUrl(res);
         if (u) {
-          setProfile((prev) => ({ ...prev, logoDataUrl: getImageUrl(u) }));
+          const logoUrl = getImageUrl(u);
+          setProfile((prev) => ({ ...prev, logoDataUrl: logoUrl }));
+          syncStoredUserAvatar(logoUrl);
           return;
         }
       } catch {

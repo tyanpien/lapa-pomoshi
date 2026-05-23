@@ -11,6 +11,7 @@ import { getImageUrl } from "@/shared/api/client";
 import type { UrgentItem } from "@/shared/api/endpoints/urgent";
 import { takeFirstSentences } from "@/shared/lib/teaserSentences";
 import { formatRub } from "@/shared/lib/formatRub";
+import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
 import { getLoginHref } from "@/shared/lib/auth/loginHref";
 import { useUser } from "@/shared/lib/hooks/useUser";
 
@@ -60,19 +61,6 @@ export default function HomePageClient({
 
   const bigCard = urgentList[0];
   const smallCards = urgentList.slice(1, 5);
-
-  const formatAge = (months: number): string => {
-    if (!months && months !== 0) return "Возраст не указан";
-    if (months < 12) {
-      return `${months} ${months === 1 ? "месяц" : months < 5 ? "месяца" : "месяцев"}`;
-    }
-    const years = Math.floor(months / 12);
-    const remainingMonths = months % 12;
-    if (remainingMonths === 0) {
-      return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
-    }
-    return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
-  };
 
   const getSpeciesType = (species: string): string => {
     if (!species) return "other";
@@ -321,7 +309,7 @@ export default function HomePageClient({
                     <div className={styles.tags}>
                       <span>{animal.species}</span>
                       <span>{animal.breed || "Метис"}</span>
-                      <span>{formatAge(animal.age_months)}</span>
+                      <span>{formatAgeMonthsRu(animal.age_months)}</span>
                     </div>
                     <p className={styles.org}>
                       <img src="/org.svg" alt="" className={styles.orgIcon} />

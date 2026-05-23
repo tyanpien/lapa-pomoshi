@@ -55,9 +55,13 @@
 .avatar {
   width: 30px;
   height: 30px;
+  min-width: 30px;
+  min-height: 30px;
   border-radius: 50%;
   background: #b48f8f;
   margin-top: 4px;
+  flex-shrink: 0;
+  object-fit: cover;
 }
 
 .chatListText {
@@ -200,6 +204,7 @@
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   background: #b48f8f;
+  object-fit: cover;
 }
 
 .messageContent {
@@ -296,6 +301,35 @@
   cursor: pointer;
 }
 
+.hiddenFileInput {
+  display: none;
+}
+
+.pendingImageWrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 0 17%;
+  max-width: 520px;
+}
+
+.pendingImage {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #d6c9b8;
+}
+
+.pendingImageRemove {
+  border: none;
+  background: transparent;
+  color: #8b5a3c;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 @media (max-width: 980px) {
   .chatLayout {
     grid-template-columns: 1fr;
@@ -309,6 +343,11 @@
   }
 
   .messageForm {
+    max-width: 100%;
+  }
+
+  .pendingImageWrap {
+    margin-left: 0;
     max-width: 100%;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
 import {
@@ -11,12 +11,15 @@ import {
   updateOrganizationAnimal,
 } from "@/shared/lib/organizationAnimals";
 import { animalsApi } from "@/shared/api/endpoints/animals";
-import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
-import { getOrganizationCabinetEventName } from "@/shared/lib/organizationCabinet";
+import { fetchOrgAnimalsAllPages, meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
+import type { Animal } from "@/shared/api/endpoints/animals";
+import { getOrganizationCabinetEventName, getOrganizationProfile } from "@/shared/lib/organizationCabinet";
+import { mapMeOrganizationAnimalRow } from "@/shared/lib/organizationMeCabinet";
 import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
 import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 import { formatAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
 import { formatCatalogLabel } from "@/shared/lib/formatCatalogLabel";
+import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
 import {
   CATALOG_OTHER_LABEL,
   CHARACTER_OTHER_SLUG,
@@ -24,6 +27,9 @@ import {
 } from "@/shared/lib/animalCatalogOther";
 
 type CatalogTagOption = { id: string; label: string };
+type StatusFilter = "all" | "looking_for_home" | "on_treatment" | "in_shelter" | "archive";
+
+const isArchivedAnimal = (animal: Animal) => animal.status === "archived";
 
 type FormState = {
   name: string;
@@ -92,9 +98,9 @@ export default function OrganizationAnimalsPage() {
   const [editingAnimalId, setEditingAnimalId] = useState<number | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "looking_for_home" | "on_treatment" | "in_shelter">(
-    "all"
-  );
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [archivedAnimals, setArchivedAnimals] = useState<Animal[]>([]);
+  const [archivedLoading, setArchivedLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [healthCareOptions, setHealthCareOptions] = useState<CatalogTagOption[]>([]);
   const [characterOptions, setCharacterOptions] = useState<CatalogTagOption[]>([]);
@@ -110,12 +116,54 @@ export default function OrganizationAnimalsPage() {
     setLocalAnimals(getCurrentOrganizationAnimals());
   };
 
+  const organizationTitle =
+    getOrganizationProfile().organizationName?.trim() ||
+    animals.find((a) => a.organization_name)?.organization_name ||
+    "Организация";
+
+  const reloadArchived = useCallback(async () => {
+    if (!useMeCabinet || apiPayload.organizationId == null) {
+      setArchivedAnimals([]);
+      return;
+    }
+    setArchivedLoading(true);
+    try {
+      const rows = await fetchOrgAnimalsAllPages({ tab: "archive" });
+      setArchivedAnimals(
+        rows.map((row) =>
+          mapMeOrganizationAnimalRow(
+            row as Record<string, unknown>,
+            organizationTitle,
+            apiPayload.organizationId!
+          )
+        )
+      );
+    } catch {
+      setArchivedAnimals([]);
+    } finally {
+      setArchivedLoading(false);
+    }
+  }, [useMeCabinet, apiPayload.organizationId, organizationTitle]);
+
   useEffect(() => {
     const eventName = getOrganizationAnimalsEventName();
-    const handleUpdate = () => reloadAnimals();
+    const cabinetEvent = getOrganizationCabinetEventName();
+    const handleUpdate = () => {
+      reloadAnimals();
+      if (statusFilter === "archive") void reloadArchived();
+    };
     window.addEventListener(eventName, handleUpdate);
-    return () => window.removeEventListener(eventName, handleUpdate);
-  }, []);
+    window.addEventListener(cabinetEvent, handleUpdate);
+    return () => {
+      window.removeEventListener(eventName, handleUpdate);
+      window.removeEventListener(cabinetEvent, handleUpdate);
+    };
+  }, [statusFilter, reloadArchived]);
+
+  useEffect(() => {
+    if (statusFilter !== "archive") return;
+    void reloadArchived();
+  }, [statusFilter, reloadArchived]);
 
   useEffect(() => {
     const closeMenu = () => setOpenMenuId(null);
@@ -314,37 +362,30 @@ export default function OrganizationAnimalsPage() {
     [animals]
   );
 
+  const activeAnimals = useMemo(
+    () => sortedAnimals.filter((animal) => !isArchivedAnimal(animal)),
+    [sortedAnimals]
+  );
+
+  const isArchiveView = statusFilter === "archive";
+  const listAnimals = isArchiveView ? archivedAnimals : activeAnimals;
+
   const visibleAnimals = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-    return sortedAnimals.filter((animal) => {
+    return listAnimals.filter((animal) => {
       const bySearch =
         !normalizedSearch ||
         animal.name.toLowerCase().includes(normalizedSearch) ||
         (animal.breed || "").toLowerCase().includes(normalizedSearch) ||
         (animal.organization_name || "").toLowerCase().includes(normalizedSearch);
 
-      const byStatus = statusFilter === "all" || animal.status === statusFilter;
+      const byStatus = isArchiveView || statusFilter === "all" || animal.status === statusFilter;
       return bySearch && byStatus;
     });
-  }, [search, sortedAnimals, statusFilter]);
-
-  const formatAge = (months: number) => {
-    if (months < 12) {
-      return `${months} ${months === 1 ? "месяц" : months < 5 ? "месяца" : "месяцев"}`;
-    }
-
-    const years = Math.floor(months / 12);
-    const remainingMonths = months % 12;
-    if (!remainingMonths) {
-      return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
-    }
-
-    return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"} ${remainingMonths} ${
-      remainingMonths === 1 ? "месяц" : remainingMonths < 5 ? "месяца" : "месяцев"
-    }`;
-  };
+  }, [search, listAnimals, statusFilter, isArchiveView]);
 
   const statusLabel = (status: string) => {
+    if (status === "archived") return "архив";
     if (status === "looking_for_home") return "ищет дом";
     if (status === "on_treatment") return "на лечении";
     if (status === "looking_for_foster") return "ищет передержку";
@@ -422,6 +463,7 @@ export default function OrganizationAnimalsPage() {
         window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
         setOpenMenuId(null);
         reloadAnimals();
+        void reloadArchived();
       });
       return;
     }
@@ -435,6 +477,7 @@ export default function OrganizationAnimalsPage() {
   };
 
   const showAnimalCardMenu = (animalId: number) => {
+    if (isArchiveView) return false;
     if (useMeCabinet) return true;
     return !apiAnimalIds.has(animalId);
   };
@@ -445,18 +488,20 @@ export default function OrganizationAnimalsPage() {
         <div className={styles.pageTop}>
           <div className={styles.topRow}>
             <h1 className={styles.title}>Подопечные</h1>
-            <button
-              className={styles.addBtn}
-              type="button"
-              onClick={() => {
-                setEditingAnimalId(null);
-                setForm(initialForm);
-                setSaveError(null);
-                setCreateModalOpen(true);
-              }}
-            >
-              + Добавить животное
-            </button>
+            {!isArchiveView ? (
+              <button
+                className={styles.addBtn}
+                type="button"
+                onClick={() => {
+                  setEditingAnimalId(null);
+                  setForm(initialForm);
+                  setSaveError(null);
+                  setCreateModalOpen(true);
+                }}
+              >
+                + Добавить животное
+              </button>
+            ) : null}
           </div>
           <div className={styles.filters}>
             <input
@@ -493,25 +538,48 @@ export default function OrganizationAnimalsPage() {
               </button>
               <button
                 type="button"
-                className={`${styles.filterButton} ${statusFilter === "in_shelter" ? styles.filterButtonActive : ""}`}
+                className={`${styles.filterButton} ${
+                  statusFilter === "in_shelter" ? styles.filterButtonActive : ""
+                }`}
                 onClick={() => setStatusFilter("in_shelter")}
               >
                 В приюте
+              </button>
+              <button
+                type="button"
+                className={`${styles.filterButton} ${statusFilter === "archive" ? styles.filterButtonActive : ""}`}
+                onClick={() => setStatusFilter("archive")}
+              >
+                Архив
               </button>
             </div>
           </div>
         </div>
 
-        {visibleAnimals.length === 0 ? (
-          <div className={styles.emptyState}>Пока нет добавленных животных.</div>
+        {archivedLoading && isArchiveView ? (
+          <div className={styles.emptyState}>Загрузка архива…</div>
+        ) : visibleAnimals.length === 0 ? (
+          <div className={styles.emptyState}>
+            {isArchiveView
+              ? useMeCabinet
+                ? "В архиве пока нет подопечных."
+                : "Архив доступен при работе с сервером."
+              : "Пока нет добавленных животных."}
+          </div>
         ) : (
           <section className={styles.list}>
             {visibleAnimals.map((animal) => (
               <article key={animal.id} className={styles.animalCard}>
                 <div className={styles.cover}>
                   <img src={animal.primary_photo_url || "/cat-placeholder.jpg"} alt={animal.name} />
-                  {animal.is_urgent ? <span className={styles.urgentBadge}>срочно</span> : null}
-                  <span className={styles.statusBadge}>{statusLabel(animal.status)}</span>
+                  {animal.is_urgent && !isArchiveView ? (
+                    <span className={styles.urgentBadge}>срочно</span>
+                  ) : null}
+                  {isArchiveView || isArchivedAnimal(animal) ? (
+                    <span className={`${styles.statusBadge} ${styles.archiveBadge}`}>архив</span>
+                  ) : (
+                    <span className={styles.statusBadge}>{statusLabel(animal.status)}</span>
+                  )}
                 </div>
                 <div className={styles.animalBody}>
                   <div className={styles.cardActions}>
@@ -544,7 +612,7 @@ export default function OrganizationAnimalsPage() {
                   <div className={styles.tags}>
                     <span>{speciesForDisplay(animal.species, animal.sex)}</span>
                     <span>{animal.breed || "Метис"}</span>
-                    <span>{formatAge(animal.age_months)}</span>
+                    <span>{formatAgeMonthsRu(animal.age_months)}</span>
                   </div>
                   <p className={styles.organizationLine}>{animal.organization_name || "Название организации"}</p>
                   <Link className={styles.moreButton} href={`/catalog/animals/${animal.id}`}>

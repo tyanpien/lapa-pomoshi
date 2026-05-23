@@ -1,4 +1,8 @@
 import type { UrgentItem, UrgentRequestDetail } from "@/shared/api/endpoints/urgent";
+import {
+  VOLUNTEER_COMPETENCY_SLUGS,
+  resolveVolunteerTaskTypeSlug,
+} from "@/shared/lib/volunteerCompetencyCatalog";
 
 const HELP_TYPE_TO_COMPETENCY_SLUGS: Record<string, string[]> = {
   manual: ["manual"],
@@ -38,20 +42,6 @@ const LABEL_HINT_TO_SLUG: { pattern: RegExp; slug: string }[] = [
   { pattern: /сбор|фандрайз|деньг|оплат|пожертв/i, slug: "fundraising" },
 ];
 
-const KNOWN_COMPETENCY_SLUGS = new Set([
-  "walk",
-  "photo_video",
-  "foster",
-  "texts_social",
-  "manual",
-  "auto",
-  "medical",
-  "rescue",
-  "events",
-  "fundraising",
-  "other",
-]);
-
 export function normalizeCityToken(city: string | null | undefined): string {
   let s = (city ?? "")
     .trim()
@@ -86,7 +76,7 @@ function inferSlugFromFreeText(raw: string): string | null {
   const s = raw.trim();
   if (!s) return null;
   const low = s.toLowerCase();
-  if (KNOWN_COMPETENCY_SLUGS.has(low)) return low;
+  if (VOLUNTEER_COMPETENCY_SLUGS.has(low)) return low;
   if (/автопомощ|авто[\s-]*помощ/i.test(s)) return "auto";
   for (const { pattern, slug } of LABEL_HINT_TO_SLUG) {
     if (pattern.test(s)) return slug;
@@ -97,6 +87,9 @@ function inferSlugFromFreeText(raw: string): string | null {
 export function collectTaskCompetencySlugs(task: UrgentItem): string[] {
   const d = task as UrgentRequestDetail;
   const out = new Set<string>();
+
+  const primary = resolveVolunteerTaskTypeSlug(task.help_type, d.volunteer_competencies);
+  if (VOLUNTEER_COMPETENCY_SLUGS.has(primary)) out.add(primary);
 
   for (const c of d.volunteer_competencies ?? []) {
     const slug = inferSlugFromFreeText(String(c));
@@ -118,8 +111,12 @@ export function collectTaskCompetencySlugs(task: UrgentItem): string[] {
   }
 
   const ht = normalizeHelpTypeKey(task.help_type);
-  const fromType = HELP_TYPE_TO_COMPETENCY_SLUGS[ht] ?? HELP_TYPE_TO_COMPETENCY_SLUGS.default ?? [];
-  for (const s of fromType) out.add(s);
+  if (VOLUNTEER_COMPETENCY_SLUGS.has(ht)) {
+    out.add(ht);
+  } else {
+    const fromType = HELP_TYPE_TO_COMPETENCY_SLUGS[ht] ?? HELP_TYPE_TO_COMPETENCY_SLUGS.default ?? [];
+    for (const s of fromType) out.add(s);
+  }
 
   const slugFromHelpTypeLabel = inferSlugFromFreeText(task.help_type ?? "");
   if (slugFromHelpTypeLabel) out.add(slugFromHelpTypeLabel);

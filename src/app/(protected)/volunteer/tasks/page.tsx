@@ -8,8 +8,16 @@ import { fetchVolunteerTasksAllPages, type UrgentItem, type UrgentRequestDetail 
 import { getUrgentHelpTypeLabel } from "@/shared/lib/urgentHelpTypeLabels";
 import { meVolunteerResponsesApi } from "@/shared/api/endpoints/meVolunteerResponses";
 import { meProfileApi } from "@/shared/api/endpoints/meProfile";
-import { filterVolunteerPersonalizedFeed } from "@/shared/lib/volunteerTaskFeed";
+import { collectTaskCompetencySlugs, filterVolunteerPersonalizedFeed } from "@/shared/lib/volunteerTaskFeed";
+import { resolveVolunteerTaskTypeSlug } from "@/shared/lib/volunteerCompetencyCatalog";
+import {
+  indexResponsesByHelpRequestId,
+  mapVolunteerResponseStatus,
+  type VolunteerHelpRequestResponseRef,
+} from "@/shared/lib/volunteerResponseStatus";
 import { VOLUNTEER_PROFILE_UPDATED_EVENT } from "@/shared/lib/volunteerProfileStorage";
+import { knowledgeApi, type KnowledgeItem } from "@/shared/api/endpoints/knowledge";
+import { TaskKnowledgeTips } from "@/features/volunteer-task-tips/TaskKnowledgeTips";
 
 type TaskFilter = "all" | "shelter" | "photo" | "walkcare" | "new" | "nearby" | "transport";
 
@@ -35,27 +43,42 @@ const pinColorByLane: Record<TaskLane, string> = {
 
 function deriveTaskLane(task: UrgentItem): TaskLane {
   const blob = `${task.title ?? ""} ${task.description ?? ""}`.toLowerCase();
-  const ht = (task.help_type ?? "").trim().toLowerCase();
+  const primarySlug = resolveVolunteerTaskTypeSlug(
+    task.help_type,
+    (task as { volunteer_competencies?: string[] }).volunteer_competencies,
+  );
+  const slugs = new Set(collectTaskCompetencySlugs(task));
 
-  if (ht === "auto" || /перевоз|транспорт|машин|авто|довезти|подвезти|перевезти|ветклиник|вет\.?\s*клиник/i.test(blob)) {
+  if (
+    primarySlug === "auto" ||
+    slugs.has("auto") ||
+    /перевоз|транспорт|машин|авто|довезти|подвезти|перевезти|ветклиник|вет\.?\s*клиник/i.test(blob)
+  ) {
     return "transport";
   }
 
+  if (primarySlug === "photo_video" || slugs.has("photo_video")) return "photo";
+  if (primarySlug === "walk" || slugs.has("walk")) return "walkcare";
+  if (
+    primarySlug === "manual" ||
+    primarySlug === "foster" ||
+    slugs.has("manual") ||
+    slugs.has("foster")
+  ) {
+    return "shelter";
+  }
+
+  const ht = (task.help_type ?? "").trim().toLowerCase();
   if (ht === "manual") {
     const photoHit = /фото|видео|съём|съемк|сним|камер|видеосъём|видеосъемк|контент|соцсет|instagram|tiktok/i.test(blob);
     if (photoHit) return "photo";
-
     const walkHit = /выгул|прогул|гулять|выгулять|погулять|выгулить|выводить\s+гулять/i.test(blob);
     if (walkHit) return "walkcare";
-
     const shelterHit =
       /приют|уборк|смен[аыу]|вольер|санитар|подопечн|животн|кормлен|накорми|передерж|содержани|территори|хвост/i.test(blob);
     if (shelterHit) return "shelter";
   }
-
-  if (ht === "foster") {
-    return "shelter";
-  }
+  if (ht === "foster") return "shelter";
 
   return "other";
 }
@@ -143,7 +166,9 @@ export default function VolunteerTasksPage() {
   const [search, setSearch] = useState("");
   const [hoveredTaskId, setHoveredTaskId] = useState<number | null>(null);
   const [activePinId, setActivePinId] = useState<number | null>(null);
-  const [appliedTaskIds, setAppliedTaskIds] = useState<number[]>([]);
+  const [responseByHelpRequestId, setResponseByHelpRequestId] = useState<
+    Record<number, VolunteerHelpRequestResponseRef>
+  >({});
   const [expandedTaskIds, setExpandedTaskIds] = useState<number[]>([]);
   const [tasks, setTasks] = useState<UrgentItem[]>([]);
   const [tasksError, setTasksError] = useState("");
@@ -152,11 +177,27 @@ export default function VolunteerTasksPage() {
   const [volunteerCity, setVolunteerCity] = useState<string | null>(null);
   const [volunteerCompetencySlugs, setVolunteerCompetencySlugs] = useState<string[]>([]);
   const [profileReloadTick, setProfileReloadTick] = useState(0);
+  const [contextTips, setContextTips] = useState<KnowledgeItem[]>([]);
 
   useEffect(() => {
     const bump = () => setProfileReloadTick((n) => n + 1);
     window.addEventListener(VOLUNTEER_PROFILE_UPDATED_EVENT, bump);
     return () => window.removeEventListener(VOLUNTEER_PROFILE_UPDATED_EVENT, bump);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void knowledgeApi
+      .getList({ only_context_tips: true, limit: 100 })
+      .then((res) => {
+        if (!cancelled) setContextTips(res.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setContextTips([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -191,12 +232,7 @@ export default function VolunteerTasksPage() {
         });
 
         setTasks(personalized);
-        const helpIds = new Set<number>();
-        for (const it of responses.items ?? []) {
-          const hid = (it as { help_request_id?: number }).help_request_id;
-          if (typeof hid === "number" && Number.isFinite(hid)) helpIds.add(hid);
-        }
-        setAppliedTaskIds(Array.from(helpIds));
+        setResponseByHelpRequestId(indexResponsesByHelpRequestId(responses.items ?? []));
         setTasksError("");
       })
       .catch(() => {
@@ -210,6 +246,28 @@ export default function VolunteerTasksPage() {
       });
     return () => {
       cancelled = true;
+    };
+  }, [profileReloadTick]);
+
+  useEffect(() => {
+    const refreshResponses = () => {
+      void meVolunteerResponsesApi
+        .getList({ tab: "all", limit: 100, offset: 0 })
+        .then((responses) => {
+          setResponseByHelpRequestId(indexResponsesByHelpRequestId(responses.items ?? []));
+        })
+        .catch(() => {});
+    };
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") refreshResponses();
+    };
+    const intervalId = window.setInterval(refreshIfVisible, 20_000);
+    window.addEventListener("visibilitychange", refreshIfVisible);
+    window.addEventListener("focus", refreshIfVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("visibilitychange", refreshIfVisible);
+      window.removeEventListener("focus", refreshIfVisible);
     };
   }, [profileReloadTick]);
 
@@ -229,7 +287,7 @@ export default function VolunteerTasksPage() {
 
     if (activeFilter === "all") return withSearch;
     if (activeFilter === "new") {
-      return withSearch.filter((task) => !appliedTaskIds.includes(task.id));
+      return withSearch.filter((task) => !responseByHelpRequestId[task.id]);
     }
     if (activeFilter === "nearby") {
       return withSearch.filter((task) => {
@@ -250,7 +308,7 @@ export default function VolunteerTasksPage() {
       return withSearch.filter((task) => deriveTaskLane(task) === "shelter");
     }
     return withSearch;
-  }, [activeFilter, locatedTasks, search, appliedTaskIds]);
+  }, [activeFilter, locatedTasks, search, responseByHelpRequestId]);
 
   useEffect(() => {
     const ymaps = window.ymaps;
@@ -344,23 +402,49 @@ export default function VolunteerTasksPage() {
 
   const handleApply = useCallback(
     (task: LocatedTask) => {
-      if (appliedTaskIds.includes(task.id)) {
-        router.push("/volunteer/responses");
+      const existing = responseByHelpRequestId[task.id];
+      if (existing) {
+        router.push(`/volunteer/responses?response=${existing.responseId}`);
         return;
       }
       setApplyBusyId(task.id);
       void meVolunteerResponsesApi
         .create({ help_request_id: task.id, message: null })
-        .then(() => {
-          setAppliedTaskIds((prev) => (prev.includes(task.id) ? prev : [...prev, task.id]));
-          router.push(`/volunteer/responses?response=${task.id}`);
+        .then((created) => {
+          setResponseByHelpRequestId((prev) => ({
+            ...prev,
+            [task.id]: {
+              responseId: created.id,
+              status: String(created.status ?? "pending"),
+              statusUi: mapVolunteerResponseStatus(
+                String(created.status ?? ""),
+                created.status_label,
+              ),
+            },
+          }));
+          router.push(`/volunteer/responses?response=${created.id}`);
         })
         .catch(() => {
           setTasksError("Не удалось отправить отклик. Проверьте авторизацию и права волонтёра.");
         })
         .finally(() => setApplyBusyId(null));
     },
-    [appliedTaskIds, router]
+    [responseByHelpRequestId, router]
+  );
+
+  const taskActionLabel = useCallback(
+    (taskId: number): string => {
+      const ref = responseByHelpRequestId[taskId];
+      if (!ref) return "Откликнуться";
+      if (ref.statusUi === "В работе") return "В работе";
+      if (ref.statusUi === "На рассмотрении") return "На рассмотрении";
+      if (ref.statusUi === "Завершено") return "Завершено";
+      if (ref.status === "completed") return "Завершено";
+      if (ref.statusUi === "Отклонено") return "Отклонено";
+      if (ref.statusUi === "Отменено") return "Отменено";
+      return "Мой отклик";
+    },
+    [responseByHelpRequestId],
   );
 
   const toggleDescription = (taskId: number) => {
@@ -435,6 +519,7 @@ export default function VolunteerTasksPage() {
                     {expandedTaskIds.includes(task.id) ? "Меньше" : "Подробнее"}
                   </button>
                 ) : null}
+                <TaskKnowledgeTips task={task} tips={contextTips} />
                 <div className={styles.cardBottom}>
                   <div className={styles.time}>
                     <img src="/clock.svg" alt="" aria-hidden="true" />
@@ -445,16 +530,16 @@ export default function VolunteerTasksPage() {
                 <button
                   type="button"
                   className={`${styles.actionBtn} ${
-                    appliedTaskIds.includes(task.id) ? styles.actionBtnMuted : ""
+                    responseByHelpRequestId[task.id] ? styles.actionBtnMuted : ""
+                  } ${
+                    responseByHelpRequestId[task.id]?.statusUi === "В работе"
+                      ? styles.actionBtnInProgress
+                      : ""
                   }`}
                   disabled={applyBusyId === task.id}
                   onClick={() => handleApply(task)}
                 >
-                  {applyBusyId === task.id
-                    ? "Отправка…"
-                    : appliedTaskIds.includes(task.id)
-                      ? "Вы откликнулись"
-                      : "Откликнуться"}
+                  {applyBusyId === task.id ? "Отправка…" : taskActionLabel(task.id)}
                 </button>
               </article>
             ))}
