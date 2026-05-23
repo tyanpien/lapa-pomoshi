@@ -134,9 +134,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <Link href="/catalog/organizations" onClick={onClose}>
                     Организации
                   </Link>
-                  <Link href="/catalog/animals" onClick={onClose}>
-                    Животные
-                  </Link>
                   <Link href="/catalog/volunteers" onClick={onClose}>
                     Волонтеры
                   </Link>

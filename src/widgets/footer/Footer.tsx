@@ -16,7 +16,6 @@ export default function Footer() {
 
             <div className={styles.footerCol}>
               <h4>Навигация</h4>
-              <Link href="/catalog/animals">Животные</Link>
               <Link href="/catalog/organizations">Организации</Link>
               <Link href="/catalog/volunteers">Волонтеры</Link>
               <Link href="/events">Мероприятия</Link>

@@ -155,7 +155,7 @@ export default function AnimalPage() {
       <div className={styles.container}>
         <div className={styles.notFound}>
           <h1>Животное не найдено</h1>
-          <Link href="/catalog/animals">Вернуться к списку</Link>
+          <Link href="/help">Вернуться к списку</Link>
         </div>
       </div>
     );
@@ -172,7 +172,7 @@ export default function AnimalPage() {
     <main className={styles.page}>
       <div className={styles.container}>
         <div className={styles.breadcrumbs}>
-          <Link href="/catalog/animals">Животные</Link>
+          <Link href="/help">Помочь</Link>
           <span>/</span>
           <span>{animal.name}</span>
         </div>

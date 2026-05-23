@@ -673,15 +673,14 @@ export default function OrganizationRequestsPage() {
 
                   return (
                     <article key={request.id} className={styles.volunteerTaskCard}>
-                      <div className={styles.volunteerCardTop}>
+                      <div className={styles.volunteerCardHeader}>
                         <span className={styles.volunteerHelpTag}>{getUrgentHelpTypeShortTag(request.help_type)}</span>
+                        <h2 className={styles.volunteerTitle}>{request.title}</h2>
                         <div className={styles.volunteerCardTopRight}>
                           {request.is_urgent ? <span className={styles.volunteerUrgentTag}>срочно</span> : null}
                           {renderStatusSelect(request)}
                         </div>
                       </div>
-
-                      <h2 className={styles.volunteerTitle}>{request.title}</h2>
 
                       {animalDisplayName ? (
                         <div className={styles.cardAnimalRow}>

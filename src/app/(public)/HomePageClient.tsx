@@ -146,7 +146,7 @@ export default function HomePageClient({
               Платформа для волонтеров, приютов и всех, кто хочет сделать что-то важное — рядом с домом или онлайн
             </p>
             <div className={styles.heroButtons}>
-              <Link href="/catalog/animals" className={styles.primary}>
+              <Link href="/help" className={styles.primary}>
                 Найти питомца
               </Link>
               <Link href="/volunteer" className={styles.secondary}>
@@ -262,7 +262,7 @@ export default function HomePageClient({
                 <img src="/help3.svg" alt="" className={styles.helpPhoto} loading="lazy" />
                 <h3>Приютить</h3>
                 <p>Найдите питомца, который подойдет именно вам, и заберите его домой навсегда</p>
-                <Link href="/catalog/animals" className={styles.helpLink}>
+                <Link href="/help" className={styles.helpLink}>
                   Смотреть животных →
                 </Link>
               </div>
@@ -341,7 +341,7 @@ export default function HomePageClient({
           )}
 
           <div className={styles.center}>
-            <Link href="/catalog/animals" className={styles.showAll}>
+            <Link href="/help" className={styles.showAll}>
               Смотреть все
             </Link>
           </div>

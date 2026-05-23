@@ -506,7 +506,7 @@ export function AdoptionQuestionnaireModal({
             .join(" ")}
         >
           {success ? (
-            <Link href="/catalog/animals" className={styles.primaryBtn} onClick={onClose}>
+            <Link href="/help" className={styles.primaryBtn} onClick={onClose}>
               Вернуться в каталог
             </Link>
           ) : (

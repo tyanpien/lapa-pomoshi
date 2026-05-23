@@ -44,7 +44,6 @@ export default function Header() {
                   Каталог
                 </div>
                 <div className={styles.dropdownMenu}>
-                  <Link href="/catalog/animals">Животные</Link>
                   <Link href="/catalog/organizations">Организации</Link>
                   <Link href="/catalog/volunteers">Волонтеры</Link>
                 </div>
