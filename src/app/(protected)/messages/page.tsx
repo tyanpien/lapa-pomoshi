@@ -19,14 +19,20 @@ import { meVolunteerCommunicationsApi } from "@/shared/api/endpoints/meVolunteer
 import { useUser } from "@/shared/lib/hooks/useUser";
 import type { ChatMessage, ChatThread } from "@/shared/lib/messages";
 import {
+  appendChatMessage,
   findOrgThreadForPeer,
+  mapCommsMessageItem,
   mapOpenedOrgDialog,
   mapOrgDialogDetailMeta,
   mapOrgDialogListRow,
   mapOrgDialogMessages,
   mergeOrgThreadList,
+  patchThreadsFromMessageNew,
   pickOrgDialogId,
+  type CommsMessageNewEvent,
+  type DialogMessagePerspective,
 } from "@/shared/lib/organizationOrgDialogs";
+import { useCommunicationsWebSocket } from "@/shared/lib/hooks/useCommunicationsWebSocket";
 import { fetchCommsDialogsAllPages } from "@/shared/lib/fetchCommsDialogsAllPages";
 import { mapUserDialogListRow, mapUserDialogMessages, mapUserDialogDetailMeta } from "@/shared/lib/userOrgDialogs";
 import { dedupeCommsThreadsForRole } from "@/shared/lib/dedupeCommsThreads";
@@ -75,7 +81,7 @@ async function resolveOpenedOrgThreadId(
 }
 
 function MessagesPageContent() {
-  const { role } = useUser();
+  const { role, isAuth } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [orgThreads, setOrgThreads] = useState<ChatThread[]>([]);
@@ -650,6 +656,120 @@ function MessagesPageContent() {
     };
   }, [role, activeThreadId, clearActiveThreadUnread, reloadUserDialogs]);
 
+  const messagePerspective = useMemo((): DialogMessagePerspective | null => {
+    if (role === "organization") return "organization";
+    if (role === "volunteer") return "volunteer";
+    if (role === "user") return "user";
+    return null;
+  }, [role]);
+
+  const applyWsMessageNew = useCallback(
+    (event: CommsMessageNewEvent) => {
+      if (!messagePerspective) return;
+      const dialogId = event.dialog_id;
+      const chatMsg = mapCommsMessageItem(event.message, messagePerspective);
+
+      const patchThreadList = (
+        setter: Dispatch<SetStateAction<ChatThread[]>>,
+        reload: () => Promise<void>
+      ) => {
+        setter((prev) => {
+          const patched = patchThreadsFromMessageNew(prev, event, activeThreadId);
+          if (patched === "missing") {
+            void reload();
+            return prev;
+          }
+          return patched;
+        });
+      };
+
+      if (role === "organization") {
+        patchThreadList(setOrgThreads, reloadOrgDialogs);
+        if (dialogId === activeThreadId) {
+          setDialogMessages((prev) => appendChatMessage(prev, chatMsg));
+          clearActiveThreadUnread(dialogId);
+        }
+        return;
+      }
+      if (role === "volunteer") {
+        patchThreadList(setVolThreads, reloadVolDialogs);
+        if (dialogId === activeThreadId) {
+          setVolunteerDialogMessages((prev) => appendChatMessage(prev, chatMsg));
+          clearActiveThreadUnread(dialogId);
+        }
+        return;
+      }
+      if (role === "user") {
+        patchThreadList(setUserThreads, reloadUserDialogs);
+        if (dialogId === activeThreadId) {
+          setUserDialogMessages((prev) => appendChatMessage(prev, chatMsg));
+          clearActiveThreadUnread(dialogId);
+        }
+      }
+    },
+    [
+      messagePerspective,
+      role,
+      activeThreadId,
+      clearActiveThreadUnread,
+      reloadOrgDialogs,
+      reloadVolDialogs,
+      reloadUserDialogs,
+    ]
+  );
+
+  useCommunicationsWebSocket(isAuth, applyWsMessageNew);
+
+  const applySentMessage = useCallback(
+    (dialogId: number, raw: unknown) => {
+      if (!messagePerspective) return;
+      const row = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+      if (!row) return;
+      const chatMsg = mapCommsMessageItem(row, messagePerspective);
+      const wsEvent: CommsMessageNewEvent = {
+        type: "message.new",
+        dialog_id: dialogId,
+        message: row,
+        dialog: {
+          id: dialogId,
+          last_message_preview: chatMsg.text,
+          last_message_at:
+            typeof row.created_at === "string" ? row.created_at : new Date().toISOString(),
+          unread_count: 0,
+        },
+      };
+
+      const patchThreadList = (setter: Dispatch<SetStateAction<ChatThread[]>>) => {
+        setter((prev) => {
+          const patched = patchThreadsFromMessageNew(prev, wsEvent, activeThreadId);
+          return patched === "missing" ? prev : patched;
+        });
+      };
+
+      if (role === "organization") {
+        if (dialogId === activeThreadId) {
+          setDialogMessages((prev) => appendChatMessage(prev, chatMsg));
+        }
+        patchThreadList(setOrgThreads);
+        return;
+      }
+      if (role === "volunteer") {
+        if (dialogId === activeThreadId) {
+          setVolunteerDialogMessages((prev) => appendChatMessage(prev, chatMsg));
+        }
+        patchThreadList(setVolThreads);
+        return;
+      }
+      if (role === "user") {
+        if (dialogId === activeThreadId) {
+          setUserDialogMessages((prev) => appendChatMessage(prev, chatMsg));
+        }
+        patchThreadList(setUserThreads);
+      }
+    },
+    [messagePerspective, role, activeThreadId]
+  );
+
   const activeThread =
     threads.find((thread) => thread.id === activeThreadId) ??
     threads[0] ?? {
@@ -718,13 +838,10 @@ function MessagesPageContent() {
       if (!activeThreadId) return;
       void meOrganizationApi
         .postDialogMessage(activeThreadId, text, image)
-        .then(() => meOrganizationApi.getDialog(activeThreadId))
         .then((raw) => {
-          setDialogMessages(mapOrgDialogMessages(raw));
-          setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
+          applySentMessage(activeThreadId, raw);
           setDialogLoadError("");
           afterSendClear();
-          return reloadOrgDialogs();
         })
         .catch((e) => {
           const msg = e instanceof Error ? e.message : "";
@@ -741,13 +858,10 @@ function MessagesPageContent() {
       if (!activeThreadId) return;
       void meVolunteerCommunicationsApi
         .postDialogMessage(activeThreadId, text, image)
-        .then(() => meVolunteerCommunicationsApi.getDialog(activeThreadId))
         .then((raw) => {
-          setVolunteerDialogMessages(mapVolDialogMessages(raw));
-          setContextHint(mapOrgDialogDetailMeta(raw).contextHint);
+          applySentMessage(activeThreadId, raw);
           setDialogLoadError("");
           afterSendClear();
-          return reloadVolDialogs();
         })
         .catch((e) => {
           const msg = e instanceof Error ? e.message : "";
@@ -766,13 +880,10 @@ function MessagesPageContent() {
       if (!activeThreadId) return;
       void meUserCommunicationsApi
         .postDialogMessage(activeThreadId, text, image)
-        .then(() => meUserCommunicationsApi.getDialog(activeThreadId))
         .then((raw) => {
-          setUserDialogMessages(mapUserDialogMessages(raw));
-          setContextHint(mapUserDialogDetailMeta(raw).contextHint);
+          applySentMessage(activeThreadId, raw);
           setDialogLoadError("");
           afterSendClear();
-          return reloadUserDialogs();
         })
         .catch((e) => {
           const msg = e instanceof Error ? e.message : "";

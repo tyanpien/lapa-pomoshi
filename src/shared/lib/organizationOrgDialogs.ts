@@ -153,6 +153,70 @@ function resolveDialogMessageIsMine(
   return side === "me" || side === "volunteer" || side === "vol";
 }
 
+export function mapCommsMessageItem(
+  r: Record<string, unknown>,
+  perspective: DialogMessagePerspective = "organization",
+  fallbackId = 0
+): ChatMessage {
+  const isMine = resolveDialogMessageIsMine(r, perspective);
+  const body = pickStr(r.text ?? r.body ?? r.content ?? r.message);
+  const photoRaw = pickStr(r.photo_url);
+  const photoUrl = photoRaw ? getImageUrl(photoRaw) : "";
+  const text = body || (photoUrl ? "Фото" : "");
+  return {
+    id: typeof r.id === "number" && Number.isFinite(r.id) ? r.id : fallbackId,
+    text,
+    photoUrl: photoUrl || undefined,
+    time: formatShortTime(r.created_at ?? r.sent_at),
+    from: isMine ? "me" : "other",
+  };
+}
+
+export function appendChatMessage(messages: ChatMessage[], msg: ChatMessage): ChatMessage[] {
+  if (messages.some((m) => m.id === msg.id)) return messages;
+  return [...messages, msg];
+}
+
+export type CommsMessageNewEvent = {
+  type: "message.new";
+  dialog_id: number;
+  message: Record<string, unknown>;
+  dialog: {
+    id: number;
+    last_message_preview?: string | null;
+    last_message_at?: string | null;
+    unread_count?: number;
+  };
+};
+
+export function patchThreadsFromMessageNew(
+  threads: ChatThread[],
+  event: CommsMessageNewEvent,
+  activeThreadId: number
+): ChatThread[] | "missing" {
+  const dialogId = event.dialog_id;
+  const d = event.dialog;
+  const preview =
+    typeof d.last_message_preview === "string" ? d.last_message_preview : threads.find((t) => t.id === dialogId)?.preview ?? "";
+  const time = formatShortTime(d.last_message_at);
+  const isActive = dialogId === activeThreadId;
+  const unreadRaw = typeof d.unread_count === "number" ? d.unread_count : undefined;
+  const unread = isActive ? undefined : unreadRaw && unreadRaw > 0 ? unreadRaw : undefined;
+
+  const idx = threads.findIndex((t) => t.id === dialogId);
+  if (idx < 0) return "missing";
+
+  const updated: ChatThread = {
+    ...threads[idx],
+    preview,
+    time,
+    unread,
+  };
+  const next = [...threads];
+  next.splice(idx, 1);
+  return [updated, ...next];
+}
+
 export function mapOrgDialogMessages(
   raw: unknown,
   perspective: DialogMessagePerspective = "organization"
@@ -165,18 +229,5 @@ export function mapOrgDialogMessages(
       ? o.items
       : [];
   const msgs = rawList as Record<string, unknown>[];
-  return msgs.map((r, i) => {
-    const isMine = resolveDialogMessageIsMine(r, perspective);
-    const body = pickStr(r.text ?? r.body ?? r.content ?? r.message);
-    const photoRaw = pickStr(r.photo_url);
-    const photoUrl = photoRaw ? getImageUrl(photoRaw) : "";
-    const text = body || (photoUrl ? "📷 Фото" : "");
-    return {
-      id: typeof r.id === "number" && Number.isFinite(r.id) ? r.id : i + 1,
-      text,
-      photoUrl: photoUrl || undefined,
-      time: formatShortTime(r.created_at ?? r.sent_at),
-      from: isMine ? "me" : "other",
-    };
-  });
+  return msgs.map((r, i) => mapCommsMessageItem(r, perspective, i + 1));
 }

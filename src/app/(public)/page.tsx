@@ -39,7 +39,7 @@ async function loadHomePageData(): Promise<{
   const settled = await withTimeout(
     Promise.allSettled([
       urgentApi.getList({ limit: 100 }),
-      animalsApi.getList(),
+      animalsApi.getList({ is_urgent: true, limit: 100 }),
       organizationsApi.getList(),
       eventsApi.getList(),
     ]),
@@ -47,9 +47,50 @@ async function loadHomePageData(): Promise<{
   ).catch(() => [{ status: "rejected" as const, reason: null }, { status: "rejected" as const, reason: null }, { status: "rejected" as const, reason: null }, { status: "rejected" as const, reason: null }]);
 
   let urgentList: UrgentItem[] = [];
+
   if (settled[0].status === "fulfilled") {
-    const raw = settled[0].value.items ?? [];
-    urgentList = normalizeUrgentFeedItems(raw.filter((i: UrgentItem) => i.is_urgent));
+    const urgentData = settled[0].value.items ?? [];
+  
+    const urgentRequests = filterUrgentCollectionFeedItems(urgentData);
+  
+    const urgentAnimalIds = new Set(
+      urgentRequests
+        .map((r) => r.animal_id)
+        .filter(
+          (id): id is number =>
+            typeof id === "number" && Number.isFinite(id)
+        )
+    );
+  
+    const urgentAnimals =
+      settled[1].status === "fulfilled"
+        ? (((settled[1].value as { items?: Animal[] }).items ?? []).filter(
+            (a) =>
+              a.is_urgent &&
+              a.status !== "archived" &&
+              !urgentAnimalIds.has(a.id)
+          ))
+        : [];
+  
+      const fromAnimals: Partial<UrgentItem>[] = urgentAnimals.map((animal) => ({
+        id: -animal.id,
+        animal_id: animal.id,
+        animal_name: animal.name,
+        animal_species:
+          animal.species?.toLowerCase().includes("соб") ? "dog" : "cat",
+        title: animal.name,
+        description: "",
+        organization_name: animal.organization_name ?? "",
+        primary_photo_url: animal.primary_photo_url ?? "",
+        city: "",
+        help_type: "manual",
+        badges: ["срочно"],
+      }));
+  
+    urgentList = normalizeUrgentFeedItems([
+      ...urgentRequests,
+      ...(fromAnimals as UrgentItem[]),
+    ]);
   }
 
   const animals = settled[1].status === "fulfilled" ? ((settled[1].value as { items?: Animal[] }).items ?? []) : [];

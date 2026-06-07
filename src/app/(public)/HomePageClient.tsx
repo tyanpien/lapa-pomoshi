@@ -15,6 +15,14 @@ import { formatRub } from "@/shared/lib/formatRub";
 import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
 import { getLoginHref } from "@/shared/lib/auth/loginHref";
 import { useUser } from "@/shared/lib/hooks/useUser";
+import {
+  filterUrgentCollectionFeedItems,
+  normalizeUrgentFeedItems,
+} from "@/shared/lib/urgentFeedNormalize";
+
+import {
+  urgentItemFromUrgentAnimal,
+} from "@/shared/lib/urgentAnimalFeed";
 
 export type HomePageClientProps = {
   urgentList: UrgentItem[];
@@ -59,9 +67,13 @@ export default function HomePageClient({
       raw == null || !Number.isFinite(Number(raw)) ? 0 : Number(raw);
     return Math.min(100, Math.round((collected / item.target_amount) * 100));
   };
-
-  const bigCard = urgentList[0];
-  const smallCards = urgentList.slice(1, 5);
+  
+  const normalizedUrgentList = normalizeUrgentFeedItems(
+    filterUrgentCollectionFeedItems(urgentList)
+  );
+  
+  const bigCard = normalizedUrgentList[0];
+  const smallCards = normalizedUrgentList.slice(1, 5);
 
   const getSpeciesType = (species: string): string => {
     if (!species) return "other";
