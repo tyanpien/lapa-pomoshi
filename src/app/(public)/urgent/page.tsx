@@ -5,11 +5,22 @@ import styles from "./page.module.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { resolveUrgentHelpHref, resolveUrgentHelpPath } from "@/shared/lib/urgentHelpHref";
 import { useUser } from "@/shared/lib/hooks/useUser";
 
+import { animalsApi, type Animal } from "@/shared/api/endpoints/animals";
 import { urgentApi, UrgentCatalogs, UrgentItem } from "@/shared/api/endpoints/urgent";
-import { getImageUrl } from "@/shared/api/client";
-import { normalizeUrgentFeedItems } from "@/shared/lib/urgentFeedNormalize";
+import { ANIMAL_PLACEHOLDER_SRC, getImageUrl } from "@/shared/api/client";
+import {
+  filterUrgentCollectionFeedItems,
+  normalizeUrgentFeedItems,
+} from "@/shared/lib/urgentFeedNormalize";
+import {
+  catalogPathForUrgentAnimal,
+  isAnimalOnlyUrgentCard,
+  urgentItemFromUrgentAnimal,
+} from "@/shared/lib/urgentAnimalFeed";
+import { isFundraisingHelpType } from "@/shared/lib/helpRequestType";
 import { takeFirstSentences } from "@/shared/lib/teaserSentences";
 import { formatRub } from "@/shared/lib/formatRub";
 
@@ -45,13 +56,33 @@ export default function UrgentPage() {
   const cityRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    urgentApi.getList().then((data) => {
-      const urgentOnly = data.items.filter((i: UrgentItem) => i.is_urgent);
-      setCards(normalizeUrgentFeedItems(urgentOnly));
-      setShowCount(10);
-    });
-
-    urgentApi.getCatalogs().then(setCatalogs);
+    void Promise.all([
+      urgentApi.getList({ limit: 100 }),
+      animalsApi.getList({ is_urgent: true, limit: 100 }),
+      urgentApi.getCatalogs(),
+    ])
+      .then(([urgentData, animalsData, catalogsData]) => {
+        const requests = filterUrgentCollectionFeedItems(urgentData.items ?? []);
+        const animalIdsWithRequest = new Set(
+          requests
+            .map((r) => r.animal_id)
+            .filter((id): id is number => typeof id === "number" && Number.isFinite(id))
+        );
+        const urgentAnimals = ((animalsData as { items?: Animal[] })?.items ?? []).filter(
+          (a) => a.status !== "archived" && !animalIdsWithRequest.has(a.id)
+        );
+        const fromAnimals = urgentAnimals.map(urgentItemFromUrgentAnimal);
+        setCards(normalizeUrgentFeedItems([...requests, ...fromAnimals]));
+        setShowCount(10);
+        setCatalogs(catalogsData);
+      })
+      .catch(() => {
+        void urgentApi.getList().then((data) => {
+          setCards(normalizeUrgentFeedItems(filterUrgentCollectionFeedItems(data.items ?? [])));
+          setShowCount(10);
+        });
+        void urgentApi.getCatalogs().then(setCatalogs);
+      });
   }, []);
 
   useEffect(() => {
@@ -83,11 +114,15 @@ export default function UrgentPage() {
 
         amount: isProgress ? "progress" : "deadline",
 
-        action: item.volunteer_needed ? "Помочь" : "Связаться",
+        action: isAnimalOnlyUrgentCard(item.id)
+          ? item.animal_id != null
+            ? "Подробнее"
+            : "Помочь"
+          : "Помочь",
 
         image: item.primary_photo_url
           ? getImageUrl(item.primary_photo_url)
-          : "/cat-placeholder.jpg",
+          : ANIMAL_PLACEHOLDER_SRC,
 
         animalSpecies: item.animal_species === "dog" || item.animal_species === "cat" ? item.animal_species : "cat",
         city: item.city ?? "",
@@ -243,7 +278,9 @@ export default function UrgentPage() {
               <h2 className={styles.filterTitle}>Как помочь</h2>
 
               <div className={styles.column}>
-                {catalogs?.help_types?.map((t) => (
+                {catalogs?.help_types
+                  ?.filter((t) => isFundraisingHelpType(t.id))
+                  .map((t) => (
                   <label key={t.id} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"
@@ -308,19 +345,35 @@ export default function UrgentPage() {
                       type="button"
                       className={styles.cardBtn}
                       onClick={() => {
-                        const target = `/urgent/${card.id}`;
-                        if (!isAuth) {
-                          router.push(getLoginHref(target));
+                        const item = cards.find((c) => c.id === card.id);
+                        if (!item) return;
+                        if (isAnimalOnlyUrgentCard(item.id) && item.animal_id != null) {
+                          const target = catalogPathForUrgentAnimal(item.animal_id);
+                          router.push(isAuth ? target : getLoginHref(target));
                           return;
                         }
-                        router.push(target);
+                        if (card.action === "Помочь") {
+                          const helpPath = resolveUrgentHelpPath(item);
+                          router.push(
+                            isAuth
+                              ? helpPath
+                              : resolveUrgentHelpHref(item, { loginReturnPath: helpPath })
+                          );
+                          return;
+                        }
+                        const target = `/urgent/${card.id}`;
+                        router.push(isAuth ? target : getLoginHref(target));
                       }}
                     >
                       {card.action}
                     </button>
 
                     <Link
-                      href={`/urgent/${card.id}`}
+                      href={
+                        isAnimalOnlyUrgentCard(card.id) && card.animalId > 0
+                          ? catalogPathForUrgentAnimal(card.animalId)
+                          : `/urgent/${card.id}`
+                      }
                       className={styles.detailsLink}
                     >
                       Подробнее

@@ -33,6 +33,21 @@
   color: #6b5b4e;
 }
 
+.coverWrap {
+  margin-bottom: 28px;
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 480px;
+}
+
+.coverImage {
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+}
+
 .header {
   margin-bottom: 32px;
 }
@@ -80,6 +95,8 @@
   line-height: 1.7;
   color: #333;
   margin-bottom: 48px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .content h2 {

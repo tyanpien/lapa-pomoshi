@@ -1,5 +1,12 @@
 import { apiFetch, getImageUrl } from "../client";
 
+export type AnimalPhotoMeta = {
+  id: number;
+  url: string;
+  is_primary: boolean;
+  is_pending?: boolean;
+};
+
 export interface Animal {
   id: number;
   name: string;
@@ -13,6 +20,7 @@ export interface Animal {
   full_description?: string | null;
   primary_photo_url: string | null;
   photo_urls?: string[];
+  photos?: AnimalPhotoMeta[];
   organization?: {
     id: number;
     name: string;
@@ -68,4 +76,12 @@ export const animalsApi = {
       body: fd,
     }) as Promise<AnimalPhotoUploadResponse>;
   },
+
+  deleteImage: (animalId: number, photoId: number) =>
+    apiFetch(`/api/v1/animals/${animalId}/images/${photoId}`, { method: "DELETE" }),
+
+  setPrimaryImage: (animalId: number, photoId: number) =>
+    apiFetch(`/api/v1/animals/${animalId}/images/${photoId}/primary`, {
+      method: "PATCH",
+    }) as Promise<AnimalPhotoUploadResponse>,
 };

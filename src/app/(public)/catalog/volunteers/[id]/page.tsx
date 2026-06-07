@@ -7,6 +7,7 @@ import styles from "./page.module.css";
 import { volunteersApi, volunteerAvailabilityText, type VolunteerDetail } from "@/shared/api/endpoints/volunteers";
 import type { KnowledgeItem } from "@/shared/api/endpoints/knowledge";
 import { knowledgeApi } from "@/shared/api/endpoints/knowledge";
+import { KnowledgeArticleCover } from "@/shared/ui/KnowledgeArticleCover/KnowledgeArticleCover";
 import { getImageUrl } from "@/shared/api/client";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import {
@@ -427,7 +428,7 @@ export default function VolunteerPage() {
               {articles.map((article) => (
                 <Link key={article.id} href={`/knowledge/${article.id}`} className={styles.articleCard}>
                   <div className={styles.articleImage}>
-                    <img src="/knowledge.png" alt="" />
+                    <KnowledgeArticleCover coverUrl={article.cover_url} alt="" />
                   </div>
                   <div className={styles.articleBody}>
                     <h3 className={styles.articleHeading}>{article.title}</h3>

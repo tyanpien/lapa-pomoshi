@@ -33,6 +33,7 @@ type IncomingVolunteerResponseItem = {
   status_label: string;
   message: string | null;
   report_body?: string | null;
+  report_photo_urls?: string[];
   report_submitted_at?: string | null;
   report_awaiting_org_review?: boolean;
   report_rejection_reason?: string | null;
@@ -49,20 +50,16 @@ function statusClass(status: string): string {
   return "";
 }
 
-function incomingStatusRank(status: string): number {
-  if (status === "pending_review" || status === "pending") return 0;
-  if (status === "accepted") return 1;
-  if (status === "rejected" || status === "withdrawn") return 2;
-  if (status === "completed") return 3;
-  return 1;
+function sortIncomingByCreatedAt<T extends { id: number; created_at: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const byDate = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (byDate !== 0) return byDate;
+    return b.id - a.id;
+  });
 }
 
-function sortIncomingByStatus<T extends { status: string; created_at: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) => {
-    const byStatus = incomingStatusRank(a.status) - incomingStatusRank(b.status);
-    if (byStatus !== 0) return byStatus;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+function replaceIncomingItem<T extends { id: number }>(items: T[], id: number, next: T): T[] {
+  return items.map((item) => (item.id === id ? next : item));
 }
 
 function IncomingTabs({
@@ -189,7 +186,9 @@ export default function OrganizationIncomingPage() {
     setBusyId(id);
     void meOrganizationApi
       .approveIncomingAdoption(id)
-      .then(() => reloadAdoptions())
+      .then((updated) => {
+        setAdoptions((prev) => replaceIncomingItem(prev, id, updated as IncomingAdoptionItem));
+      })
       .catch(() => setErrorText("Не удалось одобрить анкету."))
       .finally(() => setBusyId(null));
   };
@@ -199,7 +198,9 @@ export default function OrganizationIncomingPage() {
     setBusyId(id);
     void meOrganizationApi
       .rejectIncomingAdoption(id, reason.trim() ? { reason: reason.trim() } : {})
-      .then(() => reloadAdoptions())
+      .then((updated) => {
+        setAdoptions((prev) => replaceIncomingItem(prev, id, updated as IncomingAdoptionItem));
+      })
       .catch(() => setErrorText("Не удалось отклонить анкету."))
       .finally(() => setBusyId(null));
   };
@@ -208,7 +209,11 @@ export default function OrganizationIncomingPage() {
     setBusyId(id);
     void meOrganizationApi
       .acceptVolunteerResponse(id)
-      .then(() => reloadVolunteers())
+      .then((updated) => {
+        setVolunteerResponses((prev) =>
+          replaceIncomingItem(prev, id, updated as IncomingVolunteerResponseItem)
+        );
+      })
       .catch(() => setErrorText("Не удалось принять отклик."))
       .finally(() => setBusyId(null));
   };
@@ -218,7 +223,11 @@ export default function OrganizationIncomingPage() {
     setBusyId(id);
     void meOrganizationApi
       .rejectVolunteerResponse(id, reason.trim() ? { reason: reason.trim() } : {})
-      .then(() => reloadVolunteers())
+      .then((updated) => {
+        setVolunteerResponses((prev) =>
+          replaceIncomingItem(prev, id, updated as IncomingVolunteerResponseItem)
+        );
+      })
       .catch(() => setErrorText("Не удалось отклонить отклик."))
       .finally(() => setBusyId(null));
   };
@@ -227,7 +236,11 @@ export default function OrganizationIncomingPage() {
     setBusyId(id);
     void meOrganizationApi
       .completeVolunteerResponse(id)
-      .then(() => reloadVolunteers())
+      .then((updated) => {
+        setVolunteerResponses((prev) =>
+          replaceIncomingItem(prev, id, updated as IncomingVolunteerResponseItem)
+        );
+      })
       .catch(() => setErrorText("Не удалось завершить задачу."))
       .finally(() => setBusyId(null));
   };
@@ -238,7 +251,11 @@ export default function OrganizationIncomingPage() {
     setBusyId(id);
     void meOrganizationApi
       .rejectVolunteerReport(id, { reason: reason.trim() })
-      .then(() => reloadVolunteers())
+      .then((updated) => {
+        setVolunteerResponses((prev) =>
+          replaceIncomingItem(prev, id, updated as IncomingVolunteerResponseItem)
+        );
+      })
       .catch(() => setErrorText("Не удалось отклонить отчёт."))
       .finally(() => setBusyId(null));
   };
@@ -246,9 +263,9 @@ export default function OrganizationIncomingPage() {
   const adoptionApplicantName = (item: IncomingAdoptionItem) =>
     item.applicant_name?.trim() || "Заявитель";
 
-  const sortedAdoptions = useMemo(() => sortIncomingByStatus(adoptions), [adoptions]);
+  const sortedAdoptions = useMemo(() => sortIncomingByCreatedAt(adoptions), [adoptions]);
   const sortedVolunteerResponses = useMemo(
-    () => sortIncomingByStatus(volunteerResponses),
+    () => sortIncomingByCreatedAt(volunteerResponses),
     [volunteerResponses]
   );
 
@@ -332,6 +349,21 @@ export default function OrganizationIncomingPage() {
                     <div className={styles.reportBlock}>
                       <p className={styles.reportLabel}>Отчёт волонтёра</p>
                       <pre className={styles.message}>{item.report_body.trim()}</pre>
+                      {item.report_photo_urls?.length ? (
+                        <div className={styles.reportPhotoGrid}>
+                          {item.report_photo_urls.map((url) => (
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={styles.reportPhotoItem}
+                            >
+                              <img src={url} alt="Фото отчёта волонтёра" className={styles.reportPhotoImage} />
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
                       {item.report_awaiting_org_review ? (
                         <p className={styles.reportMeta}>Ожидает проверки организации</p>
                       ) : null}
@@ -379,9 +411,9 @@ export default function OrganizationIncomingPage() {
                         ) : null}
                       </>
                     ) : item.status === "completed" ? (
-                      <Link href="/organization/requests" className={styles.contactBtn}>
+                      <button className={styles.contactBtn}>
                         Задача завершена
-                      </Link>
+                      </button>
                     ) : null}
                   </div>
                 </article>

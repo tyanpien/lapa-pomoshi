@@ -56,6 +56,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             {role === "user" && (
               <>
                 <Link href="/profile" onClick={onClose}>Мой профиль</Link>
+                <Link href="/profile/become-volunteer" onClick={onClose}>Стать волонтёром</Link>
                 <Link href="/profile/applications" onClick={onClose}>Мои анкеты</Link>
                 <Link href="/messages" onClick={onClose}>Мои сообщения</Link>
               </>

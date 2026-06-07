@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { eventsApi, type EventItem } from "@/shared/api/endpoints/events";
 import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
@@ -17,6 +17,7 @@ type VisibilityFilter = "all" | "archive";
 type OrgEventRow = EventItem & {
   is_archived: boolean;
   is_published: boolean;
+  can_edit: boolean;
 };
 
 const emptyForm = {
@@ -25,6 +26,9 @@ const emptyForm = {
   location: "",
   dateLabel: "",
   format: "offline" as "online" | "offline",
+  entryType: "free" as "free" | "limited",
+  capacity: "",
+  seatsTaken: 0,
 };
 
 function mapMeEventRow(row: Record<string, unknown>): OrgEventRow {
@@ -42,16 +46,12 @@ function mapMeEventRow(row: Record<string, unknown>): OrgEventRow {
     starts_at: String(row.starts_at ?? ""),
     ends_at: row.ends_at != null ? String(row.ends_at) : null,
     description: row.description != null ? String(row.description) : null,
+    entry_type: row.entry_type != null ? String(row.entry_type) : "free",
+    capacity: typeof row.capacity === "number" ? row.capacity : row.capacity != null ? Number(row.capacity) || null : null,
+    seats_taken: typeof row.seats_taken === "number" ? row.seats_taken : Number(row.seats_taken) || 0,
     is_archived: Boolean(row.is_archived),
     is_published: row.is_published !== false,
-  };
-}
-
-function mapPublicEventItem(item: EventItem): OrgEventRow {
-  return {
-    ...item,
-    is_archived: false,
-    is_published: true,
+    can_edit: row.can_edit !== false,
   };
 }
 
@@ -95,6 +95,27 @@ function formatEventWhen(startsAt: string): string {
   });
 }
 
+function formatEventEntry(item: OrgEventRow): string {
+  if (item.entry_type === "limited" && item.capacity != null) {
+    const taken = item.seats_taken ?? 0;
+    return `Запись: ${taken} / ${item.capacity} мест`;
+  }
+  return "Свободный вход";
+}
+
+function validateEventForm(form: typeof emptyForm): string | null {
+  if (form.entryType === "limited") {
+    const capacity = Number(form.capacity);
+    if (!Number.isFinite(capacity) || capacity < 1) {
+      return "Укажите количество мест — не меньше 1.";
+    }
+    if (capacity < form.seatsTaken) {
+      return `Лимит не может быть меньше уже записавшихся (${form.seatsTaken}).`;
+    }
+  }
+  return null;
+}
+
 function datetimeLocalToApiValue(localValue: string): string {
   const trimmed = localValue.trim();
   if (!trimmed) return new Date().toISOString();
@@ -120,7 +141,7 @@ function isoToDatetimeLocalValue(iso: string): string {
 function buildEventPayload(form: typeof emptyForm) {
   const starts = datetimeLocalToApiValue(form.dateLabel);
   const venue = normalizeVenueText(form.location);
-  return {
+  const payload: Record<string, unknown> = {
     title: form.title.trim(),
     description: form.description.trim(),
     summary: form.description.trim().slice(0, 180),
@@ -131,14 +152,20 @@ function buildEventPayload(form: typeof emptyForm) {
     format: form.format,
     help_type: null,
     is_published: true,
+    entry_type: form.entryType,
   };
+  if (form.entryType === "limited") {
+    payload.capacity = Number(form.capacity);
+  }
+  return payload;
 }
 
 export default function OrganizationEventsPage() {
-  const { userName, role } = useUser();
+  const { isLoading: isUserLoading } = useUser();
   const [events, setEvents] = useState<OrgEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
+  const loadGenerationRef = useRef(0);
   const [search, setSearch] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -149,33 +176,29 @@ export default function OrganizationEventsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     setLoading(true);
     setErrorText("");
     try {
-      if (role === "organization") {
-        const raw = await meOrganizationApi.listEvents();
-        const rows = unwrapApiList<Record<string, unknown>>(raw);
-        setEvents(rows.map(mapMeEventRow).filter((e) => e.id > 0));
-        return;
-      }
-      const data = await eventsApi.getList();
-      const items = data.items ?? [];
-      const orgNeedle = (userName ?? "").trim().toLowerCase();
-      const filtered = orgNeedle
-        ? items.filter((e) => (e.organization_name ?? "").trim().toLowerCase() === orgNeedle)
-        : items;
-      setEvents(filtered.map(mapPublicEventItem));
+      const raw = await meOrganizationApi.listEvents();
+      if (generation !== loadGenerationRef.current) return;
+      const rows = unwrapApiList<Record<string, unknown>>(raw);
+      setEvents(rows.map(mapMeEventRow).filter((e) => e.id > 0 && e.can_edit));
     } catch (e) {
+      if (generation !== loadGenerationRef.current) return;
       setEvents([]);
       setErrorText(e instanceof Error ? e.message : "Не удалось загрузить мероприятия.");
     } finally {
-      setLoading(false);
+      if (generation === loadGenerationRef.current) {
+        setLoading(false);
+      }
     }
-  }, [role, userName]);
+  }, []);
 
   useEffect(() => {
+    if (isUserLoading) return;
     void reload();
-  }, [reload]);
+  }, [isUserLoading, reload]);
 
   const visibleEvents = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -204,6 +227,11 @@ export default function OrganizationEventsPage() {
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!createForm.title.trim() || createForm.description.trim().length < 10) return;
+    const validationError = validateEventForm(createForm);
+    if (validationError) {
+      setErrorText(validationError);
+      return;
+    }
     void eventsApi
       .create(buildEventPayload(createForm))
       .then(() => {
@@ -216,6 +244,10 @@ export default function OrganizationEventsPage() {
   };
 
   const openEditModal = (eventItem: OrgEventRow) => {
+    if (!eventItem.can_edit) {
+      setErrorText("Редактировать можно только свои мероприятия.");
+      return;
+    }
     setEditId(eventItem.id);
     setEditLoading(true);
     void eventsApi
@@ -231,6 +263,9 @@ export default function OrganizationEventsPage() {
           } as OrgEventRow),
           dateLabel: d.starts_at ? isoToDatetimeLocalValue(d.starts_at) : "",
           format: d.format === "online" ? "online" : "offline",
+          entryType: d.entry_type === "limited" ? "limited" : "free",
+          capacity: d.entry_type === "limited" && d.capacity != null ? String(d.capacity) : "",
+          seatsTaken: d.seats_taken ?? 0,
         });
       })
       .catch(() => setErrorText("Не удалось загрузить мероприятие."))
@@ -240,6 +275,11 @@ export default function OrganizationEventsPage() {
   const handleEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (editId === null || editForm.description.trim().length < 10) return;
+    const validationError = validateEventForm(editForm);
+    if (validationError) {
+      setErrorText(validationError);
+      return;
+    }
     void eventsApi
       .patch(editId, buildEventPayload(editForm))
       .then(() => {
@@ -323,6 +363,40 @@ export default function OrganizationEventsPage() {
             onChange={(e) => setForm({ ...form, dateLabel: e.target.value })}
           />
         </label>
+        <label className={styles.label}>
+          Участие
+          <select
+            className={styles.select}
+            value={form.entryType}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                entryType: e.target.value as "free" | "limited",
+                capacity: e.target.value === "free" ? "" : form.capacity,
+              })
+            }
+          >
+            <option value="free">Свободный вход</option>
+            <option value="limited">Ограниченное количество мест</option>
+          </select>
+        </label>
+        {form.entryType === "limited" ? (
+          <label className={styles.label}>
+            Количество мест
+            <input
+              type="number"
+              min={Math.max(form.seatsTaken, 1)}
+              className={styles.input}
+              value={form.capacity}
+              onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+              placeholder="Например, 30"
+              required
+            />
+          </label>
+        ) : null}
+        {form.entryType === "limited" && form.seatsTaken > 0 ? (
+          <p className={styles.fieldHint}>Уже записано: {form.seatsTaken}</p>
+        ) : null}
         <label className={styles.labelFull}>
           Описание
           <textarea
@@ -398,39 +472,42 @@ export default function OrganizationEventsPage() {
                 <h2 className={styles.eventTitle}>{eventItem.title}</h2>
                 <p className={styles.metaLine}>Место: {formatEventPlace(eventItem)}</p>
                 <p className={styles.metaLine}>Когда: {formatEventWhen(eventItem.starts_at)}</p>
+                <p className={styles.metaLine}>Участие: {formatEventEntry(eventItem)}</p>
                 <span
                   className={`${styles.badge} ${eventItem.is_archived ? styles.badgeArchived : ""}`.trim()}
                 >
                   {eventItem.is_archived ? "Архив" : "Опубликовано"}
                 </span>
-                <div className={styles.cardActions}>
-                  <button
-                    type="button"
-                    className={styles.editBtn}
-                    disabled={busyId === eventItem.id}
-                    onClick={() => openEditModal(eventItem)}
-                  >
-                    Изменить
-                  </button>
-                  {!eventItem.is_archived ? (
+                {eventItem.can_edit ? (
+                  <div className={styles.cardActions}>
                     <button
                       type="button"
-                      className={styles.archiveBtn}
+                      className={styles.editBtn}
                       disabled={busyId === eventItem.id}
-                      onClick={() => handleArchive(eventItem.id)}
+                      onClick={() => openEditModal(eventItem)}
                     >
-                      В архив
+                      Изменить
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.deleteBtn}
-                    disabled={busyId === eventItem.id}
-                    onClick={() => handleDelete(eventItem.id)}
-                  >
-                    Удалить
-                  </button>
-                </div>
+                    {!eventItem.is_archived ? (
+                      <button
+                        type="button"
+                        className={styles.archiveBtn}
+                        disabled={busyId === eventItem.id}
+                        onClick={() => handleArchive(eventItem.id)}
+                      >
+                        В архив
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={styles.deleteBtn}
+                      disabled={busyId === eventItem.id}
+                      onClick={() => handleDelete(eventItem.id)}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                ) : null}
               </article>
             ))}
           </section>

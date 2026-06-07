@@ -439,11 +439,13 @@
 .articleCard {
   display: flex;
   gap: 20px;
-  max-height: 230px;
+  height: 230px;
   padding: 24px;
   border: 1px solid #8B5A3C;
   border-radius: 8px;
   background: #F7F3ED;
+  overflow: hidden;
+  align-items: stretch;
 }
 
 .articleCard:hover {
@@ -458,24 +460,35 @@
 }
 
 .articleBody {
-  padding: 1px 1px 14px 0px;
+  flex: 1;
+  min-width: 0;
+  padding: 1px 1px 14px 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-width: 800px;
+  gap: 8px;
+  min-height: 0;
 }
 
 .articleHeading {
-  margin: 20px 10px 10px 10px;
+  margin: 0 10px 0;
   font-size: 22px;
   font-weight: 700;
   color: #8B5A3C;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .articleSummary {
-  margin: 0px 10px 42px 10px;
+  composes: clamp3 from "../../../../../shared/styles/textClamp.module.css";
+  margin: 0 10px;
   color: #333333;
   font-size: 14px;
+  line-height: 1.45;
+  flex: 1;
+  min-height: 0;
 }
 
 .articleMeta {
@@ -486,7 +499,8 @@
   justify-content: space-between;
   font-size: 12px;
   color: #7d746c;
-  margin: 0 10px 12px;
+  margin: 0 10px 0;
+  flex-shrink: 0;
 }
 
 .articleMeta span:first-child {

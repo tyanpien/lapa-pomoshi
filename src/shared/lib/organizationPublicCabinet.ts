@@ -123,10 +123,12 @@ export function mapPublicArticleToCabinet(a: OrgPublicArticle): OrganizationArti
 }
 
 export function mapPublicReportToCabinet(r: OrgPublicReport): OrganizationReport {
+  const fileRaw = r.file_url?.trim();
   return {
     id: r.id,
     title: r.title,
     content: r.summary || "",
+    fileUrl: fileRaw ? getImageUrl(fileRaw) : undefined,
     isUrgent: false,
     archived: false,
     createdAt: r.published_at,

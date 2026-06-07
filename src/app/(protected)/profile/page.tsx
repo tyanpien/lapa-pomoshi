@@ -1,16 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { UserProfileEditModal, type UserProfileEditInitial } from "@/features/user-profile/UserProfileEditModal";
 import { useUser } from "@/shared/lib/hooks/useUser";
 import { meApplicationsApi, type AdoptionApplicationListItem } from "@/shared/api/endpoints/meApplications";
-import { meProfileApi } from "@/shared/api/endpoints/meProfile";
+import { meProfileApi, type MeProfileResponse } from "@/shared/api/endpoints/meProfile";
 import { meUserCommunicationsApi } from "@/shared/api/endpoints/meUserCommunications";
 import { getImageUrl } from "@/shared/api/client";
+import { displayAccountEmail } from "@/shared/lib/displayAccountContact";
 import type { ChatThread } from "@/shared/lib/messages";
 import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
 import { mapUserDialogListRow } from "@/shared/lib/userOrgDialogs";
 import styles from "./page.module.css";
+
+function profileEditInitialFromApi(prof: MeProfileResponse, displayName: string): UserProfileEditInitial {
+  return {
+    fullName: prof.user.full_name?.trim() || displayName,
+    email: displayAccountEmail(prof.user.email),
+    phone: prof.user.phone?.trim() ?? "",
+    avatarUrl: resolveProfileAvatar(prof.volunteer_profile?.avatar_url, prof.user_profile?.avatar_url),
+  };
+}
 
 function resolveProfileAvatar(volunteerUrl: string | null | undefined, userUrl: string | null | undefined) {
   const raw = volunteerUrl?.trim() || userUrl?.trim() || "";
@@ -18,16 +29,30 @@ function resolveProfileAvatar(volunteerUrl: string | null | undefined, userUrl: 
 }
 
 export default function ProfilePage() {
-  const { userName: hookUserName } = useUser();
+  const { userName: hookUserName, role, isLoading: userLoading } = useUser();
   const [openedMenuId, setOpenedMenuId] = useState<number | null>(null);
   const [applications, setApplications] = useState<AdoptionApplicationListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [displayName, setDisplayName] = useState<string>("");
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+  const [profileSnapshot, setProfileSnapshot] = useState<MeProfileResponse | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteBusyId, setDeleteBusyId] = useState<number | null>(null);
   const [messageThreads, setMessageThreads] = useState<ChatThread[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(true);
+
+  const editModalInitial = useMemo((): UserProfileEditInitial => {
+    if (profileSnapshot) {
+      return profileEditInitialFromApi(profileSnapshot, displayName);
+    }
+    return {
+      fullName: displayName || hookUserName || "",
+      email: "",
+      phone: "",
+      avatarUrl: avatarSrc,
+    };
+  }, [profileSnapshot, displayName, hookUserName, avatarSrc]);
 
   const reload = useCallback(async () => {
     setLoadError("");
@@ -45,6 +70,7 @@ export default function ProfilePage() {
         storedName ||
         "Профиль";
       setDisplayName(name);
+      setProfileSnapshot(prof);
       setAvatarSrc(resolveProfileAvatar(prof.volunteer_profile?.avatar_url, prof.user_profile?.avatar_url));
       setApplications((apps.items ?? []).slice(0, 3));
     } catch {
@@ -113,15 +139,52 @@ export default function ProfilePage() {
     <main className={styles.page}>
       <div className={styles.container}>
         <section className={styles.userHeader}>
-          <div className={styles.headerAvatarWrap}>
-            <img
-              src={avatarSrc || "/event.png"}
-              alt=""
-              className={styles.headerAvatarImg}
-            />
+          <div className={styles.userHeaderMain}>
+            <div className={styles.headerAvatarWrap}>
+              <img
+                src={avatarSrc || "/event.png"}
+                alt=""
+                className={styles.headerAvatarImg}
+              />
+            </div>
+            <h1>{displayName || hookUserName || "Профиль"}</h1>
           </div>
-          <h1>{displayName || hookUserName || "Профиль"}</h1>
+          {role === "user" ? (
+            <button
+              type="button"
+              className={styles.editProfileButton}
+              onClick={() => setEditModalOpen(true)}
+            >
+              Редактировать профиль
+            </button>
+          ) : null}
         </section>
+
+        {!userLoading && role === "user" ? (
+          <div className={styles.volunteerCtaWrap}>
+            <section className={styles.volunteerCta} aria-labelledby="become-volunteer-cta-title">
+              <h2 id="become-volunteer-cta-title">Волонтёрство</h2>
+              <p>
+                Хотите помогать приютам и животным? Заполните расширенную анкету — откроется личный кабинет
+                волонтёра и лента задач.
+              </p>
+              <Link href="/profile/become-volunteer" className={styles.volunteerCtaButton}>
+                Стать волонтёром
+              </Link>
+            </section>
+          </div>
+        ) : null}
+
+        <UserProfileEditModal
+          open={editModalOpen}
+          initial={editModalInitial}
+          onClose={() => setEditModalOpen(false)}
+          onSaved={({ fullName, avatarUrl }) => {
+            setDisplayName(fullName);
+            setAvatarSrc(avatarUrl);
+            void reload();
+          }}
+        />
 
         <section className={styles.section}>
           <div className={styles.sectionTop}>

@@ -52,6 +52,8 @@ export interface MeProfileResponse {
 
 export interface UserRoleProfilePatch {
   full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 export interface VolunteerSelfPatch {
@@ -86,6 +88,11 @@ export interface MeProfilePatchRequest {
   organization_contact?: OrgSelfPatch | null;
 }
 
+export interface BecomeVolunteerRequest extends VolunteerSelfPatch {
+  competency_slugs: string[];
+  location_city: string;
+}
+
 export interface AvatarUploadResponse {
   avatar_url: string;
 }
@@ -110,4 +117,10 @@ export const meProfileApi = {
       body: fd,
     }) as Promise<AvatarUploadResponse>;
   },
+
+  becomeVolunteer: (payload: BecomeVolunteerRequest) =>
+    apiFetch("/api/v1/me/become-volunteer", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }) as Promise<MeProfileResponse>,
 };

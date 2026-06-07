@@ -124,12 +124,29 @@ export function collectTaskCompetencySlugs(task: UrgentItem): string[] {
   return [...out];
 }
 
+export function collectTaskRequiredCompetencySlugs(task: UrgentItem): string[] {
+  const d = task as UrgentRequestDetail;
+  const out = new Set<string>();
+
+  const ht = (task.help_type ?? "").trim().toLowerCase();
+  if (ht) out.add(ht);
+
+  for (const c of d.volunteer_competencies ?? []) {
+    const raw = String(c).trim();
+    if (!raw) continue;
+    const slug = inferSlugFromFreeText(raw);
+    out.add((slug ?? raw).toLowerCase());
+  }
+
+  return [...out];
+}
+
 export function taskMatchesVolunteerCompetencies(task: UrgentItem, volunteerCompetencySlugs: string[]): boolean {
   if (!volunteerCompetencySlugs.length) return true;
   const vol = new Set(volunteerCompetencySlugs.map((s) => s.trim().toLowerCase()).filter(Boolean));
-  const taskSlugs = collectTaskCompetencySlugs(task);
+  const taskSlugs = collectTaskRequiredCompetencySlugs(task);
   if (!taskSlugs.length) return false;
-  return taskSlugs.some((s) => vol.has(s.toLowerCase()));
+  return taskSlugs.every((s) => vol.has(s.toLowerCase()));
 }
 
 export function sortVolunteerPersonalizedTasks(tasks: UrgentItem[]): UrgentItem[] {

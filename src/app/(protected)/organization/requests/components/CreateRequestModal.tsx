@@ -173,12 +173,13 @@ export function CreateRequestModal({
               </div>
 
               <label className={styles.fieldLabel}>
-                Подопечный
+                Подопечный (необязательно)
                 <WardSelect
                   animals={animals}
                   value={form.linkedAnimalId}
                   onChange={(linkedAnimalId) => onFormChange({ linkedAnimalId })}
-                  placeholder="Выберите подопечного"
+                  placeholder="Не привязывать — общая заявка"
+                  allowEmpty
                 />
               </label>
 
@@ -263,11 +264,13 @@ export function CreateRequestModal({
               </div>
 
               <label className={styles.fieldLabel}>
-                Подопечный
+                Подопечный (необязательно)
                 <WardSelect
                   animals={animals}
                   value={form.linkedAnimalId}
                   onChange={(linkedAnimalId) => onFormChange({ linkedAnimalId })}
+                  placeholder="Не привязывать — общая заявка"
+                  allowEmpty
                 />
               </label>
 
@@ -348,7 +351,7 @@ export function CreateRequestModal({
                 disabled={saving}
                 onClick={handleDraft}
               >
-                Сохранить в черновики
+                Сохранить черновик
               </button>
               <button
                 type="submit"

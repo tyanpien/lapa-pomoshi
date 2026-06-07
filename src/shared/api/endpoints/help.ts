@@ -10,7 +10,8 @@ export interface HelpAnimalMonetary {
 }
 
 export interface HelpAnimalItem {
-  animal_id: number;
+  animal_id: number | null;
+  organization_id?: number | null;
   name: string;
   species_tag: string;
   age_tag: string;

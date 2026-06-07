@@ -10,6 +10,7 @@ import {
 } from "@/shared/lib/volunteerAvailabilityGrid";
 
 export const VOLUNTEER_PROFILE_UPDATED_EVENT = "volunteer-profile-updated";
+const VOLUNTEER_PROFILE_VERSION_KEY = "volunteer.profile.version.v1";
 
 export const VOLUNTEER_DETAILS_KEY = "volunteer.profile.details.v1";
 export const VOLUNTEER_CATALOG_USER_ID_KEY = "volunteer.profile.catalogUserId.v1";
@@ -29,6 +30,28 @@ export function volunteerProfileStorageIdentity(
   const e = userEmail?.trim();
   if (e) return e;
   return (displayName ?? "").trim();
+}
+
+export function bumpVolunteerProfileVersion(): number {
+  const next = Date.now();
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.setItem(VOLUNTEER_PROFILE_VERSION_KEY, String(next));
+  }
+  return next;
+}
+
+export function readVolunteerProfileVersion(): number {
+  if (typeof sessionStorage === "undefined") return 0;
+  const raw = sessionStorage.getItem(VOLUNTEER_PROFILE_VERSION_KEY);
+  const n = Number(raw ?? "0");
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function notifyVolunteerProfileUpdated(): void {
+  bumpVolunteerProfileVersion();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(VOLUNTEER_PROFILE_UPDATED_EVENT));
+  }
 }
 
 export type VolunteerHelpFrequency = "" | "Разовая помощь" | "Регулярная помощь";

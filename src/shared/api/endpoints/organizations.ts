@@ -95,6 +95,7 @@ export interface OrgPublicReport {
   title: string;
   published_at: string;
   summary: string | null;
+  file_url?: string | null;
 }
 
 export interface OrgPublicArticle {

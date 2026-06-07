@@ -6,7 +6,10 @@ import type { Organization } from "@/shared/api/endpoints/organizations";
 import { organizationsApi } from "@/shared/api/endpoints/organizations";
 import type { UrgentItem } from "@/shared/api/endpoints/urgent";
 import { urgentApi } from "@/shared/api/endpoints/urgent";
-import { normalizeUrgentFeedItems } from "@/shared/lib/urgentFeedNormalize";
+import {
+  filterUrgentCollectionFeedItems,
+  normalizeUrgentFeedItems,
+} from "@/shared/lib/urgentFeedNormalize";
 import HomePageClient from "./HomePageClient";
 
 export const revalidate = 120;

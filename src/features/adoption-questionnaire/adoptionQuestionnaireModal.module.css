@@ -178,6 +178,17 @@
   font-size: 14px;
 }
 
+.fieldError {
+  margin: 0;
+  color: #a33;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.fieldInputInvalid {
+  border-color: #a33;
+}
+
 .footer {
   flex-shrink: 0;
   display: flex;

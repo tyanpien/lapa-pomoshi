@@ -12,6 +12,22 @@ export interface EventItem {
   starts_at: string;
   ends_at: string | null;
   description?: string | null;
+  entry_type?: string;
+  capacity?: number | null;
+  seats_taken?: number;
+  seats_available?: number | null;
+  is_full?: boolean;
+  is_registered?: boolean;
+  registration_action?: "details" | "signup" | "full" | "registered";
+}
+
+export interface EventRegistrationResult {
+  event_id: number;
+  seats_taken: number;
+  seats_available: number | null;
+  is_full: boolean;
+  is_registered: boolean;
+  registration_action: "details" | "signup" | "full" | "registered";
 }
 
 export interface EventsResponse {
@@ -45,4 +61,7 @@ export const eventsApi = {
   delete: (id: number) => apiFetch(`/api/v1/events/${id}`, { method: "DELETE" }) as Promise<unknown>,
 
   archive: (id: number) => apiFetch(`/api/v1/events/${id}/archive`, { method: "POST" }) as Promise<unknown>,
+
+  register: (id: number) =>
+    apiFetch(`/api/v1/events/${id}/register`, { method: "POST" }) as Promise<EventRegistrationResult>,
 };

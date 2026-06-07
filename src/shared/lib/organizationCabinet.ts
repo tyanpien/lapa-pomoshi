@@ -68,6 +68,7 @@ export type OrganizationReport = {
   id: number;
   title: string;
   content: string;
+  fileUrl?: string;
   isUrgent: boolean;
   archived: boolean;
   createdAt: string;

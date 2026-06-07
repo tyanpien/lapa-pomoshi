@@ -404,6 +404,74 @@
   cursor: default;
 }
 
+.reportPhotoGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.reportPhotoItem {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(141, 91, 61, 0.25);
+  background: #f7f4ef;
+  display: block;
+}
+
+.reportPhotoImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.reportPhotoAdd {
+  width: 112px;
+  height: 112px;
+  border-radius: 8px;
+  border: 1px dashed rgba(141, 91, 61, 0.45);
+  background: #faf7f2;
+  color: #8b5a3c;
+  font-size: 14px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.reportPhotoAdd:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.reportPhotoRemove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reportPhotoInput {
+  display: none;
+}
+
+.modalPhotoNote {
+  margin: 6px 0 0;
+  color: #33333399;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 @media (max-width: 980px) {
   .top {
     flex-direction: column;

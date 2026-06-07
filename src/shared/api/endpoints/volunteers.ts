@@ -34,6 +34,7 @@ export interface VolunteerPublicArticleCard {
   id: number;
   title: string;
   summary: string | null;
+  cover_url?: string | null;
   read_minutes: number;
   category: string;
   category_label: string;

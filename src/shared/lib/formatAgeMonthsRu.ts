@@ -28,3 +28,14 @@ export function formatAgeMonthsRu(months: number | null | undefined): string {
   const monthLabel = pluralRu(remainingMonths, "месяц", "месяца", "месяцев");
   return `${years} ${yearLabel} ${remainingMonths} ${monthLabel}`;
 }
+
+export function splitAgeMonths(totalMonths: number | null | undefined): { years: number; months: number } {
+  const total = Math.max(0, Math.floor(Number(totalMonths) || 0));
+  return { years: Math.floor(total / 12), months: total % 12 };
+}
+
+export function combineAgeYearsMonths(years: number, months: number): number {
+  const y = Math.max(0, Math.min(50, Math.floor(Number(years) || 0)));
+  const m = Math.max(0, Math.min(11, Math.floor(Number(months) || 0)));
+  return y * 12 + m;
+}

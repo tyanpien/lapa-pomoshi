@@ -26,7 +26,7 @@ export function HelpAnimalCardView({
 
         <div className={styles.metaTags}>
           <span className={styles.metaTag}>{card.species}</span>
-          <span className={styles.metaTag}>{card.age}</span>
+          {card.age.trim() ? <span className={styles.metaTag}>{card.age}</span> : null}
           <span className={`${styles.metaTag} ${styles.statusTag}`}>{card.statusTag}</span>
         </div>
 

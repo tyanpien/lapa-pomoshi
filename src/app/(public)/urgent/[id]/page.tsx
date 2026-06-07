@@ -1,13 +1,15 @@
 "use client";
 
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getLoginHref } from "@/shared/lib/auth/loginHref";
+import { useEffect, useMemo, useState } from "react";
+import { resolveUrgentAnimalId, resolveUrgentHelpHref, resolveUrgentHelpPath } from "@/shared/lib/urgentHelpHref";
 import { useUser } from "@/shared/lib/hooks/useUser";
+import { HelpRequisitesModal } from "@/features/help-requisites/HelpRequisitesModal";
+import { formatHelpRub } from "@/features/help-animal-card/helpAnimalCardModel";
 import styles from "./page.module.css";
 import { urgentApi, UrgentItem } from "@/shared/api/endpoints/urgent";
-import { getImageUrl } from "@/shared/api/client";
+import { ANIMAL_PLACEHOLDER_SRC, getImageUrl, onAnimalImageError } from "@/shared/api/client";
 import { getUrgentHelpTypeLabel } from "@/shared/lib/urgentHelpTypeLabels";
 import { formatUrgentAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
 import { parseUrgentDescription } from "@/shared/lib/urgentDescriptionBlocks";
@@ -17,12 +19,20 @@ export default function AnimalPage() {
   const params = useParams();
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = Number(params.id);
+  const fromHelpIntent = searchParams.get("help") === "1";
   const { isAuth } = useUser();
 
   const [data, setData] = useState<UrgentItem | null>(null);
-  const [mainImage, setMainImage] = useState("/cat-placeholder.jpg");
+  const [mainImage, setMainImage] = useState(ANIMAL_PLACEHOLDER_SRC);
   const [loading, setLoading] = useState(true);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
+
+  const linkedAnimalId = useMemo(
+    () => (data ? resolveUrgentAnimalId(data) : null),
+    [data]
+  );
 
   useEffect(() => {
     urgentApi.getById(id)
@@ -37,9 +47,26 @@ export default function AnimalPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    e.currentTarget.src = "/cat-placeholder.jpg";
+  useEffect(() => {
+    if (!fromHelpIntent || loading || !data || linkedAnimalId != null || !isAuth) return;
+    setHelpModalOpen(true);
+  }, [fromHelpIntent, loading, data, linkedAnimalId, isAuth]);
+
+  const handleHelpClick = () => {
+    if (!data) return;
+    const helpPath = resolveUrgentHelpPath(data);
+    if (!isAuth) {
+      router.push(resolveUrgentHelpHref(data, { loginReturnPath: pathname || `/urgent/${id}` }));
+      return;
+    }
+    if (linkedAnimalId != null) {
+      router.push(helpPath);
+      return;
+    }
+    setHelpModalOpen(true);
   };
+
+  const handleImageError = onAnimalImageError;
 
   if (loading) {
     return (
@@ -153,17 +180,7 @@ export default function AnimalPage() {
             )}
 
             <div className={styles.actionButtons}>
-              <button
-                type="button"
-                className={styles.helpBtn}
-                onClick={() => {
-                  if (!isAuth) {
-                    router.push(getLoginHref(pathname || `/urgent/${id}`));
-                    return;
-                  }
-                  router.push("/help");
-                }}
-              >
+              <button type="button" className={styles.helpBtn} onClick={handleHelpClick}>
                 Помочь
               </button>
             </div>
@@ -201,6 +218,22 @@ export default function AnimalPage() {
         </div>
 
       </div>
+
+      {helpModalOpen && data && linkedAnimalId == null ? (
+        <HelpRequisitesModal
+          organizationId={data.organization_id ?? null}
+          animalName={data.animal_name?.trim() || data.title}
+          organizationName={data.organization_name}
+          needText={data.description?.trim() || "Нужна помощь"}
+          primaryHelpRequestId={data.id}
+          targetAmount={
+            data.target_amount != null && data.target_amount > 0
+              ? formatHelpRub(data.target_amount)
+              : null
+          }
+          onClose={() => setHelpModalOpen(false)}
+        />
+      ) : null}
     </main>
   );
 }

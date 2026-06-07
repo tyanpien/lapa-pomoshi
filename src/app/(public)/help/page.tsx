@@ -11,12 +11,16 @@ import {
   type HelpAnimalItem,
 } from "@/shared/api/endpoints/help";
 import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
+import { ANIMAL_PLACEHOLDER_SRC } from "@/shared/api/client";
+import { resolveHelpCardPath } from "@/shared/lib/resolveHelpCardPath";
 
 type HelpFilter = "all" | "adopt" | "food" | "treatment" | "other";
 type NeedType = "adopt" | "food" | "treatment" | "other";
 
 interface HelpCard {
   id: number;
+  animalId: number | null;
+  organizationId: number | null;
   name: string;
   image: string;
   isUrgent: boolean;
@@ -118,17 +122,31 @@ const mapItemToCard = (item: HelpAnimalItem): HelpCard => {
       : null;
 
   const hasFundraising = (item.monetary ?? []).length > 0;
+  const animalId =
+    typeof item.animal_id === "number" && Number.isFinite(item.animal_id) && item.animal_id > 0
+      ? item.animal_id
+      : null;
+  const organizationId =
+    typeof item.organization_id === "number" && Number.isFinite(item.organization_id) && item.organization_id > 0
+      ? item.organization_id
+      : null;
+  const cardId = animalId ?? (primaryHelpRequestId != null ? -primaryHelpRequestId : 0);
+  const photoUrl = helpApi.getImageUrl(item.primary_photo_url);
 
   return {
-    id: item.animal_id,
+    id: cardId,
+    animalId,
+    organizationId,
     name: item.name,
-    image: helpApi.getImageUrl(item.primary_photo_url),
+    image: photoUrl && photoUrl.trim() ? photoUrl : ANIMAL_PLACEHOLDER_SRC,
     isUrgent: item.is_urgent,
     species: item.species_tag?.trim() ? item.species_tag.trim().toLowerCase() : "животное",
     age:
-      typeof item.age_months === "number"
-        ? formatAgeMonthsRu(item.age_months)
-        : item.age_tag?.trim() || "Возраст не указан",
+      animalId == null
+        ? ""
+        : typeof item.age_months === "number"
+          ? formatAgeMonthsRu(item.age_months)
+          : item.age_tag?.trim() || "Возраст не указан",
     statusTag: item.status_chip?.trim() || "—",
     organization: item.organization_name?.trim() || "Организация",
     needText,
@@ -151,12 +169,13 @@ export default function HelpPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [helpSearch, setHelpSearch] = useState("");
-  const handleAdoptNavigate = (animalId: number) => {
+  const handleAdoptNavigate = (card: HelpCard) => {
+    if (card.animalId == null) return;
     if (!isAuth) {
       router.push(getLoginHref(pathname || "/help"));
       return;
     }
-    router.push(`/catalog/animals/${animalId}`);
+    router.push(`/catalog/animals/${card.animalId}`);
   };
 
   const load = useCallback(async (filter: HelpFilter) => {
@@ -309,7 +328,7 @@ export default function HelpPage() {
 
                   <div className={styles.metaTags}>
                     <span className={styles.metaTag}>{card.species}</span>
-                    <span className={styles.metaTag}>{card.age}</span>
+                    {card.age.trim() ? <span className={styles.metaTag}>{card.age}</span> : null}
                     <span className={`${styles.metaTag} ${styles.statusTag}`}>{card.statusTag}</span>
                   </div>
 
@@ -334,10 +353,10 @@ export default function HelpPage() {
                     className={styles.actionButton}
                     onClick={() => {
                       if (card.actionLabel === "Помочь") {
-                        router.push(`/catalog/animals/${card.id}?help=1`);
+                        router.push(resolveHelpCardPath(card));
                         return;
                       }
-                      handleAdoptNavigate(card.id);
+                      handleAdoptNavigate(card);
                     }}
                   >
                     {card.actionLabel}

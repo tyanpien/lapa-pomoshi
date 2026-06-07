@@ -7,7 +7,8 @@ import type { Animal } from "@/shared/api/endpoints/animals";
 import { useRouter } from "next/navigation";
 import { organizationLogoPath, type Organization } from "@/shared/api/endpoints/organizations";
 import type { EventItem } from "@/shared/api/endpoints/events";
-import { getImageUrl } from "@/shared/api/client";
+import { getEventActionLabel, isEventListLinkDisabled } from "@/shared/lib/eventRegistration";
+import { getImageUrl, resolveAnimalAvatarSrc } from "@/shared/api/client";
 import type { UrgentItem } from "@/shared/api/endpoints/urgent";
 import { takeFirstSentences } from "@/shared/lib/teaserSentences";
 import { formatRub } from "@/shared/lib/formatRub";
@@ -298,7 +299,7 @@ export default function HomePageClient({
                 <div key={animal.id} className={styles.animalCard}>
                   <div className={styles.imageWrapper}>
                     <img
-                      src={getImageUrl(animal.primary_photo_url) || "/cat.png"}
+                      src={resolveAnimalAvatarSrc(animal.primary_photo_url)}
                       alt={animal.name}
                       loading="lazy"
                     />
@@ -397,9 +398,16 @@ export default function HomePageClient({
                       })}
                       {ev.city ? ` • ${ev.city}` : ""}
                     </p>
-                    <Link href={`/events/${ev.id}`} className={styles.eventLink}>
-                      Подробнее →
-                    </Link>
+                    {isEventListLinkDisabled(ev.registration_action) ? (
+                      <span className={`${styles.eventLink} ${styles.eventLinkDisabled}`}>
+                        {getEventActionLabel(ev.registration_action)}
+                      </span>
+                    ) : (
+                      <Link href={`/events/${ev.id}`} className={styles.eventLink}>
+                        {getEventActionLabel(ev.registration_action)}
+                        {ev.registration_action === "details" || !ev.registration_action ? " →" : ""}
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))

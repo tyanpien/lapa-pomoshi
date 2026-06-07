@@ -42,10 +42,14 @@ export type VolunteerReportOut = {
   id: number;
   volunteer_help_response_id: number;
   content: string;
+  photo_urls: string[];
   submitted_at: string;
   org_accepted_at: string | null;
   org_rejection_reason: string | null;
 };
+
+export const VOLUNTEER_REPORT_PHOTOS_MIN = 1;
+export const VOLUNTEER_REPORT_PHOTOS_MAX = 3;
 
 function listQuery(params?: {
   q?: string | null;
@@ -92,9 +96,15 @@ export const meVolunteerResponsesApi = {
   getReport: (responseId: number) =>
     apiFetch(`/api/v1/me/volunteer/responses/${responseId}/report`) as Promise<VolunteerReportOut | null>,
 
-  submitReport: (responseId: number, payload: { content: string }) =>
-    apiFetch(`/api/v1/me/volunteer/responses/${responseId}/report`, {
+  submitReport: (responseId: number, payload: { content: string; files: File[] }) => {
+    const fd = new FormData();
+    fd.append("content", payload.content);
+    for (const file of payload.files) {
+      fd.append("files", file);
+    }
+    return apiFetch(`/api/v1/me/volunteer/responses/${responseId}/report`, {
       method: "POST",
-      body: JSON.stringify(payload ?? {}),
-    }) as Promise<unknown>,
+      body: fd,
+    }) as Promise<unknown>;
+  },
 };

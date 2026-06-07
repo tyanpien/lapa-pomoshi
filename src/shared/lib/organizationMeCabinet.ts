@@ -412,6 +412,23 @@ export function mapMeOrganizationAnimalRow(
     : primary
       ? [primary]
       : [];
+  const photoMeta = Array.isArray(row.photos)
+    ? (row.photos as unknown[])
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const rec = item as Record<string, unknown>;
+          const pid = pickNum(rec.id);
+          const url = pickStr(rec.url);
+          if (pid == null || !url) return null;
+          return {
+            id: pid,
+            url: getImageUrl(url),
+            is_primary: rec.is_primary === true,
+            is_pending: rec.is_pending === true,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x != null)
+    : undefined;
   const sex = pickStr(row.sex) || "unknown";
   const speciesRaw = pickStr(row.species);
   return {
@@ -427,6 +444,7 @@ export function mapMeOrganizationAnimalRow(
     full_description: pickStr(row.full_description) || pickStr(row.description) || null,
     primary_photo_url: primary ? getImageUrl(primary) : null,
     photo_urls: photos.map((u) => getImageUrl(u)),
+    photos: photoMeta,
     organization: { id: orgId, name: orgTitle, city: pickStr(row.location_city) || "" },
     organization_name: orgTitle,
     health_features: pickStr(row.health_features) || undefined,
@@ -481,6 +499,7 @@ export function mapMeHelpRequestToUrgentItem(
     deadline_label: pickStr(row.deadline_label) || null,
     deadline_note: pickStr(row.deadline_note) || null,
     status: pickStr(row.status) || "open",
+    is_published: typeof row.is_published === "boolean" ? row.is_published : true,
     target_amount: pickNum(row.target_amount),
     collected_amount: pickNum(row.collected_amount),
     primary_photo_url: pickStr(row.primary_photo_url) || pickStr(row.media_url) || null,
@@ -530,10 +549,12 @@ export function mapMeReportRow(row: Record<string, unknown>): OrganizationReport
     pickBool(row.archived) ||
     String(pickStr(row.status)).toLowerCase() === "archived" ||
     String(pickStr(row.visibility)).toLowerCase() === "archived";
+  const fileRaw = pickStr(row.file_url) || pickStr(row.fileUrl);
   return {
     id,
     title: pickStr(row.title) || "Отчёт",
     content: pickStr(row.body) || pickStr(row.summary) || pickStr(row.content) || "",
+    fileUrl: fileRaw ? getImageUrl(fileRaw) : undefined,
     isUrgent: pickBool(row.is_urgent),
     archived,
     createdAt: pickStr(row.published_at) || pickStr(row.created_at) || new Date().toISOString(),

@@ -1,11 +1,14 @@
 import type { HelpAnimalItem } from "@/shared/api/endpoints/help";
 import { helpApi } from "@/shared/api/endpoints/help";
+import { ANIMAL_PLACEHOLDER_SRC } from "@/shared/api/client";
 import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
 
 export type HelpCardNeedType = "adopt" | "food" | "treatment" | "other";
 
 export interface HelpAnimalCardModel {
   id: number;
+  animalId: number | null;
+  organizationId: number | null;
   name: string;
   image: string;
   isUrgent: boolean;
@@ -81,16 +84,31 @@ export const mapHelpAnimalItemToCard = (item: HelpAnimalItem): HelpAnimalCardMod
       ? item.monetary[0].request_id
       : null;
 
+  const animalId =
+    typeof item.animal_id === "number" && Number.isFinite(item.animal_id) && item.animal_id > 0
+      ? item.animal_id
+      : null;
+  const organizationId =
+    typeof item.organization_id === "number" && Number.isFinite(item.organization_id) && item.organization_id > 0
+      ? item.organization_id
+      : null;
+  const cardId = animalId ?? (primaryHelpRequestId != null ? -primaryHelpRequestId : 0);
+  const photoUrl = helpApi.getImageUrl(item.primary_photo_url);
+
   return {
-    id: item.animal_id,
+    id: cardId,
+    animalId,
+    organizationId,
     name: item.name,
-    image: helpApi.getImageUrl(item.primary_photo_url),
+    image: photoUrl && photoUrl.trim() ? photoUrl : ANIMAL_PLACEHOLDER_SRC,
     isUrgent: item.is_urgent,
     species: item.species_tag?.trim() ? item.species_tag.trim().toLowerCase() : "животное",
     age:
-      typeof item.age_months === "number"
-        ? formatAgeMonthsRu(item.age_months)
-        : item.age_tag?.trim() || "Возраст не указан",
+      animalId == null
+        ? ""
+        : typeof item.age_months === "number"
+          ? formatAgeMonthsRu(item.age_months)
+          : item.age_tag?.trim() || "Возраст не указан",
     statusTag: item.status_chip?.trim() || "—",
     organization: item.organization_name?.trim() || "Организация",
     needText,

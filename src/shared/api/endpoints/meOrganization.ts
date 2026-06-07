@@ -162,6 +162,8 @@ export const meOrganizationApi = {
     apiFetch(`${BASE}/reports`, { method: "POST", body: JSON.stringify(body ?? {}) }),
   patchReport: (reportId: number, body: Record<string, unknown>) =>
     apiFetch(`${BASE}/reports/${reportId}`, { method: "PATCH", body: JSON.stringify(body ?? {}) }),
+  uploadReportFile: (reportId: number, file: File) =>
+    apiFetch(`${BASE}/reports/${reportId}/file`, { method: "POST", body: fdSingle(file, "file") }),
   deleteReport: (reportId: number) => apiFetch(`${BASE}/reports/${reportId}`, { method: "DELETE" }),
 
   listHomeStories: () => apiFetch(`${BASE}/home-stories`),

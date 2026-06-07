@@ -282,6 +282,13 @@
   resize: vertical;
 }
 
+.fieldHint {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: rgba(51, 51, 51, 0.65);
+}
+
 .modalActions {
   display: flex;
   justify-content: flex-end;

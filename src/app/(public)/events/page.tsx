@@ -4,6 +4,10 @@ import { useState, useRef, useEffect } from "react";
 import styles from "./page.module.css";
 import { eventsApi, EventItem, EventsCatalogs } from "@/shared/api/endpoints/events";
 import Link from "next/link";
+import {
+  getEventActionLabel,
+  isEventListLinkDisabled,
+} from "@/shared/lib/eventRegistration";
 
 type Format = "all" | EventItem["format"];
 
@@ -208,7 +212,15 @@ export default function EventsPage() {
                   {e.city}, {e.address}
                 </p>
 
-                <Link href={`/events/${e.id}`} className={styles.action}>Участвовать</Link>
+                {isEventListLinkDisabled(e.registration_action) ? (
+                  <span className={`${styles.action} ${styles.actionDisabled}`}>
+                    {getEventActionLabel(e.registration_action)}
+                  </span>
+                ) : (
+                  <Link href={`/events/${e.id}`} className={styles.action}>
+                    {getEventActionLabel(e.registration_action)}
+                  </Link>
+                )}
               </div>
             ))}
           </div>

@@ -1,3 +1,4 @@
+import { displayPhoneFromStored, toE164RussianPhone } from "@/shared/lib/phoneRu";
 import {
   ADOPTION_FORM_PREFIX,
   type AdoptionQuestionnaireForm,
@@ -90,15 +91,6 @@ function yesNoToBool(value: YesNo | ""): boolean {
   return value === "yes";
 }
 
-function normalizePhoneDigits(raw: string): string {
-  let digits = raw.replace(/\D/g, "");
-  if (digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))) {
-    digits = digits.slice(1);
-  }
-  if (digits.length > 10) digits = digits.slice(0, 10);
-  return digits.length >= 10 ? `+7${digits}` : raw.trim();
-}
-
 export type AdoptionApplicationApiBody = {
   applicant_name: string;
   applicant_age: number;
@@ -130,7 +122,7 @@ export function mapAdoptionQuestionnaireToApiBody(form: AdoptionQuestionnaireFor
   return {
     applicant_name: form.name.trim(),
     applicant_age: Number.isFinite(ageRaw) ? ageRaw : 0,
-    applicant_phone: normalizePhoneDigits(form.phone),
+    applicant_phone: toE164RussianPhone(form.phone),
     applicant_email: form.email.trim(),
     housing_type: form.housingType as "apartment" | "house",
     housing_ownership: form.ownership as "own" | "rented",
@@ -182,7 +174,7 @@ export function mapAdoptionApiBodyToQuestionnaireForm(
   return {
     name: body.applicant_name?.trim() ?? "",
     age: body.applicant_age != null ? String(body.applicant_age) : "",
-    phone: body.applicant_phone?.trim() ?? "",
+    phone: body.applicant_phone?.trim() ? displayPhoneFromStored(body.applicant_phone) : "",
     email: body.applicant_email?.trim() ?? "",
     housingType: body.housing_type ?? "",
     ownership: body.housing_ownership ?? "",

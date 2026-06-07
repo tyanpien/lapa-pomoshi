@@ -781,10 +781,13 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(280px, 1fr));
   gap: 18px;
+  align-items: stretch;
 }
 
 .homeRequestCardLink {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   text-decoration: none;
   color: inherit;
   border-radius: 8px;
@@ -807,6 +810,10 @@
 
 .homeRequestCard {
   background: transparent;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .homeCover {
@@ -828,6 +835,14 @@
   border-radius: 8px;
   background: #d8d3c8;
   display: block;
+  overflow: hidden;
+}
+
+.articleCoverImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .homeRequestBody {
@@ -836,9 +851,11 @@
   border-radius: 7px;
   padding: 14px 14px 16px;
   min-height: 220px;
+  height: 100%;
   display: flex;
   flex-direction: column;
   position: relative;
+  flex: 1;
 }
 
 .homeRequestName {
@@ -888,10 +905,9 @@
 }
 
 .articleExcerpt {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: pre-wrap;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 8px;
 }
 
 .articleMoreLink {
@@ -984,6 +1000,13 @@
   outline: 2px solid #8a5a39;
   outline-offset: 2px;
   border-radius: 3px;
+}
+
+.reportComment {
+  margin: 4px 0 0;
+  color: rgba(51, 51, 51, 0.75);
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .cardsGrid {

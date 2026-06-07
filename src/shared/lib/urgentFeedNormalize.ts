@@ -1,4 +1,14 @@
 import type { UrgentItem } from "@/shared/api/endpoints/urgent";
+import { isCollectionRequest } from "@/shared/lib/helpRequestType";
+import { isAnimalOnlyUrgentCard } from "@/shared/lib/urgentAnimalFeed";
+
+export function filterUrgentCollectionFeedItems(items: UrgentItem[]): UrgentItem[] {
+  return items.filter((item) => {
+    if (!item.is_urgent) return false;
+    if (isAnimalOnlyUrgentCard(item.id)) return true;
+    return isCollectionRequest(item);
+  });
+}
 
 export function normalizeUrgentFeedItems(items: UrgentItem[]): UrgentItem[] {
   const seenId = new Set<number>();

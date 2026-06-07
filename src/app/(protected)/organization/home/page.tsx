@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
-import { getImageUrl } from "@/shared/api/client";
+import { ANIMAL_PLACEHOLDER_SRC, getImageUrl } from "@/shared/api/client";
 import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import {
   addOrganizationGreeting,
@@ -254,7 +254,7 @@ export default function OrganizationHomeGreetingsPage() {
               <article key={item.id} className={styles.requestCard}>
                 <div className={styles.cover}>
                   <img
-                    src={item.photoUrl?.trim() ? getImageUrl(item.photoUrl) : "/cat-placeholder.jpg"}
+                    src={item.photoUrl?.trim() ? getImageUrl(item.photoUrl) : ANIMAL_PLACEHOLDER_SRC}
                     alt={item.petName}
                   />
                 </div>

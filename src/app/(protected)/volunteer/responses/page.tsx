@@ -1,11 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import styles from "./page.module.css";
 import {
   meVolunteerResponsesApi,
+  VOLUNTEER_REPORT_PHOTOS_MAX,
+  VOLUNTEER_REPORT_PHOTOS_MIN,
   type VolunteerResponseCardDto,
   type VolunteerReportOut,
   type VolunteerResponseDetailDto,
@@ -13,6 +15,7 @@ import {
 import { ResponseCardDescription } from "./responseCardDescription";
 import { volunteerResponseStatusClassMap } from "@/shared/lib/volunteerResponseStatusClassMap";
 import {
+  compareVolunteerResponsesByStatus,
   mapVolunteerResponseStatus,
   type VolunteerResponseUiStatus,
 } from "@/shared/lib/volunteerResponseStatus";
@@ -30,6 +33,7 @@ export type ResponseCard = {
   descriptionSnippet: string;
   descriptionFull: string | null;
   dateLabel: string;
+  createdAt: string | null;
   status: ResponseStatus;
   urgent?: boolean;
   canChat?: boolean;
@@ -48,6 +52,18 @@ const filterOptions: { label: string; value: ResponseFilter }[] = [
 ];
 
 const statusClassMap: Record<ResponseStatus, string> = volunteerResponseStatusClassMap;
+
+type ReportPhotoDraft = {
+  key: string;
+  previewUrl: string;
+  file: File;
+};
+
+const ALLOWED_REPORT_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function newReportPhotoKey(): string {
+  return `report-photo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 function ResponseScrollFromQuery({ onTargetId }: { onTargetId: (id: number | null) => void }) {
   const searchParams = useSearchParams();
@@ -79,6 +95,8 @@ export default function VolunteerResponsesPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
   const [existingReport, setExistingReport] = useState<VolunteerReportOut | null>(null);
+  const [reportPhotos, setReportPhotos] = useState<ReportPhotoDraft[]>([]);
+  const reportPhotoInputRef = useRef<HTMLInputElement>(null);
   const [editMessageId, setEditMessageId] = useState<number | null>(null);
   const [editMessageDraft, setEditMessageDraft] = useState("");
   const [patchLoading, setPatchLoading] = useState(false);
@@ -147,6 +165,7 @@ export default function VolunteerResponsesPage() {
     if (id == null) {
       setExistingReport(null);
       setReportText("");
+      setReportPhotos([]);
       setReportError("");
       setReportLoading(false);
       return;
@@ -198,15 +217,59 @@ export default function VolunteerResponsesPage() {
     [apiResponses, reportModalResponseId],
   );
   const reportModalReadOnly = reportModalCard?.status === "Завершено";
+  const canSubmitReport =
+    reportText.trim().length >= 10 &&
+    reportPhotos.length >= VOLUNTEER_REPORT_PHOTOS_MIN &&
+    reportPhotos.length <= VOLUNTEER_REPORT_PHOTOS_MAX;
+
+  const handleReportPhotoInput = (files: FileList | null) => {
+    if (!files?.length || reportModalReadOnly) return;
+    const remaining = VOLUNTEER_REPORT_PHOTOS_MAX - reportPhotos.length;
+    if (remaining <= 0) {
+      setReportError(`Можно прикрепить не более ${VOLUNTEER_REPORT_PHOTOS_MAX} фото.`);
+      return;
+    }
+
+    const batch = Array.from(files).slice(0, remaining);
+    void (async () => {
+      const next: ReportPhotoDraft[] = [...reportPhotos];
+      for (const file of batch) {
+        if (next.length >= VOLUNTEER_REPORT_PHOTOS_MAX) break;
+        if (!ALLOWED_REPORT_PHOTO_TYPES.has(file.type)) {
+          setReportError("Допустимые форматы: JPG, PNG, WEBP.");
+          continue;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          setReportError("Каждое фото должно быть не больше 5 МБ.");
+          continue;
+        }
+        const previewUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result ?? ""));
+          reader.onerror = () => reject(new Error("read failed"));
+          reader.readAsDataURL(file);
+        });
+        next.push({ key: newReportPhotoKey(), previewUrl, file });
+      }
+      setReportPhotos(next);
+      setReportError("");
+    })().finally(() => {
+      if (reportPhotoInputRef.current) reportPhotoInputRef.current.value = "";
+    });
+  };
+
+  const removeReportPhoto = (key: string) => {
+    setReportPhotos((prev) => prev.filter((photo) => photo.key !== key));
+  };
 
   const filteredResponses = useMemo(() => {
-    if (activeFilter === "Все") {
-      return apiResponses;
-    }
+    let items = apiResponses;
     if (activeFilter === "Архив") {
-      return apiResponses.filter((item) => item.status === "Отменено" || item.status === "Отклонено");
+      items = apiResponses.filter((item) => item.status === "Отменено" || item.status === "Отклонено");
+    } else if (activeFilter !== "Все") {
+      items = apiResponses.filter((item) => item.status === activeFilter);
     }
-    return apiResponses.filter((item) => item.status === activeFilter);
+    return [...items].sort(compareVolunteerResponsesByStatus);
   }, [activeFilter, apiResponses]);
 
   useEffect(() => {
@@ -385,8 +448,8 @@ export default function VolunteerResponsesPage() {
             </h2>
             {!reportModalReadOnly ? (
               <p className={styles.modalHint}>
-                Опишите, что сделали (не менее 10 символов). После отправки организация проверит отчёт и завершит
-                задачу.
+                Опишите, что сделали (не менее 10 символов) и приложите от {VOLUNTEER_REPORT_PHOTOS_MIN} до{" "}
+                {VOLUNTEER_REPORT_PHOTOS_MAX} фото. После отправки организация проверит отчёт и завершит задачу.
               </p>
             ) : null}
 
@@ -401,6 +464,67 @@ export default function VolunteerResponsesPage() {
                 readOnly={reportModalReadOnly}
               />
             </label>
+
+            <div className={styles.modalLabel}>
+              {reportModalReadOnly ? "Фото отчёта" : `Фото отчёта (${reportPhotos.length}/${VOLUNTEER_REPORT_PHOTOS_MAX})`}
+              <div className={styles.reportPhotoGrid}>
+                {reportModalReadOnly
+                  ? (existingReport?.photo_urls ?? []).map((url) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.reportPhotoItem}
+                      >
+                        <img src={url} alt="Фото отчёта" className={styles.reportPhotoImage} />
+                      </a>
+                    ))
+                  : reportPhotos.map((photo) => (
+                      <div key={photo.key} className={styles.reportPhotoItem}>
+                        <img src={photo.previewUrl} alt="Предпросмотр" className={styles.reportPhotoImage} />
+                        <button
+                          type="button"
+                          className={styles.reportPhotoRemove}
+                          onClick={() => removeReportPhoto(photo.key)}
+                          disabled={reportLoading}
+                          aria-label="Удалить фото"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                {!reportModalReadOnly && reportPhotos.length < VOLUNTEER_REPORT_PHOTOS_MAX ? (
+                  <button
+                    type="button"
+                    className={styles.reportPhotoAdd}
+                    onClick={() => reportPhotoInputRef.current?.click()}
+                    disabled={reportLoading}
+                  >
+                    + Добавить фото
+                  </button>
+                ) : null}
+              </div>
+              {!reportModalReadOnly ? (
+                <input
+                  ref={reportPhotoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  className={styles.reportPhotoInput}
+                  onChange={(event) => handleReportPhotoInput(event.target.files)}
+                  disabled={reportLoading}
+                />
+              ) : null}
+              {!reportModalReadOnly && existingReport?.photo_urls?.length ? (
+                <p className={styles.modalPhotoNote}>
+                  При обновлении отчёта нужно снова приложить все фото.
+                </p>
+              ) : null}
+              {reportModalReadOnly && !(existingReport?.photo_urls?.length) ? (
+                <p className={styles.modalPhotoNote}>Фото не приложены.</p>
+              ) : null}
+            </div>
 
             {reportError ? <p className={styles.modalError}>{reportError}</p> : null}
 
@@ -417,14 +541,17 @@ export default function VolunteerResponsesPage() {
               <button
                 type="button"
                 className={styles.modalPrimaryButton}
-                disabled={reportLoading || reportText.trim().length < 10}
+                disabled={reportLoading || !canSubmitReport}
                 onClick={() => {
                   const id = reportModalResponseId;
                   if (id == null) return;
                   setReportLoading(true);
                   setReportError("");
                   void meVolunteerResponsesApi
-                    .submitReport(id, { content: reportText.trim() })
+                    .submitReport(id, {
+                      content: reportText.trim(),
+                      files: reportPhotos.map((photo) => photo.file),
+                    })
                     .then(() => meVolunteerResponsesApi.getById(id))
                     .then((fresh) => {
                       const next = mapDetailDtoToUi(fresh as VolunteerResponseDetailDto);
@@ -434,9 +561,13 @@ export default function VolunteerResponsesPage() {
                           return [next, ...rest];
                         });
                       }
+                      setReportPhotos([]);
                       setReportModalResponseId(null);
                     })
-                    .catch(() => setReportError("Не удалось отправить отчёт."))
+                    .catch((err: unknown) => {
+                      const msg = err instanceof Error ? err.message : String(err ?? "");
+                      setReportError(msg.trim() || "Не удалось отправить отчёт.");
+                    })
                     .finally(() => {
                       setReportLoading(false);
                       reloadList();
@@ -481,6 +612,7 @@ function mapCardDtoToUi(item: VolunteerResponseCardDto): ResponseCard | null {
     descriptionSnippet: item.description_snippet?.trim() || "",
     descriptionFull: null,
     dateLabel: item.created_at ? formatDateRu(item.created_at) : "",
+    createdAt: item.created_at ?? null,
     status: mapVolunteerResponseStatus(String(item.status ?? ""), item.status_label),
     urgent: Boolean(item.is_urgent),
     canChat: item.can_chat !== false,

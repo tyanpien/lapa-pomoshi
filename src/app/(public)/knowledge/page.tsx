@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import styles from "./page.module.css";
 import Link from "next/link";
 import { knowledgeApi, KnowledgeItem } from "@/shared/api/endpoints/knowledge";
+import { KnowledgeArticleCover } from "@/shared/ui/KnowledgeArticleCover/KnowledgeArticleCover";
 
 export default function KnowledgePage() {
   const [articles, setArticles] = useState<KnowledgeItem[]>([]);
@@ -70,12 +71,12 @@ export default function KnowledgePage() {
           {filtered.map((a) => (
             <Link href={`/knowledge/${a.id}`} key={a.id} className={styles.card}>
               <div className={styles.image}>
-                <img src="/knowledge.png" alt={a.title} />
+                <KnowledgeArticleCover coverUrl={a.cover_url} alt={a.title} />
               </div>
 
               <div className={styles.content}>
                 <h3>{a.title}</h3>
-                <p>{a.summary}</p>
+                <p className={styles.summary}>{a.summary}</p>
 
                 <div className={styles.meta}>
                   <span className={styles.time}>

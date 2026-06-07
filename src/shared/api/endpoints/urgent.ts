@@ -5,6 +5,9 @@ export interface UrgentItem {
   title: string;
   description: string;
   city: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   organization_id?: number;
   organization_name: string;
 
@@ -21,6 +24,7 @@ export interface UrgentItem {
   deadline_note?: string | null;
 
   status: string;
+  is_published?: boolean;
 
   target_amount: number | null;
   collected_amount?: number | null;

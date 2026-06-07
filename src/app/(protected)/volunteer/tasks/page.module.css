@@ -215,6 +215,18 @@
   padding: 8px 10px;
 }
 
+.emptyState {
+  margin: 0;
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #5c4a3a;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px dashed #d8cfc3;
+}
+
 @media (max-width: 980px) {
   .layout {
     grid-template-columns: 1fr;

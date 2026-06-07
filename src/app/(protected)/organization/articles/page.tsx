@@ -1,14 +1,24 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { knowledgeApi, type KnowledgeItem } from "@/shared/api/endpoints/knowledge";
+import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
+import { meProfileApi } from "@/shared/api/endpoints/meProfile";
+import { unwrapApiList } from "@/shared/lib/organizationMeCabinet";
 import { getOrganizationCabinetEventName } from "@/shared/lib/organizationCabinet";
+import { useUser } from "@/shared/lib/hooks/useUser";
 
 function notifyCabinetUpdated() {
   window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
 }
-import { getArticleCategoryLabel } from "@/shared/lib/articleCategoryLabels";
+import {
+  articleCategoriesForSelect,
+  getArticleCategoryLabel,
+} from "@/shared/lib/articleCategoryLabels";
+import { normalizeArticleContent } from "@/shared/lib/articleContent";
+import { hasKnowledgeMediaCover, resolveKnowledgeCoverSrc } from "@/shared/lib/knowledgeCover";
+import { ArticleCoverPicker } from "@/shared/ui/ArticleCoverPicker/ArticleCoverPicker";
 
 type VisibilityFilter = "all" | "archive";
 
@@ -32,21 +42,42 @@ const FALLBACK_CATEGORIES = [
   { id: "adaptation", label: "Адаптация" },
 ];
 
+type CoverDraft = {
+  previewUrl: string | null;
+  file: File | null;
+};
+
+const emptyCoverDraft: CoverDraft = { previewUrl: null, file: null };
+
 type OrgArticleRow = KnowledgeItem & {
   is_archived: boolean;
   is_published: boolean;
   can_edit: boolean;
 };
 
-function mapMineArticle(item: KnowledgeItem, categoryLabel: (id: string) => string): OrgArticleRow {
-  const category = item.category ?? "care";
+function mapOrgArticleRow(
+  row: Record<string, unknown>,
+  categoryLabel: (id: string) => string
+): OrgArticleRow {
+  const id = typeof row.id === "number" ? row.id : Number(row.id) || 0;
+  const category = String(row.category ?? "care");
+  const authorUserId =
+    typeof row.author_user_id === "number" ? row.author_user_id : Number(row.author_user_id) || null;
   return {
-    ...item,
+    id,
+    title: String(row.title ?? ""),
+    summary: row.summary != null ? String(row.summary) : "",
+    content: "",
     category,
-    category_label: item.category_label ?? categoryLabel(category),
-    is_archived: Boolean(item.is_archived),
-    is_published: item.is_published !== false,
-    can_edit: item.can_edit !== false,
+    category_label: categoryLabel(category),
+    read_minutes: typeof row.read_minutes === "number" ? row.read_minutes : Number(row.read_minutes) || 0,
+    is_context_tip: false,
+    created_at: String(row.created_at ?? new Date().toISOString()),
+    author_user_id: authorUserId,
+    is_archived: Boolean(row.is_archived),
+    is_published: row.is_published !== false,
+    can_edit: row.can_edit === true,
+    cover_url: row.cover_url != null ? String(row.cover_url) : null,
   };
 }
 
@@ -61,10 +92,12 @@ function formatCreatedAt(iso: string): string {
 }
 
 export default function OrganizationArticlesPage() {
+  const { isLoading: isUserLoading } = useUser();
   const [articles, setArticles] = useState<OrgArticleRow[]>([]);
   const [catalogs, setCatalogs] = useState<{ id: string; label: string }[]>(FALLBACK_CATEGORIES);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
+  const loadGenerationRef = useRef(0);
   const [search, setSearch] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -73,6 +106,8 @@ export default function OrganizationArticlesPage() {
   const [editForm, setEditForm] = useState<ArticleForm>(emptyForm);
   const [editLoading, setEditLoading] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [createCover, setCreateCover] = useState<CoverDraft>(emptyCoverDraft);
+  const [editCover, setEditCover] = useState<CoverDraft>(emptyCoverDraft);
 
   const categoryLabel = useCallback(
     (id: string) => catalogs.find((c) => c.id === id)?.label ?? getArticleCategoryLabel(id),
@@ -80,31 +115,48 @@ export default function OrganizationArticlesPage() {
   );
 
   const reload = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     setLoading(true);
     setErrorText("");
     try {
-      const cats = await knowledgeApi.getCatalogs();
-      const categories = cats.categories?.length ? cats.categories : FALLBACK_CATEGORIES;
-      setCatalogs(categories);
-      const labelMap = new Map(categories.map((c) => [c.id, c.label]));
+      const [cats, profile, rawArticles] = await Promise.all([
+        knowledgeApi.getCatalogs(),
+        meProfileApi.get().catch(() => null),
+        meOrganizationApi.listArticles(),
+      ]);
+      if (generation !== loadGenerationRef.current) return;
 
-      const mine = await knowledgeApi.listMine();
+      const rawCategories = cats.categories?.length ? cats.categories : FALLBACK_CATEGORIES;
+      const categories = articleCategoriesForSelect(rawCategories);
+      setCatalogs(categories.length > 0 ? categories : FALLBACK_CATEGORIES);
+      const labelMap = new Map(rawCategories.map((c) => [c.id, c.label]));
+      const currentUserId = profile?.user?.id ?? null;
+
+      const rows = unwrapApiList<Record<string, unknown>>(rawArticles);
       setArticles(
-        (mine.items ?? [])
-          .map((item) => mapMineArticle(item, (id) => labelMap.get(id) ?? id))
-          .filter((a) => a.id > 0)
+        rows
+          .map((row) => mapOrgArticleRow(row, (id) => labelMap.get(id) ?? id))
+          .filter((a) => {
+            if (a.id <= 0 || !a.can_edit) return false;
+            if (currentUserId == null) return true;
+            return a.author_user_id == null || a.author_user_id === currentUserId;
+          })
       );
     } catch (e) {
+      if (generation !== loadGenerationRef.current) return;
       setArticles([]);
       setErrorText(e instanceof Error ? e.message : "Не удалось загрузить статьи.");
     } finally {
-      setLoading(false);
+      if (generation === loadGenerationRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    if (isUserLoading) return;
     void reload();
-  }, [reload]);
+  }, [isUserLoading, reload]);
 
   const visibleArticles = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -122,26 +174,37 @@ export default function OrganizationArticlesPage() {
   const openCreateModal = () => {
     const first = catalogs[0]?.id ?? "care";
     setCreateForm({ ...emptyForm, articleType: first });
+    setCreateCover(emptyCoverDraft);
     setCreateModalOpen(true);
   };
 
-  const buildPayload = (form: ArticleForm) => ({
+  const buildPayload = (form: ArticleForm) => {
+    const category =
+      form.articleType.trim().toLowerCase() === "all"
+        ? catalogs[0]?.id ?? "care"
+        : form.articleType;
+    return {
     title: form.title.trim(),
     summary: (form.summary.trim() || form.content.trim().slice(0, 200)).trim(),
-    content: form.content.trim(),
-    category: form.articleType,
+    content: normalizeArticleContent(form.content),
+    category,
     is_context_tip: false,
     is_published: true,
-  });
+  };
+  };
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!createForm.title.trim() || createForm.content.trim().length < 10) return;
     void knowledgeApi
       .create(buildPayload(createForm))
-      .then(() => {
+      .then(async (created) => {
+        if (createCover.file) {
+          await knowledgeApi.uploadCover(created.id, createCover.file);
+        }
         setCreateModalOpen(false);
         setCreateForm(emptyForm);
+        setCreateCover(emptyCoverDraft);
         notifyCabinetUpdated();
         return reload();
       })
@@ -163,11 +226,20 @@ export default function OrganizationArticlesPage() {
           setEditId(null);
           return;
         }
+        const editCategory = d.category ?? article.category;
         setEditForm({
           title: d.title,
           summary: d.summary ?? "",
           content: d.content ?? "",
-          articleType: d.category ?? article.category,
+          articleType:
+            editCategory.trim().toLowerCase() === "all"
+              ? catalogs[0]?.id ?? "care"
+              : editCategory,
+        });
+        const coverSrc = d.cover_url?.trim();
+        setEditCover({
+          previewUrl: hasKnowledgeMediaCover(coverSrc) ? resolveKnowledgeCoverSrc(coverSrc) : null,
+          file: null,
         });
       })
       .catch(() => setErrorText("Не удалось загрузить статью."))
@@ -177,19 +249,26 @@ export default function OrganizationArticlesPage() {
   const handleEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (editId === null || editForm.content.trim().length < 10) return;
+    const articleId = editId;
     void knowledgeApi
-      .patch(editId, buildPayload(editForm))
-      .then(() => {
+      .patch(articleId, buildPayload(editForm))
+      .then(async () => {
+        if (editCover.file) {
+          await knowledgeApi.uploadCover(articleId, editCover.file);
+        }
         notifyCabinetUpdated();
         return reload();
       })
-      .then(() => setEditId(null))
+      .then(() => {
+        setEditId(null);
+        setEditCover(emptyCoverDraft);
+      })
       .catch((e) => {
         const msg = e instanceof Error ? e.message : "";
         setErrorText(
           msg.includes("403") || /edit own|own article/i.test(msg)
             ? "Редактировать можно только свои статьи."
-            : "Не удалось сохранить статью."
+            : "Превышен лимит краткого описания статьи"
         );
       });
   };
@@ -225,7 +304,9 @@ export default function OrganizationArticlesPage() {
     setForm: (next: ArticleForm) => void,
     onSubmit: (e: FormEvent<HTMLFormElement>) => void,
     submitLabel: string,
-    onCancel: () => void
+    onCancel: () => void,
+    cover: CoverDraft,
+    onCoverChange: (file: File | null, previewUrl: string | null) => void
   ) => (
     <form className={styles.form} onSubmit={onSubmit}>
       <div className={styles.formGrid}>
@@ -270,6 +351,12 @@ export default function OrganizationArticlesPage() {
             required
           />
         </label>
+        <div className={styles.labelFull}>
+          <ArticleCoverPicker
+            previewUrl={cover.previewUrl}
+            onFileSelect={(file, previewUrl) => onCoverChange(file, previewUrl)}
+          />
+        </div>
       </div>
       <div className={styles.modalActions}>
         <button type="button" className={styles.secondaryButton} onClick={onCancel}>
@@ -384,8 +471,14 @@ export default function OrganizationArticlesPage() {
         <div className={styles.modalOverlay} role="presentation" onClick={() => setCreateModalOpen(false)}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Добавить статью</h2>
-            {renderForm(createForm, setCreateForm, handleCreate, "Опубликовать", () =>
-              setCreateModalOpen(false)
+            {renderForm(
+              createForm,
+              setCreateForm,
+              handleCreate,
+              "Опубликовать",
+              () => setCreateModalOpen(false),
+              createCover,
+              (file, previewUrl) => setCreateCover({ file, previewUrl })
             )}
           </div>
         </div>
@@ -398,7 +491,18 @@ export default function OrganizationArticlesPage() {
             {editLoading ? (
               <p className={styles.empty}>Загрузка…</p>
             ) : (
-              renderForm(editForm, setEditForm, handleEdit, "Сохранить", () => setEditId(null))
+              renderForm(
+                editForm,
+                setEditForm,
+                handleEdit,
+                "Сохранить",
+                () => {
+                  setEditId(null);
+                  setEditCover(emptyCoverDraft);
+                },
+                editCover,
+                (file, previewUrl) => setEditCover({ file, previewUrl })
+              )
             )}
           </div>
         </div>

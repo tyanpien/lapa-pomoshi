@@ -224,9 +224,15 @@ function labelToCompetencySlug(label: string, competencies: CatalogOption[]): st
 
   const uiAliasSlug: Record<string, string> = {
     "фото / видеосъемка": "photo_video",
+    "фото / видео": "photo_video",
+    "выгул / уход": "walk",
     "помощь руками": "manual",
+    "помощь в приюте": "manual",
     "тексты / соцсети": "texts_social",
     "smm / тексты": "texts_social",
+    "медицинская помощь": "medical",
+    "медицина": "medical",
+    "автопомощь": "auto",
   };
   const alias = uiAliasSlug[low];
   if (alias) return alias;

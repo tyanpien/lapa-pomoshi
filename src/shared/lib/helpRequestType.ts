@@ -1,5 +1,13 @@
 const FUNDRAISING_HELP_TYPES = new Set(["financial", "food", "medical", "feed"]);
 
+export function isHelpRequestDraft(
+  item?: { is_published?: boolean } | null,
+  raw?: Record<string, unknown> | null
+): boolean {
+  if (raw && raw.is_published === false) return true;
+  return item?.is_published === false;
+}
+
 export function isFundraisingHelpType(helpType: string | null | undefined): boolean {
   const h = (helpType ?? "").trim().toLowerCase();
   return FUNDRAISING_HELP_TYPES.has(h);

@@ -511,10 +511,10 @@
 }
 
 .articleExcerpt {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: pre-wrap;
+  composes: clamp3 from "../../../../../shared/styles/textClamp.module.css";
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 8px;
 }
 
 .progressTrack {

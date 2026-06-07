@@ -5,6 +5,7 @@ export interface KnowledgeItem {
   title: string;
   summary: string;
   content?: string;
+  cover_url?: string | null;
   category: string;
   category_label: string;
   read_minutes: number;
@@ -14,6 +15,38 @@ export interface KnowledgeItem {
   can_edit?: boolean;
   is_published?: boolean;
   is_archived?: boolean;
+}
+
+export interface KnowledgeHintItem {
+  id: number;
+  title: string;
+  summary: string | null;
+  cover_url?: string | null;
+  category: string;
+  category_label: string | null;
+  read_minutes: number;
+  match_score: number;
+  match_reasons: string[];
+}
+
+export interface KnowledgeHintsResponse {
+  total: number;
+  items: KnowledgeHintItem[];
+}
+
+export type KnowledgeHintParams = {
+  help_type?: string | null;
+  animal_species?: string | null;
+  competency_slugs?: string[];
+  keywords?: string[];
+  task_text?: string | null;
+  limit?: number;
+};
+
+function fdSingle(file: File, fieldName: string) {
+  const fd = new FormData();
+  fd.append(fieldName, file);
+  return fd;
 }
 
 export interface KnowledgeMineListResponse {
@@ -58,6 +91,21 @@ export const knowledgeApi = {
   },
   listMine: () => apiFetch("/api/v1/knowledge/mine") as Promise<KnowledgeMineListResponse>,
   getCatalogs: () => apiFetch("/api/v1/knowledge/catalogs") as Promise<KnowledgeCatalogsResponse>,
+
+  getHints: (params?: KnowledgeHintParams) => {
+    const q = new URLSearchParams();
+    if (params?.help_type?.trim()) q.set("help_type", params.help_type.trim());
+    if (params?.animal_species?.trim()) q.set("animal_species", params.animal_species.trim());
+    if (params?.competency_slugs?.length) q.set("competency_slugs", params.competency_slugs.join(","));
+    if (params?.keywords?.length) q.set("keywords", params.keywords.join(","));
+    if (params?.task_text?.trim()) q.set("task_text", params.task_text.trim());
+    if (typeof params?.limit === "number") q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return apiFetch(`/api/v1/knowledge/hints${qs ? `?${qs}` : ""}`, {
+      cache: "no-store",
+    }) as Promise<KnowledgeHintsResponse>;
+  },
+
   getById: (id: number) => apiFetch(`/api/v1/knowledge/${id}`) as Promise<KnowledgeItem>,
 
   create: (payload: Record<string, unknown>) =>
@@ -69,5 +117,12 @@ export const knowledgeApi = {
   delete: (id: number) => apiFetch(`/api/v1/knowledge/${id}`, { method: "DELETE" }) as Promise<unknown>,
 
   archive: (id: number) => apiFetch(`/api/v1/knowledge/${id}/archive`, { method: "POST" }) as Promise<unknown>,
+
+  uploadCover: (id: number, file: File) =>
+    apiFetch(`/api/v1/knowledge/${id}/cover`, {
+      method: "POST",
+      body: fdSingle(file, "file"),
+    }) as Promise<KnowledgeItem>,
+
   getImageUrl,
 };

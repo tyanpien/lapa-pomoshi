@@ -10,6 +10,7 @@ type WardSelectProps = {
   value: string;
   onChange: (animalId: string) => void;
   placeholder?: string;
+  allowEmpty?: boolean;
 };
 
 export function WardSelect({
@@ -17,6 +18,7 @@ export function WardSelect({
   value,
   onChange,
   placeholder = "Введите имя подопечного",
+  allowEmpty = false,
 }: WardSelectProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -29,7 +31,8 @@ export function WardSelect({
 
   useEffect(() => {
     if (selected) setQuery(selected.name);
-  }, [selected?.id, selected?.name]);
+    else if (!value) setQuery("");
+  }, [selected?.id, selected?.name, value]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -48,6 +51,12 @@ export function WardSelect({
   const pick = (animal: Animal) => {
     onChange(String(animal.id));
     setQuery(animal.name);
+    setOpen(false);
+  };
+
+  const clear = () => {
+    onChange("");
+    setQuery("");
     setOpen(false);
   };
 
@@ -79,8 +88,20 @@ export function WardSelect({
         aria-label={open ? "Свернуть список" : "Развернуть список"}
         onClick={() => setOpen((v) => !v)}
       />
-      {open && filtered.length > 0 ? (
+      {open && (allowEmpty || filtered.length > 0) ? (
         <ul className={styles.wardDropdown} role="listbox">
+          {allowEmpty ? (
+            <li role="option" aria-selected={!value}>
+              <button
+                type="button"
+                className={`${styles.wardOption} ${!value ? styles.wardOptionActive : ""}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={clear}
+              >
+                <span className={styles.wardName}>Общая заявка организации</span>
+              </button>
+            </li>
+          ) : null}
           {filtered.map((animal) => {
             const active = String(animal.id) === value;
             const img = resolveAnimalAvatarSrc(

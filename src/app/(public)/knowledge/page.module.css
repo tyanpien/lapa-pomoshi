@@ -76,11 +76,13 @@
 .card {
   display: flex;
   gap: 20px;
-  max-height: 230px;
+  height: 230px;
   padding: 24px;
   border: 1px solid #8B5A3C;
   border-radius: 8px;
   background: #F7F3ED;
+  overflow: hidden;
+  align-items: stretch;
 }
 
 .image img {
@@ -92,27 +94,41 @@
 
 .content {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .content h3 {
-  margin: 20px 10px 36px;
+  margin: 0 10px 12px;
   font-size: 22px;
   font-weight: 700;
   color: #8B5A3C;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
-.content p {
-  margin: 0 10px 12px 10px;
+.summary {
+  composes: clamp3 from "../../../shared/styles/textClamp.module.css";
+  margin: 0 10px 12px;
   color: #333333;
   font-size: 14px;
+  line-height: 1.45;
+  flex: 1;
+  min-height: 0;
 }
 
 .meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 0 10px 12px;
-  margin-top: 40px;
+  margin: 0 10px 0;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .clockIcon {

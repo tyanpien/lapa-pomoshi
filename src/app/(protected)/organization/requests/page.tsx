@@ -22,8 +22,11 @@ import {
   unwrapApiList,
 } from "@/shared/lib/organizationMeCabinet";
 import { getOrganizationProfile } from "@/shared/lib/organizationCabinet";
+import { useUser } from "@/shared/lib/hooks/useUser";
+import { ORGANIZATION_ID_STORAGE_KEY } from "@/shared/lib/organizationMeCabinet";
 import {
   isCollectionRequest,
+  isHelpRequestDraft,
   isVolunteerTaskRequest,
   parseVolunteerTaskDescription,
 } from "@/shared/lib/helpRequestType";
@@ -50,10 +53,11 @@ function resolveOrgBankAccountDigits(publicPageBankAccount?: string | null): str
   return extractBankAccountDigits(raw);
 }
 
-type RequestsTab = "collections" | "volunteer_tasks";
+type RequestsTab = "collections" | "volunteer_tasks" | "drafts";
 const REQUEST_TABS: { key: RequestsTab; label: string }[] = [
   { key: "collections", label: "Сборы" },
   { key: "volunteer_tasks", label: "Задачи для волонтеров" },
+  { key: "drafts", label: "Черновики" },
 ];
 
 const HELP_FILTERS = ["all", "Накормить", "Вылечить", "Другое"] as const;
@@ -84,7 +88,16 @@ function toDatetimeLocalValue(iso: string | null | undefined): string {
   }
 }
 
+function readCachedOrganizationId(): number | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(ORGANIZATION_ID_STORAGE_KEY)?.trim();
+  if (!raw || !/^\d+$/.test(raw)) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function OrganizationRequestsPage() {
+  const { role } = useUser();
   const apiPayload = useOrganizationPublicCabinetPayload();
   const [form, setForm] = useState<CreateRequestFormState>(() =>
     emptyCreateForm()
@@ -108,8 +121,8 @@ export default function OrganizationRequestsPage() {
   const [requestDetailById, setRequestDetailById] = useState<Record<number, UrgentRequestDetail>>({});
   const [meHelpRawById, setMeHelpRawById] = useState<Record<number, Record<string, unknown>>>({});
 
-  const organizationId = apiPayload.organizationId;
-  const useMeCabinet = apiPayload.dataSource === "me" && organizationId != null;
+  const organizationId = apiPayload.organizationId ?? readCachedOrganizationId();
+  const useMeCabinet = role === "organization";
   const orgDisplayName = useMemo(
     () =>
       apiPayload.listItem?.name?.trim() ||
@@ -133,17 +146,18 @@ export default function OrganizationRequestsPage() {
     setErrorText("");
     setLoading(true);
     try {
-      if (useMeCabinet && organizationId != null) {
+      if (useMeCabinet) {
         const rows = unwrapApiList<Record<string, unknown>>(
           await fetchOrgHelpRequestsAllPages()
         );
+        const resolvedOrgId = organizationId ?? readCachedOrganizationId() ?? 0;
         const byId: Record<number, Record<string, unknown>> = {};
         for (const r of rows) {
           const rid = typeof r.id === "number" ? r.id : null;
           if (rid != null) byId[rid] = r;
         }
         setMeHelpRawById(byId);
-        setItems(rows.map((r) => mapMeHelpRequestToUrgentItem(r, organizationId, orgDisplayName)));
+        setItems(rows.map((r) => mapMeHelpRequestToUrgentItem(r, resolvedOrgId, orgDisplayName)));
         const catalogs = await urgentApi.getCatalogs().catch(() => null);
         if (catalogs) {
           setCatalogsLoaded({
@@ -187,7 +201,7 @@ export default function OrganizationRequestsPage() {
     } finally {
       setLoading(false);
     }
-  }, [organizationId, orgNameNormalized, orgDisplayName, useMeCabinet]);
+  }, [organizationId, orgNameNormalized, orgDisplayName, useMeCabinet, role]);
 
   useEffect(() => {
     void reload();
@@ -209,6 +223,10 @@ export default function OrganizationRequestsPage() {
   const visibleRequests = useMemo(() => {
     const query = search.trim().toLowerCase();
     return items.filter((request) => {
+      const draft = isHelpRequestDraft(request, meHelpRawById[request.id]);
+      if (activeTab === "drafts") return draft;
+      if (draft) return false;
+
       const description = `${request.description ?? ""}`;
       const city = `${request.city ?? ""}`;
       const bySearch =
@@ -224,17 +242,19 @@ export default function OrganizationRequestsPage() {
       const byHelp = helpFilter === "all" || cat === helpFilter;
       return bySearch && byHelp;
     });
-  }, [activeTab, helpFilter, items, search]);
+  }, [activeTab, helpFilter, items, search, meHelpRawById]);
 
   const tabRequests = useMemo(() => {
     const filtered =
-      activeTab === "volunteer_tasks"
-        ? visibleRequests.filter((request) =>
-            isVolunteerTaskRequest(request, meHelpRawById[request.id])
-          )
-        : visibleRequests.filter((request) =>
-            isCollectionRequest(request, meHelpRawById[request.id])
-          );
+      activeTab === "drafts"
+        ? visibleRequests
+        : activeTab === "volunteer_tasks"
+          ? visibleRequests.filter((request) =>
+              isVolunteerTaskRequest(request, meHelpRawById[request.id])
+            )
+          : visibleRequests.filter((request) =>
+              isCollectionRequest(request, meHelpRawById[request.id])
+            );
 
     return [...filtered].sort((a, b) => {
       const aUrgent = a.is_urgent ? 1 : 0;
@@ -257,11 +277,12 @@ export default function OrganizationRequestsPage() {
     }
     const ids = tabIdsKey.split(",").map(Number).filter(Number.isFinite);
     let cancelled = false;
-    if (useMeCabinet && organizationId != null) {
+    if (useMeCabinet) {
+      const resolvedOrgId = organizationId ?? readCachedOrganizationId() ?? 0;
       const next: Record<number, UrgentRequestDetail> = {};
       for (const id of ids) {
         const raw = meHelpRawById[id];
-        if (raw) next[id] = mapMeHelpRequestToUrgentDetail(raw, organizationId, orgDisplayName);
+        if (raw) next[id] = mapMeHelpRequestToUrgentDetail(raw, resolvedOrgId, orgDisplayName);
       }
       setRequestDetailById(next);
       return () => {
@@ -383,10 +404,6 @@ export default function OrganizationRequestsPage() {
       setErrorText("Заполните заголовок и описание (не менее 10 символов).");
       return;
     }
-    if (publish && !form.linkedAnimalId) {
-      setErrorText("Выберите подопечного для публикации заявки.");
-      return;
-    }
 
     const targetRaw = form.targetAmount.trim().replace(/\s/g, "").replace(",", ".");
     const targetAmount =
@@ -425,14 +442,16 @@ export default function OrganizationRequestsPage() {
       city: kind === "volunteer" ? form.location.trim() || null : null,
       deadline_at: kind === "volunteer" ? deadlineIso : null,
       is_published: publish,
-      status: "open",
+      ...(editingRequestId == null ? { status: "open" as const } : {}),
     };
 
     setMutatingId(editingRequestId ?? -1);
     setErrorText("");
 
     const done = () => {
-      setActiveTab(kind === "volunteer" ? "volunteer_tasks" : "collections");
+      setActiveTab(
+        publish ? (kind === "volunteer" ? "volunteer_tasks" : "collections") : "drafts"
+      );
       closeCreateModal();
       return reload();
     };
@@ -540,13 +559,14 @@ export default function OrganizationRequestsPage() {
   const openEditRequest = async (id: number) => {
     setMutatingId(id);
     try {
-      if (useMeCabinet && organizationId != null) {
+      if (useMeCabinet) {
         const raw = meHelpRawById[id];
         if (!raw) {
           setErrorText("Не удалось загрузить заявку для редактирования.");
           return;
         }
-        const d = mapMeHelpRequestToUrgentDetail(raw, organizationId, orgDisplayName);
+        const resolvedOrgId = organizationId ?? readCachedOrganizationId() ?? 0;
+        const d = mapMeHelpRequestToUrgentDetail(raw, resolvedOrgId, orgDisplayName);
         setEditingRequestId(id);
         fillFormFromDetail(d, d.volunteer_needed ? "volunteer" : "collection");
         setCreateModalOpen(true);
@@ -604,7 +624,20 @@ export default function OrganizationRequestsPage() {
             </button>
           </div>
 
-          {activeTab === "collections" ? (
+          {activeTab === "drafts" ? (
+            <div className={styles.volunteerSearchRow}>
+              <label className={styles.volunteerSearchLabel}>
+                <span className={styles.volunteerSearchIcon} aria-hidden />
+                <input
+                  className={styles.volunteerSearchInput}
+                  placeholder="Найти"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  aria-label="Поиск черновиков"
+                />
+              </label>
+            </div>
+          ) : activeTab === "collections" ? (
             <div className={styles.collectionsToolbar}>
               <label className={styles.collectionsSearchLabel}>
                 <span className={styles.collectionsSearchIcon} aria-hidden />
@@ -651,7 +684,9 @@ export default function OrganizationRequestsPage() {
         {loading ? <div className={styles.emptyState}>Загрузка…</div> : null}
 
         {!loading && tabRequests.length === 0 ? (
-          <div className={styles.emptyState}>Заявок пока нет.</div>
+          <div className={styles.emptyState}>
+            {activeTab === "drafts" ? "Черновиков пока нет." : "Заявок пока нет."}
+          </div>
         ) : (
           !loading && (
             <section className={styles.listVertical}>
@@ -665,7 +700,13 @@ export default function OrganizationRequestsPage() {
                   linkedAnimal?.name?.trim() ||
                   (request.animal_id != null ? "Подопечный" : "");
 
-                if (activeTab === "volunteer_tasks") {
+                const isDraft = isHelpRequestDraft(request, meHelpRawById[request.id]);
+                const showVolunteerLayout =
+                  activeTab === "volunteer_tasks" ||
+                  (activeTab === "drafts" &&
+                    isVolunteerTaskRequest(request, meHelpRawById[request.id]));
+
+                if (showVolunteerLayout) {
                   const extra = detail;
                   const deadlineText = formatVolunteerDeadline(request);
                   const createdText = formatCreatedRu(extra?.created_at);
@@ -693,8 +734,11 @@ export default function OrganizationRequestsPage() {
                         <span className={styles.volunteerHelpTag}>{getUrgentHelpTypeShortTag(request.help_type)}</span>
                         <h2 className={styles.volunteerTitle}>{request.title}</h2>
                         <div className={styles.volunteerCardTopRight}>
-                          {request.is_urgent ? <span className={styles.volunteerUrgentTag}>срочно</span> : null}
-                          {renderStatusSelect(request)}
+                          {isDraft ? <span className={styles.draftTag}>Черновик</span> : null}
+                          {!isDraft && request.is_urgent ? (
+                            <span className={styles.volunteerUrgentTag}>срочно</span>
+                          ) : null}
+                          {!isDraft ? renderStatusSelect(request) : null}
                         </div>
                       </div>
 
@@ -789,8 +833,11 @@ export default function OrganizationRequestsPage() {
                         <h2 className={`${styles.volunteerTitle} ${styles.collectionTitleOnly}`}>{request.title}</h2>
                       </div>
                       <div className={styles.volunteerCardTopRight}>
-                        {request.is_urgent ? <span className={styles.volunteerUrgentTag}>срочно</span> : null}
-                        {renderStatusSelect(request)}
+                        {isDraft ? <span className={styles.draftTag}>Черновик</span> : null}
+                        {!isDraft && request.is_urgent ? (
+                          <span className={styles.volunteerUrgentTag}>срочно</span>
+                        ) : null}
+                        {!isDraft ? renderStatusSelect(request) : null}
                       </div>
                     </div>
 

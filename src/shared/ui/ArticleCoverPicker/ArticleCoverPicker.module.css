@@ -1,0 +1,73 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.label {
+  color: rgba(51, 51, 51, 0.75);
+  font-size: 15px;
+}
+
+.previewBox {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 196 / 180;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(139, 90, 60, 0.35);
+  background: #f3eee7;
+}
+
+.previewBox img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.pickBtn,
+.removeBtn {
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pickBtn {
+  border: 1px solid #8b5a3c;
+  background: #fff;
+  color: #8b5a3c;
+}
+
+.removeBtn {
+  border: 1px solid rgba(51, 51, 51, 0.2);
+  background: #f5f5f5;
+  color: #333;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(51, 51, 51, 0.55);
+}

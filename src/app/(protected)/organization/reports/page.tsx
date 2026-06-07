@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { meOrganizationApi } from "@/shared/api/endpoints/meOrganization";
 import {
@@ -22,8 +22,25 @@ const emptyForm: ReportForm = {
   content: "",
 };
 
+const REPORT_FILE_ACCEPT = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,image/*,application/pdf";
+
 function notifyCabinetUpdated() {
   window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+}
+
+function pickReportId(created: unknown): number | null {
+  if (!created || typeof created !== "object") return null;
+  const id = (created as { id?: unknown }).id;
+  return typeof id === "number" && Number.isFinite(id) ? id : null;
+}
+
+function buildReportBody(form: ReportForm) {
+  const comment = form.content.trim();
+  return {
+    title: form.title.trim(),
+    body: comment || null,
+    summary: comment ? comment.slice(0, 600) : null,
+  };
 }
 
 export default function OrganizationReportsPage() {
@@ -37,7 +54,11 @@ export default function OrganizationReportsPage() {
   const [createForm, setCreateForm] = useState<ReportForm>(emptyForm);
   const [editId, setEditId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<ReportForm>(emptyForm);
+  const [editExistingFileUrl, setEditExistingFileUrl] = useState<string | undefined>();
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const pendingFileRef = useRef<File | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState("");
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -72,30 +93,53 @@ export default function OrganizationReportsPage() {
       });
   }, [reports, search, visibilityFilter]);
 
+  const resetFileState = () => {
+    pendingFileRef.current = null;
+    setSelectedFileName("");
+  };
+
+  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    pendingFileRef.current = file;
+    setSelectedFileName(file.name);
+  };
+
   const openCreateModal = () => {
     setCreateForm(emptyForm);
+    resetFileState();
     setCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    setCreateModalOpen(false);
+    resetFileState();
   };
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!createForm.title.trim() || !createForm.content.trim()) return;
+    const file = pendingFileRef.current;
+    if (!createForm.title.trim() || !file) return;
+
+    setSubmitting(true);
+    setErrorText("");
     void meOrganizationApi
       .createReport({
-        title: createForm.title.trim(),
-        body: createForm.content.trim(),
-        summary: createForm.content.trim().slice(0, 600),
+        ...buildReportBody(createForm),
         is_published: true,
       })
-      .then(() => {
-        setCreateModalOpen(false);
-        setCreateForm(emptyForm);
+      .then(async (created) => {
+        const reportId = pickReportId(created);
+        if (reportId == null) throw new Error("Не удалось получить id отчёта.");
+        await meOrganizationApi.uploadReportFile(reportId, file);
+        closeCreateModal();
         notifyCabinetUpdated();
-        return reload();
+        await reload();
       })
       .catch((e) =>
         setErrorText(e instanceof Error ? e.message : "Не удалось опубликовать отчёт.")
-      );
+      )
+      .finally(() => setSubmitting(false));
   };
 
   const openEditModal = (report: OrganizationReport) => {
@@ -104,23 +148,34 @@ export default function OrganizationReportsPage() {
       title: report.title,
       content: report.content,
     });
+    setEditExistingFileUrl(report.fileUrl);
+    resetFileState();
+  };
+
+  const closeEditModal = () => {
+    setEditId(null);
+    resetFileState();
+    setEditExistingFileUrl(undefined);
   };
 
   const handleEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (editId === null || !editForm.title.trim() || !editForm.content.trim()) return;
+    const file = pendingFileRef.current;
+    if (editId === null || !editForm.title.trim()) return;
+    if (!file && !editExistingFileUrl) return;
+
+    setSubmitting(true);
+    setErrorText("");
     void meOrganizationApi
-      .patchReport(editId, {
-        title: editForm.title.trim(),
-        body: editForm.content.trim(),
-        summary: editForm.content.trim().slice(0, 600),
-      })
-      .then(() => {
-        setEditId(null);
+      .patchReport(editId, buildReportBody(editForm))
+      .then(async () => {
+        if (file) await meOrganizationApi.uploadReportFile(editId, file);
+        closeEditModal();
         notifyCabinetUpdated();
-        return reload();
+        await reload();
       })
-      .catch((e) => setErrorText(e instanceof Error ? e.message : "Не удалось сохранить отчёт."));
+      .catch((e) => setErrorText(e instanceof Error ? e.message : "Не удалось сохранить отчёт."))
+      .finally(() => setSubmitting(false));
   };
 
   const handleArchive = (report: OrganizationReport) => {
@@ -156,37 +211,72 @@ export default function OrganizationReportsPage() {
     setForm: (next: ReportForm) => void,
     onSubmit: (e: FormEvent<HTMLFormElement>) => void,
     submitLabel: string,
-    onCancel: () => void
-  ) => (
-    <form className={styles.form} onSubmit={onSubmit}>
-      <label className={styles.label}>
-        Заголовок
-        <input
-          className={styles.input}
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          required
-        />
-      </label>
-      <label className={styles.label}>
-        Текст отчёта
-        <textarea
-          className={styles.textarea}
-          value={form.content}
-          onChange={(e) => setForm({ ...form, content: e.target.value })}
-          required
-        />
-      </label>
-      <div className={styles.modalActions}>
-        <button type="button" className={styles.secondaryButton} onClick={onCancel}>
-          Отмена
-        </button>
-        <button type="submit" className={styles.primaryButton}>
-          {submitLabel}
-        </button>
-      </div>
-    </form>
-  );
+    onCancel: () => void,
+    options: { requireFile: boolean; existingFileUrl?: string }
+  ) => {
+    const hasSelectedFile = Boolean(selectedFileName);
+    const hasFile = hasSelectedFile || Boolean(options.existingFileUrl);
+    const canSubmit =
+      Boolean(form.title.trim()) && (!options.requireFile || hasSelectedFile) && hasFile;
+
+    return (
+      <form className={styles.form} onSubmit={onSubmit}>
+        <label className={styles.label}>
+          Заголовок
+          <input
+            className={styles.input}
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            required
+          />
+        </label>
+        <label className={styles.label}>
+          Файл отчёта
+          <input
+            className={styles.fileInput}
+            type="file"
+            accept={REPORT_FILE_ACCEPT}
+            onChange={handleFileSelect}
+            required={options.requireFile}
+          />
+          <span className={styles.fileHint}>
+            PDF, Word или изображение, до 15 МБ
+            {options.existingFileUrl && !selectedFileName ? (
+              <>
+                {" · "}
+                <a
+                  className={styles.fileLink}
+                  href={options.existingFileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Текущий файл
+                </a>
+              </>
+            ) : null}
+            {selectedFileName ? ` · ${selectedFileName}` : null}
+          </span>
+        </label>
+        <label className={styles.label}>
+          Комментарий (необязательно)
+          <textarea
+            className={styles.textarea}
+            value={form.content}
+            onChange={(e) => setForm({ ...form, content: e.target.value })}
+            placeholder="Краткое пояснение к отчёту"
+          />
+        </label>
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.secondaryButton} onClick={onCancel} disabled={submitting}>
+            Отмена
+          </button>
+          <button type="submit" className={styles.primaryButton} disabled={submitting || !canSubmit}>
+            {submitLabel}
+          </button>
+        </div>
+      </form>
+    );
+  };
 
   return (
     <main className={styles.page}>
@@ -196,7 +286,7 @@ export default function OrganizationReportsPage() {
             <div className={styles.titleBlock}>
               <h1 className={styles.title}>Отчёты</h1>
               <p className={styles.subtitle}>
-                Публикуйте отчёты о сборах, расходах и результатах помощи.
+                Прикрепляйте файлы отчётов о сборах, расходах и результатах помощи. Комментарий — по желанию.
               </p>
             </div>
             <button type="button" className={styles.addBtn} onClick={openCreateModal}>
@@ -237,7 +327,17 @@ export default function OrganizationReportsPage() {
             {visibleReports.map((report) => (
               <article key={report.id} className={styles.itemCard}>
                 <h2 className={styles.itemTitle}>{report.title}</h2>
-                <p className={styles.summaryLine}>{report.content}</p>
+                {report.fileUrl ? (
+                  <a
+                    className={styles.fileLink}
+                    href={report.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Скачать файл отчёта
+                  </a>
+                ) : null}
+                {report.content ? <p className={styles.summaryLine}>{report.content}</p> : null}
                 <div className={styles.badgeRow}>
                   <span className={`${styles.badge} ${report.archived ? styles.badgeArchived : ""}`.trim()}>
                     {report.archived ? "Архив" : "Опубликовано"}
@@ -278,19 +378,24 @@ export default function OrganizationReportsPage() {
       </div>
 
       {isCreateModalOpen ? (
-        <div className={styles.modalOverlay} role="presentation" onClick={() => setCreateModalOpen(false)}>
+        <div className={styles.modalOverlay} role="presentation" onClick={closeCreateModal}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Добавить отчёт</h2>
-            {renderForm(createForm, setCreateForm, handleCreate, "Опубликовать", () => setCreateModalOpen(false))}
+            {renderForm(createForm, setCreateForm, handleCreate, "Опубликовать", closeCreateModal, {
+              requireFile: true,
+            })}
           </div>
         </div>
       ) : null}
 
       {editId !== null ? (
-        <div className={styles.modalOverlay} role="presentation" onClick={() => setEditId(null)}>
+        <div className={styles.modalOverlay} role="presentation" onClick={closeEditModal}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Редактировать отчёт</h2>
-            {renderForm(editForm, setEditForm, handleEdit, "Сохранить", () => setEditId(null))}
+            {renderForm(editForm, setEditForm, handleEdit, "Сохранить", closeEditModal, {
+              requireFile: false,
+              existingFileUrl: editExistingFileUrl,
+            })}
           </div>
         </div>
       ) : null}

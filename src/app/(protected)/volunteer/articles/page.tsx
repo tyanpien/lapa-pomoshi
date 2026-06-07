@@ -12,7 +12,13 @@ import {
   syncVolunteerCatalogUserId,
   volunteerProfileStorageIdentity,
 } from "@/shared/lib/volunteerProfileStorage";
-import { getArticleCategoryLabel } from "@/shared/lib/articleCategoryLabels";
+import {
+  articleCategoriesForSelect,
+  getArticleCategoryLabel,
+} from "@/shared/lib/articleCategoryLabels";
+import { normalizeArticleContent } from "@/shared/lib/articleContent";
+import { KnowledgeArticleCover } from "@/shared/ui/KnowledgeArticleCover/KnowledgeArticleCover";
+import { ArticleCoverPicker } from "@/shared/ui/ArticleCoverPicker/ArticleCoverPicker";
 
 type ArticleFilter = "all" | string;
 
@@ -30,6 +36,13 @@ const emptyForm: ArticleForm = {
   content: "",
 };
 
+type CoverDraft = {
+  previewUrl: string | null;
+  file: File | null;
+};
+
+const emptyCoverDraft: CoverDraft = { previewUrl: null, file: null };
+
 const FALLBACK_CATEGORIES = [
   { id: "care", label: "Уход" },
   { id: "first_aid", label: "Первая помощь" },
@@ -38,6 +51,7 @@ const FALLBACK_CATEGORIES = [
   { id: "training", label: "Воспитание" },
   { id: "treatment", label: "Лечение" },
   { id: "legal", label: "Юридические вопросы" },
+  { id: "other", label: "Другое" },
 ];
 
 export default function VolunteerArticlesPage() {
@@ -51,6 +65,7 @@ export default function VolunteerArticlesPage() {
   const [catalogs, setCatalogs] = useState(FALLBACK_CATEGORIES);
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState<ArticleForm>(emptyForm);
+  const [createCover, setCreateCover] = useState<CoverDraft>(emptyCoverDraft);
 
   const loadArticles = useCallback(async () => {
     setIsLoading(true);
@@ -93,7 +108,7 @@ export default function VolunteerArticlesPage() {
     void knowledgeApi
       .getCatalogs()
       .then((cats) => {
-        const categories = (cats.categories ?? []).filter((c) => c.id !== "all");
+        const categories = articleCategoriesForSelect(cats.categories ?? []);
         if (categories.length > 0) {
           setCatalogs(categories);
         }
@@ -137,13 +152,14 @@ export default function VolunteerArticlesPage() {
   const openCreateModal = () => {
     const first = catalogs[0]?.id ?? "care";
     setCreateForm({ ...emptyForm, articleType: first });
+    setCreateCover(emptyCoverDraft);
     setCreateModalOpen(true);
   };
 
   const buildPayload = (form: ArticleForm) => ({
     title: form.title.trim(),
     summary: (form.summary.trim() || form.content.trim().slice(0, 200)).trim(),
-    content: form.content.trim(),
+    content: normalizeArticleContent(form.content),
     category: form.articleType,
     is_context_tip: false,
     is_published: true,
@@ -154,9 +170,13 @@ export default function VolunteerArticlesPage() {
     if (!createForm.title.trim() || createForm.content.trim().length < 10) return;
     void knowledgeApi
       .create(buildPayload(createForm))
-      .then(() => {
+      .then(async (created) => {
+        if (createCover.file) {
+          await knowledgeApi.uploadCover(created.id, createCover.file);
+        }
         setCreateModalOpen(false);
         setCreateForm(emptyForm);
+        setCreateCover(emptyCoverDraft);
         return loadArticles();
       })
       .catch((e) => setErrorText(e instanceof Error ? e.message : "Не удалось создать статью."));
@@ -207,7 +227,7 @@ export default function VolunteerArticlesPage() {
               <Link key={article.id} href={`/knowledge/${article.id}`} className={styles.articleLink}>
                 <article className={styles.requestCard}>
                   <div className={styles.cover}>
-                    <img src="/knowledge.png" alt="" />
+                    <KnowledgeArticleCover coverUrl={article.cover_url} alt="" />
                   </div>
 
                   <div className={styles.requestBody}>
@@ -272,6 +292,12 @@ export default function VolunteerArticlesPage() {
                     required
                   />
                 </label>
+                <div className={styles.labelFull}>
+                  <ArticleCoverPicker
+                    previewUrl={createCover.previewUrl}
+                    onFileSelect={(file, previewUrl) => setCreateCover({ file, previewUrl })}
+                  />
+                </div>
               </div>
               <div className={styles.modalActions}>
                 <button type="button" className={styles.secondaryButton} onClick={() => setCreateModalOpen(false)}>

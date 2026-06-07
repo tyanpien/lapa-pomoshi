@@ -115,7 +115,16 @@ export const getImageUrl = (photoUrl: string | null | undefined): string => {
   return `${API_BASE_URL}${photoUrl}`;
 };
 
-const ANIMAL_AVATAR_FALLBACK = "/cat.png";
+export const ANIMAL_PLACEHOLDER_SRC = "/placeholder.jpg";
+
+const ANIMAL_AVATAR_FALLBACK = ANIMAL_PLACEHOLDER_SRC;
+
+export function onAnimalImageError(e: { currentTarget: HTMLImageElement }) {
+  const img = e.currentTarget;
+  if (img.dataset.fallbackApplied === "1") return;
+  img.dataset.fallbackApplied = "1";
+  img.src = ANIMAL_PLACEHOLDER_SRC;
+}
 
 export function resolveAnimalAvatarSrc(
   ...sources: (string | null | undefined)[]

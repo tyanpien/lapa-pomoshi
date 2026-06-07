@@ -1,0 +1,133 @@
+.wrap {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3d342c;
+}
+
+.hint {
+  font-size: 13px;
+  color: #6b5c52;
+}
+
+.emptyHint {
+  margin: 0;
+  font-size: 14px;
+  color: #6b5c52;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  position: relative;
+  width: 120px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ebe4dc;
+  border: 1px solid #d8cfc4;
+}
+
+.thumb {
+  display: block;
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+}
+
+.primaryBadge,
+.pendingBadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.primaryBadge {
+  background: #3d4f3a;
+}
+
+.pendingBadge {
+  top: auto;
+  bottom: 52px;
+  left: 6px;
+  background: #6b7280;
+}
+
+.tileActions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.tileBtn {
+  border: none;
+  background: transparent;
+  padding: 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3d4f3a;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.tileBtn:hover {
+  text-decoration: underline;
+}
+
+.tileBtnDanger {
+  color: #a33;
+}
+
+.hiddenInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.addBtn {
+  align-self: flex-start;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px dashed #9a8b7e;
+  border-radius: 8px;
+  background: #faf7f3;
+  color: #3d4f3a;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: #f0ebe4;
+}

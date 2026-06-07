@@ -144,8 +144,9 @@ export const updateOrganizationAnimal = (id: number, input: NewOrganizationAnima
   if (records[recordIndex].ownerName !== currentOrganizationName) return null;
 
   const normalizedSpecies = input.species.trim() || "Собака";
+  const prev = records[recordIndex].animal;
   const updatedAnimal: Animal = {
-    ...records[recordIndex].animal,
+    ...prev,
     name: input.name.trim(),
     species: normalizedSpecies,
     breed: input.breed.trim() || "Метис",
@@ -155,8 +156,14 @@ export const updateOrganizationAnimal = (id: number, input: NewOrganizationAnima
     is_urgent: input.isUrgent,
     status: input.status,
     full_description: input.description.trim(),
-    primary_photo_url: input.photoUrl?.trim() || null,
-    photo_urls: input.photoUrl?.trim() ? [input.photoUrl.trim()] : [],
+    primary_photo_url: input.photoUrl?.trim() || prev.primary_photo_url || null,
+    photo_urls: input.photoUrl?.trim()
+      ? [input.photoUrl.trim()]
+      : prev.photo_urls?.length
+        ? [...prev.photo_urls]
+        : prev.primary_photo_url
+          ? [prev.primary_photo_url]
+          : [],
     organization_name: currentOrganizationName,
     health_features: input.healthFeatures?.trim() || "",
     treatment_required: input.treatmentRequired?.trim() || "",

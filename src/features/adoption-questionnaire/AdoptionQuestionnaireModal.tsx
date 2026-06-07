@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { meApplicationsApi } from "@/shared/api/endpoints/meApplications";
+import {
+  displayPhoneFromStored,
+  getRussianPhoneValidationError,
+  normalizePhoneDigits,
+} from "@/shared/lib/phoneRu";
+import { PhoneInput } from "@/shared/ui/PhoneInput";
 import { mapAdoptionQuestionnaireToApiBody } from "./formatMessage";
 import {
   emptyAdoptionQuestionnaireForm,
@@ -97,15 +103,31 @@ function YesNoPair({ value, onChange }: { value: YesNo | ""; onChange: (v: YesNo
   );
 }
 
+type Step1FieldErrors = {
+  name?: string;
+  age?: string;
+  phone?: string;
+  email?: string;
+};
+
+function getStep1FieldErrors(form: AdoptionQuestionnaireForm): Step1FieldErrors {
+  const errors: Step1FieldErrors = {};
+  if (!form.name.trim()) errors.name = "Укажите имя.";
+  if (!form.age.trim() || !/^\d+$/.test(form.age.trim())) {
+    errors.age = "Укажите возраст (целое число лет).";
+  }
+  const phoneError = getRussianPhoneValidationError(form.phone);
+  if (phoneError) errors.phone = phoneError;
+  if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errors.email = "Укажите корректный e-mail.";
+  }
+  return errors;
+}
+
 function validateStep(step: number, form: AdoptionQuestionnaireForm): string | null {
   if (step === 1) {
-    if (!form.name.trim()) return "Укажите имя.";
-    if (!form.age.trim() || !/^\d+$/.test(form.age.trim())) return "Укажите возраст (целое число лет).";
-    if (!form.phone.trim()) return "Укажите телефон.";
-    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      return "Укажите корректный e-mail.";
-    }
-    return null;
+    const errors = getStep1FieldErrors(form);
+    return errors.name ?? errors.age ?? errors.phone ?? errors.email ?? null;
   }
   if (step === 2) {
     if (!form.housingType) return "Выберите тип жилья.";
@@ -164,10 +186,22 @@ export function AdoptionQuestionnaireModal({
     ...initialForm,
     name: initialForm?.name ?? initialName,
     email: initialForm?.email ?? initialEmail,
-    phone: initialForm?.phone ?? initialPhone,
+    phone: displayPhoneFromStored(initialForm?.phone ?? initialPhone),
   }));
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  const [step1Touched, setStep1Touched] = useState({
+    name: false,
+    age: false,
+    phone: false,
+    email: false,
+  });
+  const [step1ShowErrors, setStep1ShowErrors] = useState(false);
+
+  const step1Errors = useMemo(() => getStep1FieldErrors(form), [form]);
+  const showPhoneFieldError =
+    Boolean(step1Errors.phone) &&
+    (step1ShowErrors || step1Touched.phone || normalizePhoneDigits(form.phone).length > 0);
 
   const patch = useCallback((p: Partial<AdoptionQuestionnaireForm>) => {
     setForm((prev) => ({ ...prev, ...p }));
@@ -176,10 +210,11 @@ export function AdoptionQuestionnaireModal({
   useEffect(() => {
     if (initialName) patch({ name: initialName });
     if (initialEmail) patch({ email: initialEmail });
-    if (initialPhone) patch({ phone: initialPhone });
+    if (initialPhone) patch({ phone: displayPhoneFromStored(initialPhone) });
   }, [initialName, initialEmail, initialPhone, patch]);
 
   const goNext = () => {
+    if (step === 1) setStep1ShowErrors(true);
     const err = validateStep(step, form);
     if (err) {
       setError(err);
@@ -247,44 +282,76 @@ export function AdoptionQuestionnaireModal({
             <label className={styles.fieldLabel}>
               Имя
               <input
-                className={styles.fieldInput}
+                className={`${styles.fieldInput} ${
+                  (step1ShowErrors || step1Touched.name) && step1Errors.name ? styles.fieldInputInvalid : ""
+                }`.trim()}
                 placeholder="Введите ваше имя"
                 value={form.name}
                 onChange={(e) => patch({ name: e.target.value })}
+                onBlur={() => setStep1Touched((t) => ({ ...t, name: true }))}
                 disabled={sending}
+                aria-invalid={Boolean((step1ShowErrors || step1Touched.name) && step1Errors.name)}
               />
+              {(step1ShowErrors || step1Touched.name) && step1Errors.name ? (
+                <span className={styles.fieldError} role="alert">
+                  {step1Errors.name}
+                </span>
+              ) : null}
             </label>
             <label className={styles.fieldLabel}>
               Возраст
               <input
-                className={styles.fieldInput}
+                className={`${styles.fieldInput} ${
+                  (step1ShowErrors || step1Touched.age) && step1Errors.age ? styles.fieldInputInvalid : ""
+                }`.trim()}
                 placeholder="Введите полное количество лет"
                 inputMode="numeric"
                 value={form.age}
                 onChange={(e) => patch({ age: e.target.value.replace(/\D/g, "") })}
+                onBlur={() => setStep1Touched((t) => ({ ...t, age: true }))}
                 disabled={sending}
+                aria-invalid={Boolean((step1ShowErrors || step1Touched.age) && step1Errors.age)}
               />
+              {(step1ShowErrors || step1Touched.age) && step1Errors.age ? (
+                <span className={styles.fieldError} role="alert">
+                  {step1Errors.age}
+                </span>
+              ) : null}
             </label>
             <label className={styles.fieldLabel}>
               Телефон
-              <input
-                className={styles.fieldInput}
-                placeholder="+ 7 __________"
+              <PhoneInput
+                id="adoption-phone"
                 value={form.phone}
-                onChange={(e) => patch({ phone: e.target.value })}
+                onChange={(phone) => patch({ phone })}
+                onBlur={() => setStep1Touched((t) => ({ ...t, phone: true }))}
                 disabled={sending}
+                error={showPhoneFieldError ? step1Errors.phone : null}
+                inputClassName={`${styles.fieldInput} ${
+                  showPhoneFieldError ? styles.fieldInputInvalid : ""
+                }`.trim()}
+                errorClassName={styles.fieldError}
               />
             </label>
             <label className={styles.fieldLabel}>
               E-mail
               <input
-                className={styles.fieldInput}
+                className={`${styles.fieldInput} ${
+                  (step1ShowErrors || step1Touched.email) && step1Errors.email ? styles.fieldInputInvalid : ""
+                }`.trim()}
                 type="email"
                 placeholder="Введите ваш E-mail"
                 value={form.email}
                 onChange={(e) => patch({ email: e.target.value })}
+                onBlur={() => setStep1Touched((t) => ({ ...t, email: true }))}
                 disabled={sending}
+                aria-invalid={Boolean((step1ShowErrors || step1Touched.email) && step1Errors.email)}
               />
+              {(step1ShowErrors || step1Touched.email) && step1Errors.email ? (
+                <span className={styles.fieldError} role="alert">
+                  {step1Errors.email}
+                </span>
+              ) : null}
             </label>
           </div>
         );
@@ -519,7 +586,15 @@ export function AdoptionQuestionnaireModal({
                 <span />
               )}
               {step < TOTAL_STEPS ? (
-                <button type="button" className={styles.primaryBtn} disabled={sending} onClick={goNext}>
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  disabled={
+                    sending ||
+                    (step === 1 && Object.keys(step1Errors).length > 0 && step1ShowErrors)
+                  }
+                  onClick={goNext}
+                >
                   Далее
                 </button>
               ) : (

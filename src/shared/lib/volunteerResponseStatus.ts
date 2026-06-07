@@ -5,6 +5,30 @@ export type VolunteerResponseUiStatus =
   | "Отменено"
   | "Отклонено";
 
+const STATUS_SORT_RANK: Record<VolunteerResponseUiStatus, number> = {
+  "На рассмотрении": 0,
+  "В работе": 1,
+  "Завершено": 2,
+  "Отменено": 3,
+  "Отклонено": 4,
+};
+
+export function volunteerResponseStatusSortRank(status: VolunteerResponseUiStatus): number {
+  return STATUS_SORT_RANK[status] ?? 99;
+}
+
+export function compareVolunteerResponsesByStatus(
+  a: { status: VolunteerResponseUiStatus; createdAt?: string | null; id: number },
+  b: { status: VolunteerResponseUiStatus; createdAt?: string | null; id: number },
+): number {
+  const rankDiff = volunteerResponseStatusSortRank(a.status) - volunteerResponseStatusSortRank(b.status);
+  if (rankDiff !== 0) return rankDiff;
+  const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
+  const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
+  if (bTime !== aTime) return bTime - aTime;
+  return b.id - a.id;
+}
+
 export function mapVolunteerResponseStatus(
   raw: string,
   labelFallback?: string | null,

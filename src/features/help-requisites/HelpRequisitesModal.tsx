@@ -9,7 +9,8 @@ import { organizationsApi } from "@/shared/api/endpoints/organizations";
 import { urgentApi } from "@/shared/api/endpoints/urgent";
 
 export interface HelpRequisitesModalProps {
-  animalId: number;
+  animalId?: number | null;
+  organizationId?: number | null;
   animalName: string;
   organizationName: string;
   needText: string;
@@ -20,6 +21,7 @@ export interface HelpRequisitesModalProps {
 
 export function HelpRequisitesModal({
   animalId,
+  organizationId,
   animalName,
   organizationName,
   needText,
@@ -47,8 +49,13 @@ export function HelpRequisitesModal({
           }
         }
 
-        const animal = (await animalsApi.getById(animalId)) as Animal;
-        const orgId = animal.organization?.id;
+        let orgId: number | undefined;
+        if (animalId != null && animalId > 0) {
+          const animal = (await animalsApi.getById(animalId)) as Animal;
+          orgId = animal.organization?.id;
+        } else if (organizationId != null && organizationId > 0) {
+          orgId = organizationId;
+        }
         let req = "";
         if (orgId) {
           const org = await organizationsApi.getById(orgId);
@@ -80,7 +87,7 @@ export function HelpRequisitesModal({
     return () => {
       cancelled = true;
     };
-  }, [animalId, primaryHelpRequestId, needText, organizationName, targetAmount]);
+  }, [animalId, organizationId, primaryHelpRequestId, needText, organizationName, targetAmount]);
 
   return (
     <ModalPortal>

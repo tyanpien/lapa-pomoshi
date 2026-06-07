@@ -15,7 +15,7 @@ import {
   type OrgPublicArticle,
   type OrgPublicReport,
 } from "@/shared/api/endpoints/organizations";
-import { getImageUrl } from "@/shared/api/client";
+import { ANIMAL_PLACEHOLDER_SRC, getImageUrl } from "@/shared/api/client";
 import { getOrganizationAnimalsByName, getCurrentOrganizationAnimals, getOrganizationAnimalsEventName } from "@/shared/lib/organizationAnimals";
 import {
   getOrganizationCabinetEventName,
@@ -43,6 +43,8 @@ import {
 } from "@/features/help-animal-card/helpAnimalCardModel";
 import { helpApi } from "@/shared/api/endpoints/help";
 import { getArticleCategoryLabel } from "@/shared/lib/articleCategoryLabels";
+import { KnowledgeArticleCover } from "@/shared/ui/KnowledgeArticleCover/KnowledgeArticleCover";
+import { ArticleFormattedContent } from "@/shared/ui/ArticleFormattedContent/ArticleFormattedContent";
 import { formatAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
 import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
 import { formatInstructionDisplayText } from "@/shared/lib/formatInstructionText";
@@ -140,10 +142,12 @@ function mapOrgArticle(a: OrgPublicArticle): OrganizationArticle {
 }
 
 function mapOrgReport(r: OrgPublicReport): OrganizationReport {
+  const fileRaw = r.file_url?.trim();
   return {
     id: r.id,
     title: r.title,
     content: r.summary || "",
+    fileUrl: fileRaw ? getImageUrl(fileRaw) : undefined,
     isUrgent: false,
     archived: false,
     createdAt: r.published_at,
@@ -511,7 +515,9 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
       router.push(getLoginHref(pathname || "/"));
       return;
     }
-    router.push(`/catalog/animals/${card.id}`);
+    if (card.animalId != null) {
+      router.push(`/catalog/animals/${card.animalId}`);
+    }
   };
 
   const organizationEvents = useMemo(() => {
@@ -861,7 +867,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
             organizationGreetings.map((story) => (
               <article className={styles.homeRequestCard} key={story.id}>
                 <div className={styles.homeCover}>
-                  <img src={story.photoUrl || "/cat-placeholder.jpg"} alt={story.petName} />
+                  <img src={story.photoUrl || ANIMAL_PLACEHOLDER_SRC} alt={story.petName} />
                 </div>
                 <div className={styles.homeRequestBody}>
                   <h3 className={styles.homeRequestName}>{story.petName}</h3>
@@ -904,14 +910,24 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
                   className={styles.homeRequestCardLink}
                 >
                   <article className={styles.homeRequestCard}>
-                  <div className={styles.articleCoverPlaceholder} aria-hidden />
+                  <div className={styles.articleCoverPlaceholder} aria-hidden>
+                    <KnowledgeArticleCover
+                      coverUrl={article.coverUrl}
+                      alt=""
+                      className={styles.articleCoverImage}
+                    />
+                  </div>
                   <div className={styles.homeRequestBody}>
                     <h3 className={styles.homeRequestName}>{article.title}</h3>
                     <div className={styles.homeTags}>
                       <span>{getArticleCategoryLabel(article.articleType)}</span>
                       {article.author ? <span>{article.author}</span> : null}
                     </div>
-                    <p className={`${styles.homeOrganizationLine} ${styles.articleExcerpt}`}>{article.content}</p>
+                    <ArticleFormattedContent
+                      text={article.content}
+                      variant="excerpt"
+                      className={`${styles.homeOrganizationLine} ${styles.articleExcerpt}`}
+                    />
                     <p className={styles.homeMetaLine}>
                       {new Date(article.createdAt).toLocaleDateString("ru-RU", {
                         day: "2-digit",
@@ -940,7 +956,19 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
             ) : (
               organizationReports.map((item) => (
                 <li key={item.id}>
-                  <span className={styles.reportLink}>{item.title}</span>
+                  {item.fileUrl ? (
+                    <a
+                      className={styles.reportLink}
+                      href={item.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.title}
+                    </a>
+                  ) : (
+                    <span className={styles.reportLink}>{item.title}</span>
+                  )}
+                  {item.content ? <p className={styles.reportComment}>{item.content}</p> : null}
                 </li>
               ))
             )}
@@ -960,7 +988,7 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
             wardRows.map((animal) => (
               <article className={styles.card} key={animal.id}>
                 <div className={styles.imageWrap}>
-                  <img src={animal.primary_photo_url || "/cat-placeholder.jpg"} alt={animal.name} className={styles.image} />
+                  <img src={animal.primary_photo_url || ANIMAL_PLACEHOLDER_SRC} alt={animal.name} className={styles.image} />
                   {animal.is_urgent ? <span className={styles.urgentTopBadge}>срочно</span> : null}
                   <span className={styles.badge}>{wardStatusLabel(animal)}</span>
                 </div>
@@ -1183,7 +1211,8 @@ export function OrganizationCatalogView(props: OrganizationCatalogViewProps) {
 
       {helpModalCard ? (
         <HelpRequisitesModal
-          animalId={helpModalCard.id}
+          animalId={helpModalCard.animalId}
+          organizationId={helpModalCard.organizationId}
           animalName={helpModalCard.name}
           organizationName={helpModalCard.organization || orgName}
           needText={helpModalCard.needText}

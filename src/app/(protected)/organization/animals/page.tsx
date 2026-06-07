@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
 import {
@@ -19,12 +19,21 @@ import { mergeApiAndLocalAnimals } from "@/shared/lib/organizationPublicWards";
 import { useOrganizationPublicCabinetPayload } from "@/shared/lib/hooks/useOrganizationPublicCabinetPayload";
 import { formatAnimalSpeciesLabel } from "@/shared/lib/animalSpeciesLabels";
 import { formatCatalogLabel } from "@/shared/lib/formatCatalogLabel";
-import { formatAgeMonthsRu } from "@/shared/lib/formatAgeMonthsRu";
+import {
+  combineAgeYearsMonths,
+  formatAgeMonthsRu,
+  splitAgeMonths,
+} from "@/shared/lib/formatAgeMonthsRu";
 import {
   CATALOG_OTHER_LABEL,
   CHARACTER_OTHER_SLUG,
   HEALTH_CARE_OTHER_SLUG,
 } from "@/shared/lib/animalCatalogOther";
+import {
+  AnimalPhotoPicker,
+  type AnimalFormPhoto,
+} from "./components/AnimalPhotoPicker";
+import { getImageUrl } from "@/shared/api/client";
 
 type CatalogTagOption = { id: string; label: string };
 type StatusFilter = "all" | "looking_for_home" | "on_treatment" | "in_shelter" | "archive";
@@ -36,7 +45,8 @@ type FormState = {
   species: string;
   breed: string;
   sex: "male" | "female";
-  ageMonths: number;
+  ageYears: number;
+  ageMonthsPart: number;
   city: string;
   description: string;
   healthFeatures: string;
@@ -47,7 +57,7 @@ type FormState = {
   characterOther: string;
   status: "looking_for_home" | "on_treatment" | "in_shelter";
   isUrgent: boolean;
-  photoUrl: string;
+  photos: AnimalFormPhoto[];
 };
 
 const initialForm: FormState = {
@@ -55,7 +65,8 @@ const initialForm: FormState = {
   species: "Собака",
   breed: "",
   sex: "male" as "male" | "female",
-  ageMonths: 12,
+  ageYears: 0,
+  ageMonthsPart: 0,
   city: "",
   description: "",
   healthFeatures: "",
@@ -66,8 +77,31 @@ const initialForm: FormState = {
   characterOther: "",
   status: "looking_for_home" as "looking_for_home" | "on_treatment" | "in_shelter",
   isUrgent: false,
-  photoUrl: "",
+  photos: [],
 };
+
+function photosFromAnimal(animal: Animal): AnimalFormPhoto[] {
+  if (animal.photos?.length) {
+    return animal.photos.map((p) => ({
+      key: `server-${p.id}`,
+      id: p.id,
+      previewUrl: p.url,
+      isPrimary: p.is_primary,
+      isPending: p.is_pending,
+    }));
+  }
+  const urls =
+    animal.photo_urls?.length
+      ? animal.photo_urls
+      : animal.primary_photo_url
+        ? [animal.primary_photo_url]
+        : [];
+  return urls.map((url, index) => ({
+    key: `legacy-${index}-${url}`,
+    previewUrl: url.startsWith("http") || url.startsWith("data:") ? url : getImageUrl(url),
+    isPrimary: index === 0,
+  }));
+}
 
 function labelsFromSlugs(slugs: string[], options: CatalogTagOption[]): string[] {
   const byId = new Map(options.map((o) => [o.id, o.label]));
@@ -102,6 +136,8 @@ export default function OrganizationAnimalsPage() {
   const [archivedAnimals, setArchivedAnimals] = useState<Animal[]>([]);
   const [archivedLoading, setArchivedLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [ageYearsFocused, setAgeYearsFocused] = useState(false);
+  const [ageMonthsFocused, setAgeMonthsFocused] = useState(false);
   const [healthCareOptions, setHealthCareOptions] = useState<CatalogTagOption[]>([]);
   const [characterOptions, setCharacterOptions] = useState<CatalogTagOption[]>([]);
 
@@ -150,7 +186,7 @@ export default function OrganizationAnimalsPage() {
     const cabinetEvent = getOrganizationCabinetEventName();
     const handleUpdate = () => {
       reloadAnimals();
-      if (statusFilter === "archive") void reloadArchived();
+      if (statusFilter === "archive" || statusFilter === "all") void reloadArchived();
     };
     window.addEventListener(eventName, handleUpdate);
     window.addEventListener(cabinetEvent, handleUpdate);
@@ -161,7 +197,7 @@ export default function OrganizationAnimalsPage() {
   }, [statusFilter, reloadArchived]);
 
   useEffect(() => {
-    if (statusFilter !== "archive") return;
+    if (statusFilter !== "archive" && statusFilter !== "all") return;
     void reloadArchived();
   }, [statusFilter, reloadArchived]);
 
@@ -213,7 +249,7 @@ export default function OrganizationAnimalsPage() {
       species,
       breed: form.breed.trim() || null,
       sex: form.sex,
-      age_months: Math.max(0, Number(form.ageMonths) || 0),
+      age_months: combineAgeYearsMonths(form.ageYears, form.ageMonthsPart),
       location_city: form.city.trim() || null,
       full_description: form.description.trim() || null,
       health_features: form.healthFeatures.trim() || null,
@@ -242,7 +278,7 @@ export default function OrganizationAnimalsPage() {
       species: form.species,
       breed: form.breed,
       sex: form.sex,
-      ageMonths: Number(form.ageMonths),
+      ageMonths: combineAgeYearsMonths(form.ageYears, form.ageMonthsPart),
       city: form.city,
       description: form.description,
       healthFeatures: form.healthFeatures,
@@ -265,25 +301,24 @@ export default function OrganizationAnimalsPage() {
       ],
       status: form.status,
       isUrgent: form.isUrgent,
-      photoUrl: form.photoUrl,
+      photoUrl: form.photos.find((p) => p.isPrimary)?.previewUrl ?? form.photos[0]?.previewUrl ?? "",
     };
 
     const doneLocal = () => {
       setForm(initialForm);
+      setAgeYearsFocused(false);
+      setAgeMonthsFocused(false);
       setCreateModalOpen(false);
       setEditingAnimalId(null);
       reloadAnimals();
     };
 
     if (useMeCabinet) {
-      const uploadDataUrlIfNeeded = async (animalId: number) => {
-        if (!form.photoUrl?.startsWith("data:")) return;
-        try {
-          const r = await fetch(form.photoUrl);
-          const blob = await r.blob();
-          const file = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
-          await animalsApi.uploadImage(animalId, file, true);
-        } catch {
+      const uploadPendingLocalPhotos = async (animalId: number) => {
+        const pending = form.photos.filter((p) => p.localFile && p.id == null);
+        for (const photo of pending) {
+          if (!photo.localFile) continue;
+          await animalsApi.uploadImage(animalId, photo.localFile, photo.isPrimary);
         }
       };
 
@@ -291,7 +326,10 @@ export default function OrganizationAnimalsPage() {
         void meOrganizationApi
           .patchAnimal(editingAnimalId, buildAnimalApiBody())
           .then(async () => {
-            await uploadDataUrlIfNeeded(editingAnimalId);
+            await uploadPendingLocalPhotos(editingAnimalId);
+            if (form.photos.some((p) => p.localFile || p.isPending)) {
+              await meOrganizationApi.patchAnimal(editingAnimalId, buildAnimalApiBody());
+            }
             window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
             doneLocal();
           })
@@ -306,7 +344,12 @@ export default function OrganizationAnimalsPage() {
         .then(async (created) => {
           const row = created as { id?: unknown };
           const cid = typeof row?.id === "number" ? row.id : null;
-          if (cid != null) await uploadDataUrlIfNeeded(cid);
+          if (cid != null) {
+            await uploadPendingLocalPhotos(cid);
+            if (form.photos.length > 0) {
+              await meOrganizationApi.patchAnimal(cid, buildAnimalApiBody());
+            }
+          }
           window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
           doneLocal();
         })
@@ -325,34 +368,6 @@ export default function OrganizationAnimalsPage() {
     doneLocal();
   };
 
-  const handlePhotoSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const editing = editingAnimalId;
-    if (editing !== null && apiAnimalIds.has(editing)) {
-      void animalsApi
-        .uploadImage(editing, file, true)
-        .then(() => {
-          window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
-          window.dispatchEvent(new Event(getOrganizationAnimalsEventName()));
-        })
-        .catch(() => {})
-        .finally(() => {
-          event.target.value = "";
-        });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") return;
-      setForm((prev) => ({ ...prev, photoUrl: result }));
-    };
-    reader.readAsDataURL(file);
-  };
-
   const sortedAnimals = useMemo(
     () =>
       [...animals].sort((a, b) => {
@@ -368,21 +383,41 @@ export default function OrganizationAnimalsPage() {
   );
 
   const isArchiveView = statusFilter === "archive";
-  const listAnimals = isArchiveView ? archivedAnimals : activeAnimals;
+  const showAllWithArchive = statusFilter === "all";
 
-  const visibleAnimals = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    return listAnimals.filter((animal) => {
-      const bySearch =
-        !normalizedSearch ||
+  const matchesSearch = useCallback(
+    (animal: Animal) => {
+      const normalizedSearch = search.trim().toLowerCase();
+      if (!normalizedSearch) return true;
+      return (
         animal.name.toLowerCase().includes(normalizedSearch) ||
         (animal.breed || "").toLowerCase().includes(normalizedSearch) ||
-        (animal.organization_name || "").toLowerCase().includes(normalizedSearch);
+        (animal.organization_name || "").toLowerCase().includes(normalizedSearch)
+      );
+    },
+    [search]
+  );
 
-      const byStatus = isArchiveView || statusFilter === "all" || animal.status === statusFilter;
-      return bySearch && byStatus;
+  const visibleAnimals = useMemo(() => {
+    const archived = archivedAnimals.filter(matchesSearch);
+    if (isArchiveView) return archived;
+
+    const active = activeAnimals.filter((animal) => {
+      if (!matchesSearch(animal)) return false;
+      if (statusFilter === "all") return true;
+      return animal.status === statusFilter;
     });
-  }, [search, listAnimals, statusFilter, isArchiveView]);
+
+    if (showAllWithArchive) return [...active, ...archived];
+    return active;
+  }, [
+    activeAnimals,
+    archivedAnimals,
+    isArchiveView,
+    showAllWithArchive,
+    matchesSearch,
+    statusFilter,
+  ]);
 
   const statusLabel = (status: string) => {
     if (status === "archived") return "архив";
@@ -402,12 +437,14 @@ export default function OrganizationAnimalsPage() {
     const animal = animals.find((item) => item.id === animalId);
     if (!animal) return;
 
+    const age = splitAgeMonths(animal.age_months);
     setForm({
       name: animal.name || "",
       species: speciesForForm(animal.species, animal.sex),
       breed: animal.breed || "",
       sex: animal.sex === "female" ? "female" : "male",
-      ageMonths: animal.age_months || 0,
+      ageYears: age.years,
+      ageMonthsPart: age.months,
       city: animal.location_city || "",
       description: animal.full_description || "",
       healthFeatures: animal.health_features || "",
@@ -447,9 +484,11 @@ export default function OrganizationAnimalsPage() {
           ? animal.status
           : "looking_for_home",
       isUrgent: Boolean(animal.is_urgent),
-      photoUrl: animal.primary_photo_url || "",
+      photos: photosFromAnimal(animal),
     });
     setEditingAnimalId(animalId);
+    setAgeYearsFocused(false);
+    setAgeMonthsFocused(false);
     setSaveError(null);
     setCreateModalOpen(true);
     setOpenMenuId(null);
@@ -476,11 +515,65 @@ export default function OrganizationAnimalsPage() {
     reloadAnimals();
   };
 
-  const showAnimalCardMenu = (animalId: number) => {
-    if (isArchiveView) return false;
+  const showAnimalCardMenu = (animal: Animal) => {
+    if (isArchiveView || isArchivedAnimal(animal)) return false;
     if (useMeCabinet) return true;
-    return !apiAnimalIds.has(animalId);
+    return !apiAnimalIds.has(animal.id);
   };
+
+  const renderAnimalCard = (animal: Animal) => (
+    <article key={animal.id} className={styles.animalCard}>
+      <div className={styles.cover}>
+        <img src={animal.primary_photo_url || "/placeholder.jpg"} alt={animal.name} />
+        {animal.is_urgent && !isArchivedAnimal(animal) ? (
+          <span className={styles.urgentBadge}>срочно</span>
+        ) : null}
+        {isArchiveView || isArchivedAnimal(animal) ? (
+          <span className={`${styles.statusBadge} ${styles.archiveBadge}`}>архив</span>
+        ) : (
+          <span className={styles.statusBadge}>{statusLabel(animal.status)}</span>
+        )}
+      </div>
+      <div className={styles.animalBody}>
+        <div className={styles.cardActions}>
+          {showAnimalCardMenu(animal) ? (
+            <>
+              <button
+                className={styles.menuButton}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setOpenMenuId((prev) => (prev === animal.id ? null : animal.id));
+                }}
+              >
+                ⋮
+              </button>
+              {openMenuId === animal.id ? (
+                <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
+                  <button type="button" onClick={() => openEditModal(animal.id)}>
+                    Редактировать
+                  </button>
+                  <button type="button" onClick={() => handleDelete(animal.id)}>
+                    {useMeCabinet && apiAnimalIds.has(animal.id) ? "В архив" : "Удалить анкету"}
+                  </button>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+        <h3 className={styles.animalName}>{animal.name}</h3>
+        <div className={styles.tags}>
+          <span>{speciesForDisplay(animal.species, animal.sex)}</span>
+          <span>{animal.breed || "Метис"}</span>
+          <span>{formatAgeMonthsRu(animal.age_months)}</span>
+        </div>
+        <p className={styles.organizationLine}>{animal.organization_name || "Название организации"}</p>
+        <Link className={styles.moreButton} href={`/catalog/animals/${animal.id}`}>
+          Подробнее
+        </Link>
+      </div>
+    </article>
+  );
 
   return (
     <main className={styles.page}>
@@ -495,6 +588,8 @@ export default function OrganizationAnimalsPage() {
                 onClick={() => {
                   setEditingAnimalId(null);
                   setForm(initialForm);
+                  setAgeYearsFocused(false);
+                  setAgeMonthsFocused(false);
                   setSaveError(null);
                   setCreateModalOpen(true);
                 }}
@@ -556,8 +651,8 @@ export default function OrganizationAnimalsPage() {
           </div>
         </div>
 
-        {archivedLoading && isArchiveView ? (
-          <div className={styles.emptyState}>Загрузка архива…</div>
+        {archivedLoading && (isArchiveView || showAllWithArchive) && visibleAnimals.length === 0 ? (
+          <div className={styles.emptyState}>Загрузка…</div>
         ) : visibleAnimals.length === 0 ? (
           <div className={styles.emptyState}>
             {isArchiveView
@@ -567,61 +662,7 @@ export default function OrganizationAnimalsPage() {
               : "Пока нет добавленных животных."}
           </div>
         ) : (
-          <section className={styles.list}>
-            {visibleAnimals.map((animal) => (
-              <article key={animal.id} className={styles.animalCard}>
-                <div className={styles.cover}>
-                  <img src={animal.primary_photo_url || "/cat-placeholder.jpg"} alt={animal.name} />
-                  {animal.is_urgent && !isArchiveView ? (
-                    <span className={styles.urgentBadge}>срочно</span>
-                  ) : null}
-                  {isArchiveView || isArchivedAnimal(animal) ? (
-                    <span className={`${styles.statusBadge} ${styles.archiveBadge}`}>архив</span>
-                  ) : (
-                    <span className={styles.statusBadge}>{statusLabel(animal.status)}</span>
-                  )}
-                </div>
-                <div className={styles.animalBody}>
-                  <div className={styles.cardActions}>
-                    {showAnimalCardMenu(animal.id) ? (
-                      <>
-                        <button
-                          className={styles.menuButton}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setOpenMenuId((prev) => (prev === animal.id ? null : animal.id));
-                          }}
-                        >
-                          ⋮
-                        </button>
-                        {openMenuId === animal.id ? (
-                          <div className={styles.menuDropdown} onClick={(event) => event.stopPropagation()}>
-                            <button type="button" onClick={() => openEditModal(animal.id)}>
-                              Редактировать
-                            </button>
-                            <button type="button" onClick={() => handleDelete(animal.id)}>
-                              {useMeCabinet && apiAnimalIds.has(animal.id) ? "В архив" : "Удалить анкету"}
-                            </button>
-                          </div>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </div>
-                  <h3 className={styles.animalName}>{animal.name}</h3>
-                  <div className={styles.tags}>
-                    <span>{speciesForDisplay(animal.species, animal.sex)}</span>
-                    <span>{animal.breed || "Метис"}</span>
-                    <span>{formatAgeMonthsRu(animal.age_months)}</span>
-                  </div>
-                  <p className={styles.organizationLine}>{animal.organization_name || "Название организации"}</p>
-                  <Link className={styles.moreButton} href={`/catalog/animals/${animal.id}`}>
-                    Подробнее
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </section>
+          <section className={styles.list}>{visibleAnimals.map(renderAnimalCard)}</section>
         )}
       </div>
 
@@ -671,16 +712,53 @@ export default function OrganizationAnimalsPage() {
                     <option value="female">Девочка</option>
                   </select>
                 </label>
-                <label className={styles.label}>
-                  Возраст (в месяцах)
-                  <input
-                    className={styles.input}
-                    type="number"
-                    min={1}
-                    value={form.ageMonths}
-                    onChange={(e) => setForm((prev) => ({ ...prev, ageMonths: Number(e.target.value) }))}
-                  />
-                </label>
+                <div className={styles.label}>
+                  <span>Возраст</span>
+                  <div className={styles.ageInputs}>
+                    <label className={styles.ageInputBox}>
+                      <span className={styles.visuallyHidden}>Лет</span>
+                      <input
+                        className={styles.ageInput}
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={form.ageYears === 0 && ageYearsFocused ? "" : form.ageYears}
+                        onFocus={() => setAgeYearsFocused(true)}
+                        onBlur={() => setAgeYearsFocused(false)}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            ageYears: Math.max(0, Number(e.target.value) || 0),
+                          }))
+                        }
+                      />
+                      <span className={styles.ageUnit} aria-hidden>
+                        лет
+                      </span>
+                    </label>
+                    <label className={styles.ageInputBox}>
+                      <span className={styles.visuallyHidden}>Мес.</span>
+                      <input
+                        className={styles.ageInput}
+                        type="number"
+                        min={0}
+                        max={11}
+                        value={form.ageMonthsPart === 0 && ageMonthsFocused ? "" : form.ageMonthsPart}
+                        onFocus={() => setAgeMonthsFocused(true)}
+                        onBlur={() => setAgeMonthsFocused(false)}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            ageMonthsPart: Math.min(11, Math.max(0, Number(e.target.value) || 0)),
+                          }))
+                        }
+                      />
+                      <span className={styles.ageUnit} aria-hidden>
+                        мес.
+                      </span>
+                    </label>
+                  </div>
+                </div>
                 <label className={styles.label}>
                   Город
                   <input
@@ -706,11 +784,31 @@ export default function OrganizationAnimalsPage() {
                     <option value="in_shelter">В приюте</option>
                   </select>
                 </label>
-                <label className={styles.label}>
-                  Прикрепить фото
-                  <input className={styles.input} type="file" accept="image/*" onChange={handlePhotoSelect} />
+              </div>
+
+              <div className={styles.urgentRow}>
+                <span>Срочный случай</span>
+                <label className={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={form.isUrgent}
+                    onChange={(e) => setForm((prev) => ({ ...prev, isUrgent: e.target.checked }))}
+                  />
+                  <span className={styles.toggleSlider} />
                 </label>
               </div>
+
+              <AnimalPhotoPicker
+                photos={form.photos}
+                animalId={editingAnimalId}
+                canUseApi={Boolean(editingAnimalId && apiAnimalIds.has(editingAnimalId))}
+                onChange={(photos) => setForm((prev) => ({ ...prev, photos }))}
+                onError={(message) => setSaveError(message)}
+                onMutated={() => {
+                  window.dispatchEvent(new Event(getOrganizationCabinetEventName()));
+                  window.dispatchEvent(new Event(getOrganizationAnimalsEventName()));
+                }}
+              />
 
               <label className={styles.label}>
                 Краткая история / описание*
@@ -839,20 +937,19 @@ export default function OrganizationAnimalsPage() {
                 )}
               </fieldset>
 
-              <label className={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={form.isUrgent}
-                  onChange={(e) => setForm((prev) => ({ ...prev, isUrgent: e.target.checked }))}
-                />
-                Срочный случай
-              </label>
-
               <div className={styles.actions}>
                 <button type="submit" className={styles.primaryButton}>
                   {editingAnimalId ? "Сохранить" : "Создать"}
                 </button>
-                <button type="button" className={styles.secondaryButton} onClick={() => setForm(initialForm)}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => {
+                    setForm(initialForm);
+                    setAgeYearsFocused(false);
+                    setAgeMonthsFocused(false);
+                  }}
+                >
                   Очистить форму
                 </button>
               </div>

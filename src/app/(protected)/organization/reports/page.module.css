@@ -285,8 +285,36 @@
 }
 
 .textarea {
-  min-height: 140px;
+  min-height: 100px;
   resize: vertical;
+}
+
+.fileInput {
+  font-size: 14px;
+  font-family: inherit;
+  color: #333;
+}
+
+.fileHint {
+  font-size: 13px;
+  color: rgba(51, 51, 51, 0.6);
+  line-height: 1.4;
+}
+
+.fileLink {
+  color: #8b5a3c;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fileLink:hover {
+  color: #71472d;
+}
+
+.primaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .modalActions {

@@ -114,7 +114,7 @@ export function useUser() {
             if (apiAvatar) {
               localStorage.setItem("userAvatar", apiAvatar);
               setUserAvatar(apiAvatar);
-            } else {
+            } else if (storedRole !== "volunteer") {
               localStorage.removeItem("userAvatar");
               setUserAvatar(null);
             }

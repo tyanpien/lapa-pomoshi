@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import styles from "./page.module.css";
 import { knowledgeApi, KnowledgeItem } from "@/shared/api/endpoints/knowledge";
+import { ArticleFormattedContent } from "@/shared/ui/ArticleFormattedContent/ArticleFormattedContent";
+import { KnowledgeArticleCover } from "@/shared/ui/KnowledgeArticleCover/KnowledgeArticleCover";
 
 export default function ArticlePage() {
   const params = useParams();
@@ -58,9 +60,7 @@ export default function ArticlePage() {
           </div>
         </div>
 
-        <div className={styles.content}>
-          {article.content}
-        </div>
+        <ArticleFormattedContent text={article.content ?? ""} className={styles.content} />
 
         <Link href="/knowledge" className={styles.backLink}>
           ← Все статьи

@@ -19,14 +19,21 @@ import type { ChatThread } from "@/shared/lib/messages";
 import { dedupeCommsThreadsByOrganization } from "@/shared/lib/dedupeCommsThreads";
 import { fetchCommsDialogsAllPages } from "@/shared/lib/fetchCommsDialogsAllPages";
 import { mapVolDialogListRow } from "@/shared/lib/volunteerOrgDialogs";
+import { applyCityGeocodeToVolunteerPatch } from "@/shared/lib/geocodeCity";
+import {
+  resolveVolunteerMapCenter,
+  volunteerProfileNeedsCitySync,
+  volunteerProfileNeedsCoordsSync,
+} from "@/shared/lib/volunteerLocation";
 import {
   storedDetailsToVolunteerPatch,
   syncCompetencyLabelsWithCatalog,
   volunteerApiToStoredDetails,
 } from "@/shared/lib/volunteerMeProfileMap";
 import {
-  VOLUNTEER_PROFILE_UPDATED_EVENT,
+  notifyVolunteerProfileUpdated,
   emptyVolunteerDetails,
+  readVolunteerDetailsFromStorage,
   syncVolunteerCatalogUserId,
   volunteerProfileStorageIdentity,
   writeVolunteerDetailsToStorage,
@@ -281,6 +288,32 @@ export default function VolunteerProfilePage() {
         void syncVolunteerCatalogUserId(profileIdentity, { userId: prof.user.id }).then(({ listIsAvailable }) => {
           if (!cancelled && listIsAvailable !== null) setLiveListIsAvailable(listIsAvailable);
         });
+
+        {
+          const storedLocation = readVolunteerDetailsFromStorage(profileIdentity).location;
+          const locationText =
+            vp?.location_city?.trim() || storedLocation.trim();
+          if (vp && locationText) {
+            void resolveVolunteerMapCenter(vp, storedLocation).then(({ center, locationQuery, usedStoredText }) => {
+              if (cancelled || !center) return;
+              const cityToSave =
+                usedStoredText && storedLocation.trim() ? storedLocation.trim() : locationQuery;
+              const needsCoords = volunteerProfileNeedsCoordsSync(vp, center);
+              const needsCity = cityToSave ? volunteerProfileNeedsCitySync(vp, cityToSave) : false;
+              if (!needsCoords && !needsCity) return;
+              void meProfileApi
+                .patch({
+                  volunteer: {
+                    latitude: center[0],
+                    longitude: center[1],
+                    ...(needsCity && cityToSave ? { location_city: cityToSave } : {}),
+                  },
+                })
+                .then(() => notifyVolunteerProfileUpdated())
+                .catch(() => {});
+            });
+          }
+        }
       } catch (e) {
         if (!cancelled) {
           setProfileLoadError(e instanceof Error ? e.message : "Не удалось загрузить профиль");
@@ -312,7 +345,7 @@ export default function VolunteerProfilePage() {
       try {
         await meProfileApi.patch({ volunteer: { is_available: value } });
         await syncVolunteerCatalogUserId(profileIdentity, { userId: authUserId ?? undefined });
-        window.dispatchEvent(new Event(VOLUNTEER_PROFILE_UPDATED_EVENT));
+        notifyVolunteerProfileUpdated();
       } catch (e) {
         setAvailabilitySaveError(e instanceof Error ? e.message : "Не удалось сохранить статус");
       }
@@ -475,7 +508,7 @@ export default function VolunteerProfilePage() {
       const nextUrl = response.avatar_url ? getImageUrl(response.avatar_url) : null;
       setAvatarUrl(nextUrl);
       syncStoredUserAvatar(nextUrl);
-      window.dispatchEvent(new Event(VOLUNTEER_PROFILE_UPDATED_EVENT));
+      notifyVolunteerProfileUpdated();
     } catch {
       setAvatarUploadError("Не удалось загрузить фото. Допустимы JPG, PNG или WebP.");
     } finally {
@@ -519,10 +552,11 @@ export default function VolunteerProfilePage() {
     setSaveError(null);
     setIsSaving(true);
     try {
-      const volunteer = storedDetailsToVolunteerPatch(details, {
+      let volunteer = storedDetailsToVolunteerPatch(details, {
         competencyCatalog: competencyCatalogRows,
         experienceCatalog: experienceCatalogRows,
       });
+      volunteer = await applyCityGeocodeToVolunteerPatch(volunteer, details.location);
       const res = await meProfileApi.patch({ volunteer });
       if (res.volunteer_profile) {
         const mapped = volunteerApiToStoredDetails(res.volunteer_profile, experienceCatalogRows);
@@ -540,7 +574,7 @@ export default function VolunteerProfilePage() {
         setAuthUserId(res.user.id);
       }
       await syncVolunteerCatalogUserId(profileIdentity, { userId: res.user?.id ?? authUserId ?? undefined });
-      window.dispatchEvent(new Event(VOLUNTEER_PROFILE_UPDATED_EVENT));
+      notifyVolunteerProfileUpdated();
       editSnapshotRef.current = null;
       setEditModalOpen(false);
     } catch (e) {
@@ -1217,6 +1251,7 @@ function mapVolunteerCardToPreview(item: VolunteerResponseCardDto): ResponseCard
     descriptionSnippet: item.description_snippet?.trim() || "",
     descriptionFull: null,
     dateLabel: item.created_at ? formatDateRuShort(item.created_at) : "",
+    createdAt: item.created_at ?? null,
     status: mapSt(String(item.status ?? ""), item.status_label),
     urgent: Boolean(item.is_urgent),
   };

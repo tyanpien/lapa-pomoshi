@@ -1,27 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import type { KnowledgeItem } from "@/shared/api/endpoints/knowledge";
-import {
-  pickRelevantKnowledgeTips,
-  taskQualifiesForKnowledgeTips,
-  type TaskForKnowledgeTips,
-} from "@/shared/lib/volunteerTaskKnowledgeTips";
+import type { KnowledgeHintItem } from "@/shared/api/endpoints/knowledge";
 import styles from "./TaskKnowledgeTips.module.css";
 
+export type TaskWithKnowledgeHints = {
+  knowledge_hints?: KnowledgeHintItem[] | null;
+};
+
 type Props = {
-  task: TaskForKnowledgeTips;
-  tips: KnowledgeItem[];
+  task: TaskWithKnowledgeHints;
   className?: string;
 };
 
-export function TaskKnowledgeTips({ task, tips, className }: Props) {
-  if (!taskQualifiesForKnowledgeTips(task)) {
-    return null;
-  }
+export function TaskKnowledgeTips({ task, className }: Props) {
+  const tips = (task.knowledge_hints ?? []).filter(
+    (tip) => (tip.title ?? "").trim() && (tip.summary ?? "").trim(),
+  );
 
-  const relevant = pickRelevantKnowledgeTips(tips, task);
-  if (!relevant.length) {
+  if (!tips.length) {
     return null;
   }
 
@@ -32,7 +29,7 @@ export function TaskKnowledgeTips({ task, tips, className }: Props) {
         Полезно перед задачей
       </p>
       <ul className={styles.list}>
-        {relevant.map((tip) => (
+        {tips.map((tip) => (
           <li key={tip.id}>
             <Link href={`/knowledge/${tip.id}`} className={styles.link}>
               <span className={styles.linkTitle}>{tip.title}</span>
