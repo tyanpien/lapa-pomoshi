@@ -39,7 +39,17 @@ async function loadHomePageData(): Promise<{
   const settled = await withTimeout(
     Promise.allSettled([
       urgentApi.getList({ limit: 100 }),
-      animalsApi.getList({ is_urgent: true, limit: 100 }),
+    
+      animalsApi.getList({
+        is_urgent: true,
+        limit: 100,
+      }),
+    
+      animalsApi.getList({
+        status: "looking_for_home",
+        limit: 100,
+      }),
+    
       organizationsApi.getList(),
       eventsApi.getList(),
     ]),
@@ -62,7 +72,7 @@ async function loadHomePageData(): Promise<{
         )
     );
   
-    const urgentAnimals =
+      const urgentAnimals =
       settled[1].status === "fulfilled"
         ? (((settled[1].value as { items?: Animal[] }).items ?? []).filter(
             (a) =>
@@ -93,16 +103,19 @@ async function loadHomePageData(): Promise<{
     ]);
   }
 
-  const animals = settled[1].status === "fulfilled" ? ((settled[1].value as { items?: Animal[] }).items ?? []) : [];
+  const animals =
+  settled[2].status === "fulfilled"
+    ? ((settled[2].value as { items?: Animal[] }).items ?? [])
+    : [];
 
   const organizations =
-    settled[2].status === "fulfilled"
-      ? (((settled[2].value as { items?: Organization[] }).items ?? []) as Organization[])
+    settled[3].status === "fulfilled"
+      ? (((settled[3].value as { items?: Organization[] }).items ?? []) as Organization[])
       : [];
 
   const homeEvents =
-    settled[3].status === "fulfilled"
-      ? ((settled[3].value as { items?: EventItem[] }).items ?? []).slice(0, 3)
+    settled[4].status === "fulfilled"
+      ? ((settled[4].value as { items?: EventItem[] }).items ?? []).slice(0, 3)
       : [];
 
   return { urgentList, animals, organizations, homeEvents };
